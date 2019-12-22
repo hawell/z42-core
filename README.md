@@ -1,6 +1,6 @@
-[![Build Status](https://img.shields.io/travis/arvancloud/redins.svg)](https://travis-ci.org/arvancloud/redins)
-[![Code Coverage](https://img.shields.io/codecov/c/github/arvancloud/redins.svg)](https://codecov.io/github/arvancloud/redins?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/arvancloud/redins)](https://goreportcard.com/report/arvancloud/redins)
+[![Build Status](https://img.shields.io/travis/hawell/redins.svg)](https://travis-ci.org/hawell/redins)
+[![Code Coverage](https://img.shields.io/codecov/c/github/hawell/redins.svg)](https://codecov.io/github/hawell/redins?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hawell/redins)](https://goreportcard.com/report/hawell/redins)
 
 # table of contents
 
