@@ -79,14 +79,21 @@ var config = HealthcheckConfig{
 	UpdateInterval:     600,
 	CheckInterval:      600,
 	RedisStatusServer: uperdis.RedisConfig{
-		Ip:             "redis",
-		Port:           6379,
-		DB:             0,
-		Password:       "",
-		Prefix:         "healthcheck_",
-		Suffix:         "_healthcheck",
-		ConnectTimeout: 0,
-		ReadTimeout:    0,
+		Address:  "redis:6379",
+		Net:      "tcp",
+		DB:       0,
+		Password: "",
+		Prefix:   "healthcheck_",
+		Suffix:   "_healthcheck",
+		Connection: uperdis.RedisConnectionConfig{
+			MaxIdleConnections:   10,
+			MaxActiveConnections: 10,
+			ConnectTimeout:       500,
+			ReadTimeout:          500,
+			IdleKeepAlive:        30,
+			MaxKeepAlive:         0,
+			WaitForConnection:    true,
+		},
 	},
 	Log: logger.LogConfig{
 		Enable: true,
@@ -95,19 +102,26 @@ var config = HealthcheckConfig{
 }
 
 var configRedisConf = uperdis.RedisConfig{
-	Ip:             "redis",
-	Port:           6379,
-	DB:             0,
-	Password:       "",
-	Prefix:         "hcconfig_",
-	Suffix:         "_hcconfig",
-	ConnectTimeout: 0,
-	ReadTimeout:    0,
+	Address:  "redis:6379",
+	Net:      "tcp",
+	DB:       0,
+	Password: "",
+	Prefix:   "hcconfig_",
+	Suffix:   "_hcconfig",
+	Connection: uperdis.RedisConnectionConfig{
+		MaxIdleConnections:   10,
+		MaxActiveConnections: 10,
+		ConnectTimeout:       500,
+		ReadTimeout:          500,
+		IdleKeepAlive:        30,
+		MaxKeepAlive:         0,
+		WaitForConnection:    true,
+	},
 }
 
 func TestGet(t *testing.T) {
 	log.Println("TestGet")
-	logger.Default = logger.NewLogger(&logger.LogConfig{})
+	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	configRedis := uperdis.NewRedis(&configRedisConf)
 	h := NewHealthcheck(&config, configRedis)
 
@@ -131,7 +145,7 @@ func TestGet(t *testing.T) {
 
 func TestFilter(t *testing.T) {
 	log.Println("TestFilter")
-	logger.Default = logger.NewLogger(&logger.LogConfig{})
+	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	configRedis := uperdis.NewRedis(&configRedisConf)
 	h := NewHealthcheck(&config, configRedis)
 
@@ -267,7 +281,7 @@ func TestFilter(t *testing.T) {
 
 func TestSet(t *testing.T) {
 	log.Println("TestSet")
-	logger.Default = logger.NewLogger(&logger.LogConfig{})
+	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	configRedis := uperdis.NewRedis(&configRedisConf)
 	h := NewHealthcheck(&config, configRedis)
 
@@ -294,7 +308,7 @@ func TestSet(t *testing.T) {
 
 func TestTransfer(t *testing.T) {
 	log.Printf("TestTransfer")
-	logger.Default = logger.NewLogger(&logger.LogConfig{})
+	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	configRedis := uperdis.NewRedis(&configRedisConf)
 	h := NewHealthcheck(&config, configRedis)
 
@@ -359,14 +373,12 @@ var healthcheckConfig = HealthcheckConfig{
 		TimeFormat: "2006-01-02 15:04:05",
 	},
 	RedisStatusServer: uperdis.RedisConfig{
-		Ip:             "redis",
-		Port:           6379,
-		DB:             0,
-		Password:       "",
-		Prefix:         "hcstattest_",
-		Suffix:         "_hcstattest",
-		ConnectTimeout: 0,
-		ReadTimeout:    0,
+		Address:  "redis:6379",
+		Net:      "tcp",
+		DB:       0,
+		Password: "",
+		Prefix:   "hcstattest_",
+		Suffix:   "_hcstattest",
 	},
 	CheckInterval:      1,
 	UpdateInterval:     200,
@@ -377,7 +389,7 @@ var healthcheckConfig = HealthcheckConfig{
 var hcConfig = `{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.google.com.","ns":"ns1.google.com.","refresh":44,"retry":55,"expire":66}}`
 var hcEntries = [][]string{
 	{"www",
-		`{"a":{"ttl":300, "health_check":{"enable":true,"protocol":"http","uri":"","port":80, "up_count": 3, "down_count": -3, "timeout":1000}, "records":[{"ip":"172.217.17.238"}]}}`,
+		`{"a":{"ttl":300, "health_check":{"enable":true,"protocol":"http","uri":"","port":80, "up_count": 3, "down_count": -3, "timeout":1000}, "records":[{"ip":"172.217.17.78"}]}}`,
 	},
 	{"ddd",
 		`{"a":{"ttl":300, "health_check":{"enable":true,"protocol":"http","uri":"/uri2","port":80, "up_count": 3, "down_count": -3, "timeout":1000}, "records":[{"ip":"3.3.3.3"}]}}`,
@@ -394,7 +406,7 @@ var hcEntries = [][]string{
 
 func TestHealthCheck(t *testing.T) {
 	log.Println("TestHealthCheck")
-	logger.Default = logger.NewLogger(&logger.LogConfig{Enable: true, Target: "stdout", Format: "text"})
+	logger.Default = logger.NewLogger(&logger.LogConfig{Enable: true, Target: "stdout", Format: "text"}, nil)
 
 	configRedis := uperdis.NewRedis(&configRedisConf)
 	hc := NewHealthcheck(&healthcheckConfig, configRedis)
@@ -407,8 +419,8 @@ func TestHealthCheck(t *testing.T) {
 	configRedis.Set("redins:zones:google.com.:config", hcConfig)
 
 	go hc.Start()
-	time.Sleep(10 * time.Second)
-	h1 := hc.getStatus("www.google.com.", net.ParseIP("172.217.17.238"))
+	time.Sleep(12 * time.Second)
+	h1 := hc.getStatus("www.google.com.", net.ParseIP("172.217.17.78"))
 	h2 := hc.getStatus("ddd.google.com.", net.ParseIP("3.3.3.3"))
 	/*
 		h3 := hc.getStatus("y.google.com.", net.ParseIP("4.2.2.4"))
@@ -439,14 +451,12 @@ func TestExpire(t *testing.T) {
 		UpdateInterval:     1,
 		CheckInterval:      600,
 		RedisStatusServer: uperdis.RedisConfig{
-			Ip:             "redis",
-			Port:           6379,
-			DB:             0,
-			Password:       "",
-			Prefix:         "healthcheck1_",
-			Suffix:         "_healthcheck1",
-			ConnectTimeout: 0,
-			ReadTimeout:    0,
+			Address:  "redis:6379",
+			Net:      "tcp",
+			DB:       0,
+			Password: "",
+			Prefix:   "healthcheck1_",
+			Suffix:   "_healthcheck1",
 		},
 		Log: logger.LogConfig{
 			Enable: true,
@@ -455,7 +465,7 @@ func TestExpire(t *testing.T) {
 	}
 
 	log.Printf("TestExpire")
-	logger.Default = logger.NewLogger(&logger.LogConfig{})
+	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	configRedis := uperdis.NewRedis(&configRedisConf)
 	h := NewHealthcheck(&config, configRedis)
 

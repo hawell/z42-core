@@ -2,8 +2,8 @@ package handler
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
+	"github.com/json-iterator/go"
 	"net"
 	"net/http"
 	"strings"
@@ -119,10 +119,10 @@ func httpCheck(url string, host string, timeout time.Duration) error {
 // FIXME: ping check is not working properly
 func pingCheck(ip string, timeout time.Duration) error {
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-	c.SetDeadline(time.Now().Add(timeout))
 	if err != nil {
 		return err
 	}
+	c.SetDeadline(time.Now().Add(timeout))
 	defer c.Close()
 
 	id := int(binary.BigEndian.Uint32(net.ParseIP(ip)))
@@ -160,13 +160,13 @@ func pingCheck(ip string, timeout time.Duration) error {
 }
 
 type HealthcheckConfig struct {
-	Enable             bool                `json:"enable,omitempty"`
-	MaxRequests        int                 `json:"max_requests,omitempty"`
-	MaxPendingRequests int                 `json:"max_pending_requests,omitempty"`
-	UpdateInterval     int                 `json:"update_interval,omitempty"`
-	CheckInterval      int                 `json:"check_interval,omitempty"`
-	RedisStatusServer  uperdis.RedisConfig `json:"redis,omitempty"`
-	Log                logger.LogConfig    `json:"log,omitempty"`
+	Enable             bool                `json:"enable"`
+	MaxRequests        int                 `json:"max_requests"`
+	MaxPendingRequests int                 `json:"max_pending_requests"`
+	UpdateInterval     int                 `json:"update_interval"`
+	CheckInterval      int                 `json:"check_interval"`
+	RedisStatusServer  uperdis.RedisConfig `json:"redis"`
+	Log                logger.LogConfig    `json:"log"`
 }
 
 func NewHealthcheck(config *HealthcheckConfig, redisConfigServer *uperdis.Redis) *Healthcheck {
@@ -187,7 +187,7 @@ func NewHealthcheck(config *HealthcheckConfig, redisConfigServer *uperdis.Redis)
 		for i := 0; i < config.MaxRequests; i++ {
 			h.dispatcher.AddWorker(HandleHealthCheck(h))
 		}
-		h.logger = logger.NewLogger(&config.Log)
+		h.logger = logger.NewLogger(&config.Log, nil)
 		h.quit = make(chan struct{}, 1)
 	}
 
@@ -240,7 +240,7 @@ func (h *Healthcheck) loadItem(key string) *HealthCheckItem {
 		logger.Default.Errorf("cannot load item %s : %s", key, err)
 		return nil
 	}
-	json.Unmarshal([]byte(itemStr), item)
+	jsoniter.Unmarshal([]byte(itemStr), item)
 	if item.DownCount > 0 {
 		item.DownCount = -item.DownCount
 	}
@@ -249,7 +249,7 @@ func (h *Healthcheck) loadItem(key string) *HealthCheckItem {
 
 func (h *Healthcheck) storeItem(item *HealthCheckItem) {
 	key := item.Host + ":" + item.Ip
-	itemStr, err := json.Marshal(item)
+	itemStr, err := jsoniter.Marshal(item)
 	if err != nil {
 		logger.Default.Errorf("cannot marshal item to json : %s", err)
 		return
@@ -265,7 +265,7 @@ func (h *Healthcheck) getDomainId(zone string) string {
 		logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
 	}
 	if len(val) > 0 {
-		err := json.Unmarshal([]byte(val), &cfg)
+		err := jsoniter.Unmarshal([]byte(val), &cfg)
 		if err != nil {
 			logger.Default.Errorf("cannot parse zone config : %s", err)
 		}
@@ -281,6 +281,7 @@ func (h *Healthcheck) Start() {
 
 	go h.Transfer()
 
+	ticker := time.NewTicker(h.checkInterval)
 	for {
 		itemKeys, err := h.redisStatusServer.GetKeys("redins:healthcheck:*")
 		if err != nil {
@@ -288,9 +289,10 @@ func (h *Healthcheck) Start() {
 		}
 		select {
 		case <-h.quit:
+			ticker.Stop()
 			h.quitWG.Done()
 			return
-		case <-time.After(h.checkInterval):
+		case <-ticker.C:
 			for i := range itemKeys {
 				itemKey := strings.TrimPrefix(itemKeys[i], "redins:healthcheck:")
 				item := h.loadItem(itemKey)
@@ -420,7 +422,7 @@ func (h *Healthcheck) Transfer() {
 						Enable:    false,
 					}
 					record.AAAA = record.A
-					err = json.Unmarshal([]byte(recordStr), record)
+					err = jsoniter.Unmarshal([]byte(recordStr), record)
 					if err != nil {
 						logger.Default.Errorf("cannot parse json : zone -> %s, location -> %s, %s -> %s", domain, subdomain, recordStr, err)
 						continue

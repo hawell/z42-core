@@ -2,7 +2,7 @@ package handler
 
 import (
 	"crypto"
-	"encoding/json"
+	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"net"
@@ -35,22 +35,6 @@ type ZoneKey struct {
 	KeyExpiration uint32
 }
 
-type ZoneConfig struct {
-	DomainId        string     `json:"domain_id,omitempty"`
-	SOA             *SOA_RRSet `json:"soa,omitempty"`
-	DnsSec          bool       `json:"dnssec,omitempty"`
-	CnameFlattening bool       `json:"cname_flattening,omitempty"`
-}
-
-type Zone struct {
-	Name          string
-	Config        ZoneConfig
-	Locations     map[string]struct{}
-	ZSK           *ZoneKey
-	KSK           *ZoneKey
-	DnsKeySig     dns.RR
-}
-
 type IP_RRSet struct {
 	FilterConfig      IpFilterConfig      `json:"filter,omitempty"`
 	HealthCheckConfig IpHealthCheckConfig `json:"health_check,omitempty"`
@@ -74,7 +58,7 @@ type _IP_RR struct {
 
 func (iprr *IP_RR) UnmarshalJSON(data []byte) error {
 	var _ip_rr _IP_RR
-	if err := json.Unmarshal(data, &_ip_rr); err != nil {
+	if err := jsoniter.Unmarshal(data, &_ip_rr); err != nil {
 		return err
 	}
 
