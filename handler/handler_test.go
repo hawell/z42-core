@@ -1908,6 +1908,14 @@ var testCases = []*TestCase{
 					test.A("ub1.zone.zon. 300 IN A 6.6.6.6"),
 				},
 			},
+			{
+				Qname: "zonee.zon.", Qtype: dns.TypeA,
+				Rcode: dns.RcodeNotAuth,
+			},
+			{
+				Qname: "azone.zon.", Qtype: dns.TypeA,
+				Rcode: dns.RcodeNotAuth,
+			},
 		},
 	},
 	{

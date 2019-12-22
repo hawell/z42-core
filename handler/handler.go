@@ -397,13 +397,12 @@ func (h *DnsRequestHandler) LogRequest(state *RequestContext, responseCode int) 
 	}
 }
 
-func reverseZone(zone string) string {
-	x := strings.Split(zone, ".")
-	var y string
-	for i := len(x) - 1; i >= 0; i-- {
-		y += x[i] + "."
+func reverseZone(zone string) []byte {
+	runes := []rune("." + zone)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
 	}
-	return y
+	return []byte(string(runes))
 }
 
 func (h *DnsRequestHandler) LoadZones() {
@@ -415,7 +414,7 @@ func (h *DnsRequestHandler) LoadZones() {
 	}
 	newZones := iradix.New()
 	for _, zone := range zones {
-		newZones, _, _ = newZones.Insert([]byte(reverseZone(zone)), zone)
+		newZones, _, _ = newZones.Insert(reverseZone(zone), zone)
 	}
 	h.Zones = newZones
 }
@@ -595,7 +594,7 @@ func split255(s string) []string {
 
 func (h *DnsRequestHandler) FindZone(qname string) string {
 	rname := reverseZone(qname)
-	if _, zname, ok := h.Zones.Root().LongestPrefix([]byte(rname)); ok {
+	if _, zname, ok := h.Zones.Root().LongestPrefix(rname); ok {
 		return zname.(string)
 	}
 	return ""
