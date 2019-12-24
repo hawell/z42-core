@@ -1180,7 +1180,7 @@ var testCases = []*TestCase{
 				resp.Extra = nil
 
 				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(err)
+					fmt.Println(i, err)
 					t.Fail()
 				}
 			}
@@ -1416,7 +1416,7 @@ var testCases = []*TestCase{
 				resp := w.Msg
 
 				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(err)
+					fmt.Println(1, err)
 					t.Fail()
 				}
 			}
@@ -1431,7 +1431,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 5 {
-					fmt.Println("expected 5 results ", len(resp.Answer), " received")
+					fmt.Println("2 expected 5 results ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1450,9 +1450,9 @@ var testCases = []*TestCase{
 					w20++
 				}
 			}
-			// fmtPrintln(w1, w2, w4, w10, w20)
+			// fmt.Println(w1, w2, w4, w10, w20)
 			if w1 > w2 || w2 > w4 || w4 > w10 || w10 > w20 {
-				fmt.Println("bad ip weight balance")
+				fmt.Println("3 bad ip weight balance")
 				t.Fail()
 			}
 
@@ -1466,7 +1466,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 5 {
-					fmt.Println("expected 5 results ", len(resp.Answer), " received")
+					fmt.Println("4 expected 5 results ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1488,7 +1488,7 @@ var testCases = []*TestCase{
 			// fmt.Println(rr)
 			for i := range rr {
 				if rr[i] < 1500 || rr[i] > 2500 {
-					fmt.Println("bad ip weight balance")
+					fmt.Println("5 bad ip weight balance")
 					t.Fail()
 				}
 			}
@@ -1575,7 +1575,7 @@ var testCases = []*TestCase{
 				resp := w.Msg
 
 				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(err)
+					fmt.Println(1, err)
 					t.Fail()
 				}
 			}
@@ -1590,7 +1590,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 1 {
-					fmt.Println("expected 1 answer ", len(resp.Answer), " received")
+					fmt.Println("2 expected 1 answer ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1611,7 +1611,7 @@ var testCases = []*TestCase{
 			}
 			// fmt.Println(w1, w2, w4, w10, w20)
 			if w1 > w2 || w2 > w4 || w4 > w10 || w10 > w20 {
-				fmt.Println("bad ip weight balance")
+				fmt.Println("3 bad ip weight balance")
 				t.Fail()
 			}
 
@@ -1625,7 +1625,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 1 {
-					fmt.Println("expected 1 answer ", len(resp.Answer), " received")
+					fmt.Println("4 expected 1 answer ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1647,7 +1647,7 @@ var testCases = []*TestCase{
 			// fmt.Println(rr)
 			for i := range rr {
 				if rr[i] < 1500 || rr[i] > 2500 {
-					fmt.Println("bad ip weight balance")
+					fmt.Println("5 bad ip weight balance")
 					t.Fail()
 				}
 			}

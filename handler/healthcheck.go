@@ -348,17 +348,17 @@ func statusUp(item *HealthCheckItem) {
 	}
 }
 
-func (h *Healthcheck) FilterHealthcheck(qname string, rrset *IP_RRSet) []IP_RR {
-	var newIps []IP_RR
+func (h *Healthcheck) FilterHealthcheck(qname string, rrset *IP_RRSet, mask []int) []int {
 	if !h.Enable {
-		newIps = append(newIps, rrset.Data...)
-		return newIps
+		return mask
 	}
 	min := rrset.HealthCheckConfig.DownCount
-	for _, ip := range rrset.Data {
-		status := h.getStatus(qname, ip.Ip)
-		if status > min {
-			min = status
+	for i, x := range mask {
+		if x == IpMaskWhite {
+			status := h.getStatus(qname, rrset.Data[i].Ip)
+			if status > min {
+				min = status
+			}
 		}
 	}
 	logger.Default.Debugf("min = %d", min)
@@ -366,14 +366,17 @@ func (h *Healthcheck) FilterHealthcheck(qname string, rrset *IP_RRSet) []IP_RR {
 		min = rrset.HealthCheckConfig.DownCount + 1
 	}
 	logger.Default.Debugf("min = %d", min)
-	for _, ip := range rrset.Data {
-		logger.Default.Debug("qname: ", ip.Ip.String(), " status: ", h.getStatus(qname, ip.Ip))
-		if h.getStatus(qname, ip.Ip) < min {
-			continue
+	for i, x := range mask {
+		if x == IpMaskWhite {
+			logger.Default.Debug("qname: ", rrset.Data[i].Ip.String(), " status: ", h.getStatus(qname, rrset.Data[i].Ip))
+			if h.getStatus(qname, rrset.Data[i].Ip) < min {
+				mask[i] = IpMaskBlack
+			}
+		} else {
+			mask[i] = IpMaskBlack
 		}
-		newIps = append(newIps, ip)
 	}
-	return newIps
+	return mask
 }
 
 func (h *Healthcheck) Transfer() {

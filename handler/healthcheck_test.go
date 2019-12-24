@@ -269,9 +269,16 @@ func TestFilter(t *testing.T) {
 	}
 	for i := range w {
 		log.Println("[DEBUG]", w[i])
-		ips := h.FilterHealthcheck("w"+strconv.Itoa(i)+".healthcheck.com.", &w[i].A)
+		mask := make([]int, len(w[i].A.Data))
+		mask = h.FilterHealthcheck("w"+strconv.Itoa(i)+".healthcheck.com.", &w[i].A, mask)
 		log.Println("[DEBUG]", w[i])
-		if len(ips) != filterResult[i] {
+		count := 0
+		for _, x := range mask {
+			if x == IpMaskWhite {
+				count++
+			}
+		}
+		if count != filterResult[i] {
 			t.Fail()
 		}
 	}

@@ -39,127 +39,155 @@ func NewGeoIp(config *GeoIpConfig) *GeoIp {
 	return g
 }
 
-func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR) []IP_RR {
+func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	if !g.Enable || g.CountryDB == nil {
-		return ips
+		return mask
 	}
 	_, _, sourceCountry, err := g.GetGeoLocation(sourceIp)
 	if err != nil {
 		logger.Default.Error("getSameCountry failed")
-		return ips
+		return mask
 	}
 
-	var result []IP_RR
+	passed := 0
 	if sourceCountry != "" {
-		for _, ip := range ips {
-			for _, country := range ip.Country {
-				if country == sourceCountry {
-					result = append(result, ip)
-					break
+		outer:
+		for i, x := range mask {
+			if x == IpMaskWhite {
+				for _, country := range ips[i].Country {
+					if country == sourceCountry {
+						passed++
+						continue outer
+					}
+				}
+				mask[i] = IpMaskGrey
+			} else {
+				mask[i] = IpMaskBlack
+			}
+		}
+	}
+	if passed > 0 {
+		return mask
+	}
+
+	for i, x := range mask {
+		if x != IpMaskBlack {
+			if ips[i].Country == nil || len(ips[i].Country) == 0 {
+				mask[i] = IpMaskWhite
+			} else {
+				mask[i] = IpMaskBlack
+				for _, country := range ips[i].Country {
+					if country == "" {
+						mask[i] = IpMaskWhite
+						break
+					}
 				}
 			}
 		}
 	}
-	if len(result) > 0 {
-		return result
-	}
 
-	for _, ip := range ips {
-		if ip.Country == nil || len(ip.Country) == 0 {
-			result = append(result, ip)
-		} else {
-			for _, country := range ip.Country {
-				if country == "" {
-					result = append(result, ip)
-					break
-				}
-			}
-		}
-	}
-	if len(result) > 0 {
-		return result
-	}
-
-	return ips
+	return mask
 }
 
-func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []IP_RR) []IP_RR {
+func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	if !g.Enable || g.ASNDB == nil {
-		return ips
+		return mask
 	}
 	sourceASN, err := g.GetASN(sourceIp)
 	if err != nil {
 		logger.Default.Error("getSameASN failed")
-		return ips
+		return mask
 	}
 
-	var result []IP_RR
+	passed := 0
 	if sourceASN != 0 {
-		for _, ip := range ips {
-			for _, asn := range ip.ASN {
-				if asn == sourceASN {
-					result = append(result, ip)
-					break
+		outer:
+		for i, x := range mask {
+			if x == IpMaskWhite {
+				for _, asn := range ips[i].ASN {
+					if asn == sourceASN {
+						passed++
+						continue outer
+					}
+				}
+				mask[i] = IpMaskGrey
+			} else {
+				mask[i] = IpMaskBlack
+			}
+		}
+	}
+	if passed > 0 {
+		return mask
+	}
+
+	for i, x := range mask {
+		if x != IpMaskBlack {
+			if ips[i].ASN == nil || len(ips[i].ASN) == 0 {
+				mask[i] = IpMaskWhite
+			} else {
+				mask[i] = IpMaskBlack
+				for _, asn := range ips[i].ASN {
+					if asn == 0 {
+						mask[i] = IpMaskWhite
+						break
+					}
 				}
 			}
 		}
 	}
-	if len(result) > 0 {
-		return result
-	}
 
-	for _, ip := range ips {
-		if ip.ASN == nil || len(ip.ASN) == 0 {
-			result = append(result, ip)
-		} else {
-			for _, asn := range ip.ASN {
-				if asn == 0 {
-					result = append(result, ip)
-					break
-				}
-			}
-		}
-	}
-	if len(result) > 0 {
-		return result
-	}
-
-	return ips
+	return mask
 }
 
-func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []IP_RR) []IP_RR {
+// TODO: add a margin for minimum distance
+func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	if !g.Enable || g.CountryDB == nil {
-		return ips
+		return mask
 	}
 	minDistance := 1000.0
-	var dists []float64
-	var result []IP_RR
+	dists := make([]float64, 0, len(mask))
 	slat, slong, _, err := g.GetGeoLocation(sourceIp)
 	if err != nil {
 		logger.Default.Error("getMinimumDistance failed")
-		return ips
+		return mask
 	}
-	for _, ip := range ips {
-		destinationIp := ip.Ip
-		dlat, dlong, _, _ := g.GetGeoLocation(destinationIp)
-		d, err := g.getDistance(slat, slong, dlat, dlong)
-		if err != nil {
-			d = 1000.0
-		}
-		if d < minDistance {
-			minDistance = d
-		}
-		dists = append(dists, d)
-	}
-	for i, ip := range ips {
-		if dists[i] == minDistance {
-			result = append(result, ip)
+	for i, x := range mask {
+		if x == IpMaskWhite {
+			destinationIp := ips[i].Ip
+			dlat, dlong, _, _ := g.GetGeoLocation(destinationIp)
+			d, err := g.getDistance(slat, slong, dlat, dlong)
+			if err != nil {
+				d = 1000.0
+			}
+			if d < minDistance {
+				minDistance = d
+			}
+			dists = append(dists, d)
 		}
 	}
-	if len(result) > 0 {
-		return result
+
+	passed := 0
+	for i, x := range mask {
+		if x == IpMaskWhite {
+			if dists[i] == minDistance {
+				passed++
+			} else {
+				mask[i] = IpMaskGrey
+			}
+		} else {
+			mask[i] = IpMaskBlack
+		}
 	}
-	return ips
+	if passed > 0 {
+		return mask
+	} else {
+		for i := range mask {
+			if mask[i] == IpMaskGrey {
+				mask[i] = IpMaskWhite
+			}
+		}
+		return mask
+	}
 }
 
 func (g *GeoIp) getDistance(slat, slong, dlat, dlong float64) (float64, error) {
