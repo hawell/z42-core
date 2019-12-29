@@ -8,7 +8,6 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
-	"math/rand"
 	"net"
 	"strings"
 	"sync"
@@ -53,7 +52,6 @@ type DnsRequestHandlerConfig struct {
 const (
 	RecordCacheSize   = 1000000
 	ZoneCacheSize     = 10000
-	CacheItemsToPrune = 100
 )
 
 func NewHandler(config *DnsRequestHandlerConfig) *DnsRequestHandler {
@@ -786,9 +784,8 @@ func (h *DnsRequestHandler) SetLocation(location string, z *Zone, val *Record) {
 func ChooseIp(ips []IP_RR, weighted bool) int {
 	sum := 0
 
-	rg := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	if !weighted {
-		return rg.Intn(len(ips))
+		return time.Now().Nanosecond() % len(ips)
 	}
 
 	for _, ip := range ips {
@@ -798,10 +795,10 @@ func ChooseIp(ips []IP_RR, weighted bool) int {
 
 	// all Ips have 0 weight, choosing a random one
 	if sum == 0 {
-		return rg.Intn(len(ips))
+		return time.Now().Nanosecond() % len(ips)
 	}
 
-	x := rg.Intn(sum)
+	x := time.Now().Nanosecond() % sum
 	for ; index < len(ips); index++ {
 		// skip Ips with 0 weight
 		x -= ips[index].Weight
