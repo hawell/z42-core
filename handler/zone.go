@@ -15,6 +15,7 @@ type Zone struct {
 	ZSK       *ZoneKey
 	KSK       *ZoneKey
 	DnsKeySig dns.RR
+	CacheTimeout int64
 }
 
 type ZoneConfig struct {

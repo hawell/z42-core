@@ -4,8 +4,8 @@ import (
 	"arvancloud/redins/handler/logformat"
 	"errors"
 	"fmt"
+	"github.com/dgraph-io/ristretto"
 	"github.com/json-iterator/go"
-	"github.com/karlseguin/ccache"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
 	"math/rand"
@@ -26,9 +26,9 @@ type DnsRequestHandler struct {
 	LastZoneUpdate time.Time
 	Redis          *uperdis.Redis
 	Logger         *logger.EventLogger
-	RecordCache    *ccache.Cache
+	RecordCache    *ristretto.Cache
 	RecordInflight *singleflight.Group
-	ZoneCache      *ccache.Cache
+	ZoneCache      *ristretto.Cache
 	ZoneInflight   *singleflight.Group
 	geoip          *GeoIp
 	healthcheck    *Healthcheck
@@ -97,9 +97,19 @@ func NewHandler(config *DnsRequestHandlerConfig) *DnsRequestHandler {
 
 	h.LoadZones()
 
-	h.RecordCache = ccache.New(ccache.Configure().MaxSize(RecordCacheSize).ItemsToPrune(CacheItemsToPrune))
+	h.RecordCache, _ = ristretto.NewCache(&ristretto.Config{
+		NumCounters: RecordCacheSize * 10,
+		MaxCost:     RecordCacheSize,
+		BufferItems: 64,
+		Metrics:     false,
+	})
 	h.RecordInflight = new(singleflight.Group)
-	h.ZoneCache = ccache.New(ccache.Configure().MaxSize(ZoneCacheSize).ItemsToPrune(CacheItemsToPrune))
+	h.ZoneCache, _ = ristretto.NewCache(&ristretto.Config{
+		NumCounters: ZoneCacheSize * 10,
+		MaxCost:     ZoneCacheSize,
+		BufferItems: 64,
+		Metrics:     false,
+	})
 	h.ZoneInflight = new(singleflight.Group)
 
 	go h.healthcheck.Start()
@@ -625,9 +635,13 @@ func (h *DnsRequestHandler) loadKey(pub string, priv string) *ZoneKey {
 }
 
 func (h *DnsRequestHandler) LoadZone(zone string) *Zone {
-	cachedZone := h.ZoneCache.Get(zone)
-	if cachedZone != nil && !cachedZone.Expired() {
-		return cachedZone.Value().(*Zone)
+	cachedZone, found := h.ZoneCache.Get(zone)
+	var z *Zone = nil
+	if found && cachedZone != nil {
+		z = cachedZone.(*Zone)
+		if time.Now().Unix() <= z.CacheTimeout {
+			return z
+		}
 	}
 
 	answer, _, _ := h.ZoneInflight.Do(zone, func() (interface{}, error) {
@@ -643,16 +657,15 @@ func (h *DnsRequestHandler) LoadZone(zone string) *Zone {
 
 		z := NewZone(zone, locations, config)
 		h.LoadZoneKeys(z)
+		z.CacheTimeout = time.Now().Unix() + int64(h.Config.CacheTimeout)
 
-		h.ZoneCache.Set(zone, z, time.Duration(h.Config.CacheTimeout)*time.Second)
+		h.ZoneCache.Set(zone, z, 1)
 		return z, nil
 	})
 	if answer != nil {
 		return answer.(*Zone)
-	} else if cachedZone != nil {
-		return cachedZone.Value().(*Zone)
 	}
-	return nil
+	return z
 }
 
 func (h *DnsRequestHandler) LoadZoneKeys(z *Zone) {
@@ -686,10 +699,13 @@ func (h *DnsRequestHandler) LoadZoneKeys(z *Zone) {
 
 func (h *DnsRequestHandler) LoadLocation(location string, z *Zone) *Record {
 	key := location + "." + z.Name
-	cachedRecord := h.RecordCache.Get(key)
-	if cachedRecord != nil && !cachedRecord.Expired() {
-		logger.Default.Debug("cached")
-		return cachedRecord.Value().(*Record)
+	var r *Record = nil
+	cachedRecord, found := h.RecordCache.Get(key)
+	if found && cachedRecord != nil {
+		r = cachedRecord.(*Record)
+		if time.Now().Unix() <= r.CacheTimeout {
+			return r
+		}
 	}
 
 	answer, _, _ := h.RecordInflight.Do(key, func() (interface{}, error) {
@@ -719,7 +735,7 @@ func (h *DnsRequestHandler) LoadLocation(location string, z *Zone) *Record {
 		if _, ok := z.Locations[label]; !ok {
 			// implicit root location
 			if label == "@" {
-				h.RecordCache.Set(key, r, time.Duration(h.Config.CacheTimeout)*time.Second)
+				h.RecordCache.Set(key, r, 1)
 				return r, nil
 			}
 			err := errors.New(fmt.Sprintf("location %s not exists in %s", label, z.Name))
@@ -739,16 +755,15 @@ func (h *DnsRequestHandler) LoadLocation(location string, z *Zone) *Record {
 				return nil, err
 			}
 		}
-		h.RecordCache.Set(key, r, time.Duration(h.Config.CacheTimeout)*time.Second)
+		r.CacheTimeout = time.Now().Unix() + int64(h.Config.CacheTimeout)
+		h.RecordCache.Set(key, r, 1)
 		return r, nil
 	})
 
 	if answer != nil {
 		return answer.(*Record)
-	} else if cachedRecord != nil {
-		return cachedRecord.Value().(*Record)
 	}
-	return nil
+	return r
 }
 
 func (h *DnsRequestHandler) SetLocation(location string, z *Zone, val *Record) {
@@ -771,7 +786,7 @@ func (h *DnsRequestHandler) SetLocation(location string, z *Zone, val *Record) {
 func ChooseIp(ips []IP_RR, weighted bool) int {
 	sum := 0
 
-	rg := rand.New(rand.NewSource(time.Now().Unix()))
+	rg := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	if !weighted {
 		return rg.Intn(len(ips))
 	}
