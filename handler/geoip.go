@@ -200,7 +200,7 @@ func (g *GeoIp) getDistance(slat, slong, dlat, dlong float64) (float64, error) {
 		math.Cos(slat)*math.Cos(dlat)*math.Sin(deltaLong/2.0)*math.Sin(deltaLong/2.0)
 	c := 2.0 * math.Atan2(math.Sqrt(a), math.Sqrt(1.0-a))
 
-	logger.Default.Debugf("distance = %f", c)
+	// logger.Default.Debugf("distance = %f", c)
 
 	return c, nil
 }
@@ -218,13 +218,13 @@ func (g *GeoIp) GetGeoLocation(ip net.IP) (latitude float64, longitude float64, 
 			ISOCode string `maxminddb:"iso_code"`
 		} `maxminddb:"country"`
 	}
-	logger.Default.Debugf("ip : %s", ip)
+	// logger.Default.Debugf("ip : %s", ip)
 	if err := g.CountryDB.Lookup(ip, &record); err != nil {
 		logger.Default.Errorf("lookup failed : %s", err)
 		return 0, 0, "", err
 	}
 	_ = g.CountryDB.Decode(record.Location.LongitudeOffset, &longitude)
-	logger.Default.Debug("lat = ", record.Location.Latitude, " lang = ", longitude, " country = ", record.Country.ISOCode)
+	// logger.Default.Debug("lat = ", record.Location.Latitude, " lang = ", longitude, " country = ", record.Country.ISOCode)
 	return record.Location.Latitude, longitude, record.Country.ISOCode, nil
 }
 
@@ -237,6 +237,6 @@ func (g *GeoIp) GetASN(ip net.IP) (uint, error) {
 		logger.Default.Errorf("lookup failed : %s", err)
 		return 0, err
 	}
-	logger.Default.Debug("asn = ", record.AutonomousSystemNumber)
+	// logger.Default.Debug("asn = ", record.AutonomousSystemNumber)
 	return record.AutonomousSystemNumber, nil
 }

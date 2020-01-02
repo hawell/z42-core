@@ -113,7 +113,7 @@ func NewHandler(config *DnsRequestHandlerConfig) *DnsRequestHandler {
 	go h.healthcheck.Start()
 
 	go func() {
-		logger.Default.Debug("zone updater")
+		// logger.Default.Debug("zone updater")
 		h.quitWG.Add(1)
 		quit := make(chan *sync.WaitGroup, 1)
 		modified := false
@@ -132,12 +132,12 @@ func NewHandler(config *DnsRequestHandlerConfig) *DnsRequestHandler {
 			case <-h.quit:
 				reloadTicker.Stop()
 				forceReloadTicker.Stop()
-				logger.Default.Debug("zone updater stopped")
+				// logger.Default.Debug("zone updater stopped")
 				quit <- &h.quitWG
 				return
 			case <-reloadTicker.C:
 				if modified {
-					logger.Default.Debug("loading zones")
+					// logger.Default.Debug("loading zones")
 					h.LoadZones()
 					modified = false
 				}
@@ -151,12 +151,12 @@ func NewHandler(config *DnsRequestHandlerConfig) *DnsRequestHandler {
 }
 
 func (h *DnsRequestHandler) ShutDown() {
-	logger.Default.Debug("handler : stopping")
+	// logger.Default.Debug("handler : stopping")
 	h.healthcheck.ShutDown()
 	close(h.logQueue)
 	close(h.quit)
 	h.quitWG.Wait()
-	logger.Default.Debug("handler : stopped")
+	// logger.Default.Debug("handler : stopped")
 }
 
 func (h *DnsRequestHandler) Response(context *RequestContext, res int) {
@@ -165,7 +165,7 @@ func (h *DnsRequestHandler) Response(context *RequestContext, res int) {
 }
 
 func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
-	logger.Default.Debugf("[%d] start handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
+	// logger.Default.Debugf("[%d] start handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
 	if h.Config.LogSourceLocation {
 		sourceIP := context.SourceIp
 		_, _, sourceCountry, _ := h.geoip.GetGeoLocation(sourceIP)
@@ -179,7 +179,7 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 		h.Response(context, dns.RcodeNotAuth)
 		return
 	}
-	logger.Default.Debugf("[%d] zone name : %s", context.Req.Id, zoneName)
+	// logger.Default.Debugf("[%d] zone name : %s", context.Req.Id, zoneName)
 
 	zone := h.LoadZone(zoneName)
 	if zone == nil {
@@ -203,7 +203,7 @@ loop:
 		loopCount++
 
 		if h.FindZone(currentQName) != zoneName {
-			logger.Default.Debugf("[%d] out of zone - qname : %s, zone : %s", context.Req.Id, currentQName, zoneName)
+			// logger.Default.Debugf("[%d] out of zone - qname : %s, zone : %s", context.Req.Id, currentQName, zoneName)
 			res = dns.RcodeSuccess
 			break loop
 		}
@@ -211,7 +211,7 @@ loop:
 		location, match := zone.FindLocation(currentQName)
 		switch match {
 		case NoMatch:
-			logger.Default.Debugf("[%d] no location matched for %s in %s", context.Req.Id, currentQName, zoneName)
+			// logger.Default.Debugf("[%d] no location matched for %s in %s", context.Req.Id, currentQName, zoneName)
 			context.Authority = []dns.RR{zone.Config.SOA.Data}
 			res = dns.RcodeNameError
 			break loop
@@ -220,14 +220,14 @@ loop:
 			fallthrough
 
 		case ExactMatch:
-			logger.Default.Debugf("[%d] loading location %s", context.Req.Id, location)
+			// logger.Default.Debugf("[%d] loading location %s", context.Req.Id, location)
 			currentRecord = h.LoadLocation(location, zone)
 			if currentRecord == nil {
 				res = dns.RcodeServerFailure
 				break loop
 			}
 			if currentRecord.CNAME != nil && context.QType() != dns.TypeCNAME {
-				logger.Default.Debugf("[%d] cname chain %s -> %s", context.Req.Id, currentQName, currentRecord.CNAME.Host)
+				// logger.Default.Debugf("[%d] cname chain %s -> %s", context.Req.Id, currentQName, currentRecord.CNAME.Host)
 				if !zone.Config.CnameFlattening {
 					context.Answer = append(context.Answer, h.CNAME(currentQName, currentRecord)...)
 				} else if h.FindZone(currentRecord.CNAME.Host) != zoneName {
@@ -238,7 +238,7 @@ loop:
 				continue
 			}
 			if len(currentRecord.NS.Data) > 0 && currentQName != zone.Name {
-				logger.Default.Debugf("[%d] delegation", context.Req.Id)
+				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
 				context.Authority = append(context.Authority, h.NS(currentQName, currentRecord)...)
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := zone.FindLocation(ns.Host)
@@ -256,7 +256,7 @@ loop:
 				break loop
 			}
 
-			logger.Default.Debugf("[%d] final location : %s", context.Req.Id, currentQName)
+			// logger.Default.Debugf("[%d] final location : %s", context.Req.Id, currentQName)
 			if zone.Config.CnameFlattening {
 				currentQName = context.RawName()
 			}
@@ -338,7 +338,7 @@ loop:
 	}
 
 	h.Response(context, res)
-	logger.Default.Debugf("[%d] end handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
+	// logger.Default.Debugf("[%d] end handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
 }
 
 const (
@@ -834,7 +834,7 @@ func (h *DnsRequestHandler) FindCAA(record *Record) *Record {
 	currentRecord := record
 	currentLocation := strings.TrimSuffix(currentRecord.Name, "."+zone.Name)
 	for {
-		logger.Default.Debug("location : ", currentLocation)
+		// logger.Default.Debug("location : ", currentLocation)
 		if len(currentRecord.CAA.Data) != 0 {
 			return currentRecord
 		}
@@ -863,7 +863,7 @@ func (h *DnsRequestHandler) FindCAA(record *Record) *Record {
 }
 
 func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qtype uint16) ([]net.IP, int, uint32) {
-	logger.Default.Debug("finding aname")
+	// logger.Default.Debug("finding aname")
 	currentQName := aname
 	currentRecord := &Record{}
 	loopCount := 0
@@ -875,9 +875,9 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 		loopCount++
 
 		zoneName := h.FindZone(currentQName)
-		logger.Default.Debug("zone : ", zoneName, " qname : ", currentQName, " record : ", currentRecord.Name)
+		// logger.Default.Debug("zone : ", zoneName, " qname : ", currentQName, " record : ", currentRecord.Name)
 		if zoneName == "" {
-			logger.Default.Debug("non-authoritative zone, using upstream")
+			// logger.Default.Debug("non-authoritative zone, using upstream")
 			upstreamAnswers, upstreamRes := h.upstream.Query(currentQName, qtype)
 			if upstreamRes == dns.RcodeSuccess {
 				var ips []net.IP
@@ -904,12 +904,12 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 
 		zone := h.LoadZone(zoneName)
 		if zone == nil {
-			logger.Default.Debugf("error loading zone : %s", zoneName)
+			// logger.Default.Debugf("error loading zone : %s", zoneName)
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 		location, _ := zone.FindLocation(currentQName)
 		if location == "" {
-			logger.Default.Debugf("location not found for %s", currentQName)
+			// logger.Default.Debugf("location not found for %s", currentQName)
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 
@@ -918,21 +918,21 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 		if currentRecord.CNAME != nil {
-			logger.Default.Debug("cname")
+			// logger.Default.Debug("cname")
 			currentQName = currentRecord.CNAME.Host
 			continue
 		}
 
 		if qtype == dns.TypeA && len(currentRecord.A.Data) > 0 {
-			logger.Default.Debug("found a")
+			// logger.Default.Debug("found a")
 			return h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.A), dns.RcodeSuccess, currentRecord.A.Ttl
 		} else if qtype == dns.TypeAAAA && len(currentRecord.AAAA.Data) > 0 {
-			logger.Default.Debug("found aaaa")
+			// logger.Default.Debug("found aaaa")
 			return h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.AAAA), dns.RcodeSuccess, currentRecord.AAAA.Ttl
 		}
 
 		if currentRecord.ANAME != nil {
-			logger.Default.Debug("aname")
+			// logger.Default.Debug("aname")
 			currentQName = currentRecord.ANAME.Location
 			continue
 		}

@@ -55,7 +55,7 @@ type Healthcheck struct {
 func HandleHealthCheck(h *Healthcheck) workerpool.JobHandler {
 	return func(worker *workerpool.Worker, job workerpool.Job) {
 		item := job.(*HealthCheckItem)
-		logger.Default.Debugf("item %v received", item)
+		// logger.Default.Debugf("item %v received", item)
 		var err error
 		switch item.Protocol {
 		case "http", "https":
@@ -254,7 +254,7 @@ func (h *Healthcheck) storeItem(item *HealthCheckItem) {
 		logger.Default.Errorf("cannot marshal item to json : %s", err)
 		return
 	}
-	logger.Default.Debugf("setting %v in redis : %s", *item, string(itemStr))
+	// logger.Default.Debugf("setting %v in redis : %s", *item, string(itemStr))
 	h.redisStatusServer.Set("redins:healthcheck:"+key, string(itemStr))
 }
 
@@ -361,14 +361,14 @@ func (h *Healthcheck) FilterHealthcheck(qname string, rrset *IP_RRSet, mask []in
 			}
 		}
 	}
-	logger.Default.Debugf("min = %d", min)
+	// logger.Default.Debugf("min = %d", min)
 	if min < rrset.HealthCheckConfig.UpCount-1 && min > rrset.HealthCheckConfig.DownCount {
 		min = rrset.HealthCheckConfig.DownCount + 1
 	}
-	logger.Default.Debugf("min = %d", min)
+	// logger.Default.Debugf("min = %d", min)
 	for i, x := range mask {
 		if x == IpMaskWhite {
-			logger.Default.Debug("qname: ", rrset.Data[i].Ip.String(), " status: ", h.getStatus(qname, rrset.Data[i].Ip))
+			// logger.Default.Debug("qname: ", rrset.Data[i].Ip.String(), " status: ", h.getStatus(qname, rrset.Data[i].Ip))
 			if h.getStatus(qname, rrset.Data[i].Ip) < min {
 				mask[i] = IpMaskBlack
 			}
