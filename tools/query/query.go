@@ -53,7 +53,7 @@ func main() {
 		q := job.(query.Query)
 		count[worker.Id]++
 		//fmt.Println(q)
-		t.Act(q,clients[worker.Id])
+		t.Act(q, clients[worker.Id])
 	}
 	for i := 0; i < maxWorkers; i++ {
 		client := &dns.Client{
