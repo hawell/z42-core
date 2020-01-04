@@ -317,7 +317,6 @@ func Verify(configFile string) {
 		err := rd.Ping()
 		printResult(msg, err)
 		msg = fmt.Sprintf("checking notify-keyspace-events")
-		err = nil
 		var nkse string
 		nkse, err = rd.GetConfig("notify-keyspace-events")
 		if err == nil {
@@ -350,7 +349,6 @@ func Verify(configFile string) {
 		}
 		if config.Target == "udp" {
 			msg = fmt.Sprintf("checking udp target : %s", config.Target)
-			err = nil
 			var raddr *net.UDPAddr
 			raddr, err = net.ResolveUDPAddr("udp", config.Path)
 			if err == nil {
@@ -378,7 +376,6 @@ func Verify(configFile string) {
 		printResult(msg, err)
 
 		msg = fmt.Sprintf("checking time format : %s", config.TimeFormat)
-		err = nil
 		t1, _ := time.Parse(time.RFC3339, time.RFC3339)
 		timeStr := t1.Format(config.TimeFormat)
 		var t2 time.Time
@@ -393,7 +390,6 @@ func Verify(configFile string) {
 		if config.Kafka.Enable {
 			fmt.Println("checking kafka at ", config.Kafka.Brokers)
 			msg = fmt.Sprintf("checking kafka")
-			err = nil
 			cfg := sarama.NewConfig()
 			cfg.Producer.RequiredAcks = sarama.WaitForAll
 			cfg.Producer.Compression = sarama.CompressionNone
@@ -419,7 +415,6 @@ func Verify(configFile string) {
 		}
 		if config.Sentry.Enable {
 			msg = fmt.Sprintf("checking sentry at %s", config.Sentry.DSN)
-			err = nil
 			var client *raven.Client
 			client, err = raven.New(config.Sentry.DSN)
 			if err == nil {
@@ -463,7 +458,6 @@ func Verify(configFile string) {
 
 		address := server.Ip + ":" + strconv.Itoa(server.Port)
 		msg = fmt.Sprintf("checking whether %s://%s is available", server.Protocol, address)
-		err = nil
 		if server.Protocol == "udp" {
 			var ln net.PacketConn
 			ln, err = net.ListenPacket(server.Protocol, address)
@@ -484,7 +478,6 @@ func Verify(configFile string) {
 		checkAddress(upstream.Protocol, upstream.Ip, upstream.Port)
 		address := upstream.Ip + ":" + strconv.Itoa(upstream.Port)
 		msg = fmt.Sprintf("checking whether %s://%s is available", upstream.Protocol, address)
-		err = nil
 		client := &dns.Client{
 			Net:     upstream.Protocol,
 			Timeout: time.Duration(upstream.Timeout) * time.Millisecond,
