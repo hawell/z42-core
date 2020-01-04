@@ -63,7 +63,7 @@ func TestGeoIpAutomatic(t *testing.T) {
 	for i := range sip {
 		dest := new(IP_RRSet)
 		for j := range dip {
-			_, _, cc, _ := g.GetGeoLocation(net.ParseIP(dip[j][0]))
+			cc, _ := g.GetCountry(net.ParseIP(dip[j][0]))
 			if cc != dip[j][1] {
 				t.Fail()
 			}
@@ -267,7 +267,7 @@ func printCountryASN() {
 
 	for _, ip := range ips {
 		asn, _ := g.GetASN(net.ParseIP(ip))
-		_, _, c, _ := g.GetGeoLocation(net.ParseIP(ip))
+		c, _ := g.GetCountry(net.ParseIP(ip))
 		fmt.Println(ip, asn, c)
 	}
 }

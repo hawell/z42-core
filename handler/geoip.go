@@ -43,7 +43,7 @@ func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	if !g.Enable || g.CountryDB == nil {
 		return mask
 	}
-	_, _, sourceCountry, err := g.GetGeoLocation(sourceIp)
+	sourceCountry, err := g.GetCountry(sourceIp)
 	if err != nil {
 		logger.Default.Error("getSameCountry failed")
 		return mask
@@ -146,7 +146,7 @@ func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []IP_RR, mask []int) []i
 	}
 	minDistance := 1000.0
 	dists := make([]float64, 0, len(mask))
-	slat, slong, _, err := g.GetGeoLocation(sourceIp)
+	slat, slong, err := g.GetCoordinates(sourceIp)
 	if err != nil {
 		logger.Default.Error("getMinimumDistance failed")
 		return mask
@@ -154,7 +154,7 @@ func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []IP_RR, mask []int) []i
 	for i, x := range mask {
 		if x == IpMaskWhite {
 			destinationIp := ips[i].Ip
-			dlat, dlong, _, _ := g.GetGeoLocation(destinationIp)
+			dlat, dlong, _ := g.GetCoordinates(destinationIp)
 			d, err := g.getDistance(slat, slong, dlat, dlong)
 			if err != nil {
 				d = 1000.0
@@ -205,7 +205,7 @@ func (g *GeoIp) getDistance(slat, slong, dlat, dlong float64) (float64, error) {
 	return c, nil
 }
 
-func (g *GeoIp) GetGeoLocation(ip net.IP) (latitude float64, longitude float64, country string, err error) {
+func (g *GeoIp) GetCoordinates(ip net.IP) (latitude float64, longitude float64, err error) {
 	if !g.Enable || g.CountryDB == nil {
 		return
 	}
@@ -214,6 +214,22 @@ func (g *GeoIp) GetGeoLocation(ip net.IP) (latitude float64, longitude float64, 
 			Latitude        float64 `maxminddb:"latitude"`
 			LongitudeOffset uintptr `maxminddb:"longitude"`
 		} `maxminddb:"location"`
+	}
+
+	if err := g.CountryDB.Lookup(ip, &record); err != nil {
+		logger.Default.Errorf("lookup failed : %s", err)
+		return 0, 0, err
+	}
+	_ = g.CountryDB.Decode(record.Location.LongitudeOffset, &longitude)
+	// logger.Default.Debug("lat = ", record.Location.Latitude, " lang = ", longitude)
+	return record.Location.Latitude, longitude, nil
+}
+
+func (g *GeoIp) GetCountry(ip net.IP) (country string, err error) {
+	if !g.Enable || g.CountryDB == nil {
+		return
+	}
+	var record struct {
 		Country struct {
 			ISOCode string `maxminddb:"iso_code"`
 		} `maxminddb:"country"`
@@ -221,11 +237,10 @@ func (g *GeoIp) GetGeoLocation(ip net.IP) (latitude float64, longitude float64, 
 	// logger.Default.Debugf("ip : %s", ip)
 	if err := g.CountryDB.Lookup(ip, &record); err != nil {
 		logger.Default.Errorf("lookup failed : %s", err)
-		return 0, 0, "", err
+		return "", err
 	}
-	_ = g.CountryDB.Decode(record.Location.LongitudeOffset, &longitude)
-	// logger.Default.Debug("lat = ", record.Location.Latitude, " lang = ", longitude, " country = ", record.Country.ISOCode)
-	return record.Location.Latitude, longitude, record.Country.ISOCode, nil
+	// logger.Default.Debug(" country = ", record.Country.ISOCode)
+	return record.Country.ISOCode, nil
 }
 
 func (g *GeoIp) GetASN(ip net.IP) (uint, error) {

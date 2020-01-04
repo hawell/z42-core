@@ -168,7 +168,7 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 	// logger.Default.Debugf("[%d] start handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
 	if h.Config.LogSourceLocation {
 		sourceIP := context.SourceIp
-		_, _, sourceCountry, _ := h.geoip.GetGeoLocation(sourceIP)
+		sourceCountry, _ := h.geoip.GetCountry(sourceIP)
 		context.LogData["source_country"] = sourceCountry
 		sourceASN, _ := h.geoip.GetASN(sourceIP)
 		context.LogData["source_asn"] = sourceASN
