@@ -16,9 +16,9 @@ branches:
 before_install:
   - sudo systemctl restart redis-server
   - echo "127.0.0.1 redis" |  sudo tee -a /etc/hosts > /dev/null
-  - mkdir -p $GOPATH/src/hawell/
-  - ln -sf `pwd` $GOPATH/src/hawell/redins
-  - cd $GOPATH/src/hawell/redins
+  - mkdir -p $GOPATH/src/arvancloud/
+  - ln -sf `pwd` $GOPATH/src/arvancloud/redins
+  - cd $GOPATH/src/arvancloud/redins
 
 script:
   - go test -v -coverprofile=coverage.txt -covermode=atomic ./...
