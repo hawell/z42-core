@@ -10,8 +10,8 @@ import (
 
 type FileQueryGenerator struct {
 	queries []query.Query
-	count int
-	zipf *rand.Zipf
+	count   int
+	zipf    *rand.Zipf
 }
 
 func NewFileQueryGenerator(path string, count int) *FileQueryGenerator {
@@ -26,7 +26,7 @@ func NewFileQueryGenerator(path string, count int) *FileQueryGenerator {
 	for scanner.Scan() {
 		var q query.Query
 		line := scanner.Text()
-		if _, err := fmt.Sscanf(line,"%s%s", &q.QName, &q.QType); err != nil {
+		if _, err := fmt.Sscanf(line, "%s%s", &q.QName, &q.QType); err != nil {
 			fmt.Println(err)
 		}
 		// fmt.Println(q)
@@ -55,4 +55,3 @@ func (g *FileQueryGenerator) GetQuery() query.Query {
 	// fmt.Println(z)
 	return g.queries[z]
 }
-

@@ -1180,7 +1180,7 @@ var testCases = []*TestCase{
 				resp.Extra = nil
 
 				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(err)
+					fmt.Println(i, err)
 					t.Fail()
 				}
 			}
@@ -1416,7 +1416,7 @@ var testCases = []*TestCase{
 				resp := w.Msg
 
 				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(err)
+					fmt.Println(1, err)
 					t.Fail()
 				}
 			}
@@ -1431,7 +1431,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 5 {
-					fmt.Println("expected 5 results ", len(resp.Answer), " received")
+					fmt.Println("2 expected 5 results ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1450,9 +1450,9 @@ var testCases = []*TestCase{
 					w20++
 				}
 			}
-			// fmtPrintln(w1, w2, w4, w10, w20)
+			// fmt.Println(w1, w2, w4, w10, w20)
 			if w1 > w2 || w2 > w4 || w4 > w10 || w10 > w20 {
-				fmt.Println("bad ip weight balance")
+				fmt.Println("3 bad ip weight balance")
 				t.Fail()
 			}
 
@@ -1466,7 +1466,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 5 {
-					fmt.Println("expected 5 results ", len(resp.Answer), " received")
+					fmt.Println("4 expected 5 results ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1488,7 +1488,7 @@ var testCases = []*TestCase{
 			// fmt.Println(rr)
 			for i := range rr {
 				if rr[i] < 1500 || rr[i] > 2500 {
-					fmt.Println("bad ip weight balance")
+					fmt.Println("5 bad ip weight balance")
 					t.Fail()
 				}
 			}
@@ -1575,7 +1575,7 @@ var testCases = []*TestCase{
 				resp := w.Msg
 
 				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(err)
+					fmt.Println(1, err)
 					t.Fail()
 				}
 			}
@@ -1590,7 +1590,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 1 {
-					fmt.Println("expected 1 answer ", len(resp.Answer), " received")
+					fmt.Println("2 expected 1 answer ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1611,7 +1611,7 @@ var testCases = []*TestCase{
 			}
 			// fmt.Println(w1, w2, w4, w10, w20)
 			if w1 > w2 || w2 > w4 || w4 > w10 || w10 > w20 {
-				fmt.Println("bad ip weight balance")
+				fmt.Println("3 bad ip weight balance")
 				t.Fail()
 			}
 
@@ -1625,7 +1625,7 @@ var testCases = []*TestCase{
 
 				resp := w.Msg
 				if len(resp.Answer) != 1 {
-					fmt.Println("expected 1 answer ", len(resp.Answer), " received")
+					fmt.Println("4 expected 1 answer ", len(resp.Answer), " received")
 					t.Fail()
 				}
 
@@ -1647,7 +1647,7 @@ var testCases = []*TestCase{
 			// fmt.Println(rr)
 			for i := range rr {
 				if rr[i] < 1500 || rr[i] > 2500 {
-					fmt.Println("bad ip weight balance")
+					fmt.Println("5 bad ip weight balance")
 					t.Fail()
 				}
 			}
@@ -1907,6 +1907,14 @@ var testCases = []*TestCase{
 				Answer: []dns.RR{
 					test.A("ub1.zone.zon. 300 IN A 6.6.6.6"),
 				},
+			},
+			{
+				Qname: "zonee.zon.", Qtype: dns.TypeA,
+				Rcode: dns.RcodeNotAuth,
+			},
+			{
+				Qname: "azone.zon.", Qtype: dns.TypeA,
+				Rcode: dns.RcodeNotAuth,
 			},
 		},
 	},
@@ -2342,10 +2350,10 @@ var testCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "zone list update",
-		Description:    "test zone list update",
-		Enabled:        true,
-		Config:         defaultConfig,
+		Name:        "zone list update",
+		Description: "test zone list update",
+		Enabled:     true,
+		Config:      defaultConfig,
 		Initialize: func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
 			logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 			testCase.Config.ZoneReload = 1
@@ -2409,9 +2417,9 @@ var testCases = []*TestCase{
 				}
 			}
 		},
-		Zones:          []string{"zone1.zon.", "zone2.zon."},
-		ZoneConfigs:    []string{"", ""},
-		Entries:        [][][]string{
+		Zones:       []string{"zone1.zon.", "zone2.zon."},
+		ZoneConfigs: []string{"", ""},
+		Entries: [][][]string{
 			{
 				{"www",
 					`{"a":{"ttl":300, "records":[{"ip":"1.2.3.4"}]}}`,
@@ -2423,7 +2431,7 @@ var testCases = []*TestCase{
 				},
 			},
 		},
-		TestCases:      []test.Case{
+		TestCases: []test.Case{
 			{
 				Qname: "www.zone1.zon", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNotAuth,
@@ -2445,7 +2453,7 @@ var testCases = []*TestCase{
 		ApplyAndVerify: defaultApplyAndVerify,
 		Zones:          []string{"ουτοπία.δπθ.gr.", "ascii.com."},
 		ZoneConfigs:    []string{"", ""},
-		Entries:        [][][]string{
+		Entries: [][][]string{
 			{
 				{"@",
 					`{"a":{"ttl":300, "records":[{"ip":"1.2.3.4"}]}}`,
@@ -2466,7 +2474,7 @@ var testCases = []*TestCase{
 				},
 			},
 		},
-		TestCases:      []test.Case{
+		TestCases: []test.Case{
 			{
 				Qname: "ουτοπία.δπθ.gr.", Qtype: dns.TypeA,
 				Answer: []dns.RR{

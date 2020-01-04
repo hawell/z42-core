@@ -52,4 +52,3 @@ func (t *CompareTool) Act(q query.Query, client *dns.Client) {
 func (t *CompareTool) Result() {
 
 }
-

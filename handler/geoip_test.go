@@ -63,7 +63,7 @@ func TestGeoIpAutomatic(t *testing.T) {
 	for i := range sip {
 		dest := new(IP_RRSet)
 		for j := range dip {
-			_, _, cc, _ := g.GetGeoLocation(net.ParseIP(dip[j][0]))
+			cc, _ := g.GetCountry(net.ParseIP(dip[j][0]))
 			if cc != dip[j][1] {
 				t.Fail()
 			}
@@ -73,9 +73,17 @@ func TestGeoIpAutomatic(t *testing.T) {
 			dest.Data = append(dest.Data, r)
 		}
 		dest.Ttl = 100
-		ips := g.GetMinimumDistance(net.ParseIP(sip[i][0]), dest.Data)
-		log.Println("[DEBUG]", sip[i][0], " ", ips[0].Ip.String(), " ", len(ips))
-		if sip[i][2] != ips[0].Ip.String() {
+		mask := make([]int, len(dest.Data))
+		mask = g.GetMinimumDistance(net.ParseIP(sip[i][0]), dest.Data, mask)
+		index := 0
+		for j, x := range mask {
+			if x == IpMaskWhite {
+				index = j
+				break
+			}
+		}
+		log.Println("[DEBUG]", sip[i][0], " ", dest.Data[index].Ip.String())
+		if sip[i][2] != dest.Data[index].Ip.String() {
 			t.Fail()
 		}
 	}
@@ -104,12 +112,20 @@ func TestGetSameCountry(t *testing.T) {
 			{Ip: net.ParseIP("2.3.4.5"), Country: []string{"FR"}},
 			{Ip: net.ParseIP("3.4.5.6"), Country: []string{""}},
 		}
-		ips := g.GetSameCountry(net.ParseIP(sip[i][0]), dest.Data)
-		if len(ips) != 1 {
+		mask := make([]int, len(dest.Data))
+		mask = g.GetSameCountry(net.ParseIP(sip[i][0]), dest.Data, mask)
+		index := -1
+		for j, x := range mask {
+			if x == IpMaskWhite {
+				index = j
+				break
+			}
+		}
+		if index == -1 {
 			t.Fail()
 		}
-		log.Println("[DEBUG]", sip[i][1], sip[i][2], ips[0].Country, ips[0].Ip.String())
-		if ips[0].Country[0] != sip[i][1] || ips[0].Ip.String() != sip[i][2] {
+		log.Println("[DEBUG]", sip[i][1], sip[i][2], dest.Data[index].Country, dest.Data[index].Ip.String())
+		if dest.Data[index].Country[0] != sip[i][1] || dest.Data[index].Ip.String() != sip[i][2] {
 			t.Fail()
 		}
 	}
@@ -147,11 +163,19 @@ func TestGetSameASN(t *testing.T) {
 	g := NewGeoIp(&cfg)
 
 	for i := range sip {
-		ips := g.GetSameASN(net.ParseIP(sip[i]), dip.Data)
-		if len(ips) != 1 {
+		mask := make([]int, len(dip.Data))
+		mask = g.GetSameASN(net.ParseIP(sip[i]), dip.Data, mask)
+		index := -1
+		for j, x := range mask {
+			if x == IpMaskWhite {
+				index = j
+				break
+			}
+		}
+		if index == -1 {
 			t.Fail()
 		}
-		if strconv.Itoa(int(ips[0].ASN[0])) != res[i][0] || ips[0].Ip.String() != res[i][1] {
+		if strconv.Itoa(int(dip.Data[index].ASN[0])) != res[i][0] || dip.Data[index].Ip.String() != res[i][1] {
 			t.Fail()
 		}
 	}
@@ -243,7 +267,7 @@ func printCountryASN() {
 
 	for _, ip := range ips {
 		asn, _ := g.GetASN(net.ParseIP(ip))
-		_, _, c, _ := g.GetGeoLocation(net.ParseIP(ip))
+		c, _ := g.GetCountry(net.ParseIP(ip))
 		fmt.Println(ip, asn, c)
 	}
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"testing"
@@ -12,16 +13,26 @@ func TestWeight(t *testing.T) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
 	// distribution
-	ips := []IP_RR{
-		{Ip: net.ParseIP("1.2.3.4"), Weight: 4},
-		{Ip: net.ParseIP("2.3.4.5"), Weight: 1},
-		{Ip: net.ParseIP("3.4.5.6"), Weight: 5},
-		{Ip: net.ParseIP("4.5.6.7"), Weight: 10},
+	rrset := IP_RRSet{
+		FilterConfig: IpFilterConfig{
+			Count:     "single",
+			Order:     "weighted",
+			GeoFilter: "",
+		},
+		HealthCheckConfig: IpHealthCheckConfig{},
+		Ttl:               300,
+		Data: []IP_RR{
+			{Ip: net.ParseIP("1.2.3.4"), Weight: 4},
+			{Ip: net.ParseIP("2.3.4.5"), Weight: 1},
+			{Ip: net.ParseIP("3.4.5.6"), Weight: 5},
+			{Ip: net.ParseIP("4.5.6.7"), Weight: 10},
+		},
 	}
+	mask := make([]int, len(rrset.Data))
 	n := make([]int, 4)
 	for i := 0; i < 100000; i++ {
-		x := ChooseIp(ips, true)
-		switch ips[x].Ip.String() {
+		x := OrderIps(&rrset, mask)
+		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++
 		case "2.3.4.5":
@@ -33,17 +44,18 @@ func TestWeight(t *testing.T) {
 		}
 	}
 	if n[0] > n[2] || n[2] > n[3] || n[1] > n[0] {
+		fmt.Println(1, n)
 		t.Fail()
 	}
 
 	// all zero
-	for i := range ips {
-		ips[i].Weight = 0
+	for i := range rrset.Data {
+		rrset.Data[i].Weight = 0
 	}
 	n[0], n[1], n[2], n[3] = 0, 0, 0, 0
 	for i := 0; i < 100000; i++ {
-		x := ChooseIp(ips, true)
-		switch ips[x].Ip.String() {
+		x := OrderIps(&rrset, mask)
+		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++
 		case "2.3.4.5":
@@ -56,16 +68,17 @@ func TestWeight(t *testing.T) {
 	}
 	for i := 0; i < 4; i++ {
 		if n[i] < 2000 && n[i] > 3000 {
+			fmt.Println(2, n)
 			t.Fail()
 		}
 	}
 
 	// some zero
 	n[0], n[1], n[2], n[3] = 0, 0, 0, 0
-	ips[0].Weight, ips[1].Weight, ips[2].Weight, ips[3].Weight = 0, 5, 7, 0
+	rrset.Data[0].Weight, rrset.Data[1].Weight, rrset.Data[2].Weight, rrset.Data[3].Weight = 0, 5, 7, 0
 	for i := 0; i < 100000; i++ {
-		x := ChooseIp(ips, true)
-		switch ips[x].Ip.String() {
+		x := OrderIps(&rrset, mask)
+		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++
 		case "2.3.4.5":
@@ -78,15 +91,17 @@ func TestWeight(t *testing.T) {
 	}
 	log.Println(n)
 	if n[0] > 0 || n[3] > 0 {
+		fmt.Println(3, n)
 		t.Fail()
 	}
 
 	// weighted = false
 	n[0], n[1], n[2], n[3] = 0, 0, 0, 0
-	ips[0].Weight, ips[1].Weight, ips[2].Weight, ips[3].Weight = 0, 5, 7, 0
+	rrset.Data[0].Weight, rrset.Data[1].Weight, rrset.Data[2].Weight, rrset.Data[3].Weight = 0, 5, 7, 0
+	rrset.FilterConfig.Order = "rr"
 	for i := 0; i < 100000; i++ {
-		x := ChooseIp(ips, false)
-		switch ips[x].Ip.String() {
+		x := OrderIps(&rrset, mask)
+		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++
 		case "2.3.4.5":
@@ -100,6 +115,7 @@ func TestWeight(t *testing.T) {
 	log.Println(n)
 	for i := 0; i < 4; i++ {
 		if n[i] < 2000 && n[i] > 3000 {
+			fmt.Println(4, n)
 			t.Fail()
 		}
 	}
