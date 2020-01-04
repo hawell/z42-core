@@ -51,7 +51,7 @@ func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 
 	passed := 0
 	if sourceCountry != "" {
-		outer:
+	outer:
 		for i, x := range mask {
 			if x == IpMaskWhite {
 				for _, country := range ips[i].Country {
@@ -101,7 +101,7 @@ func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 
 	passed := 0
 	if sourceASN != 0 {
-		outer:
+	outer:
 		for i, x := range mask {
 			if x == IpMaskWhite {
 				for _, asn := range ips[i].ASN {

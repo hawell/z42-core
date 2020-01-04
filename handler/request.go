@@ -32,7 +32,7 @@ func NewRequestContext(w dns.ResponseWriter, r *dns.Msg) *RequestContext {
 		},
 		StartTime: time.Now(),
 		Auth:      true,
-		name: "",
+		name:      "",
 	}
 	context.SourceIp = context.sourceIp()
 	context.SourceSubnet = context.sourceSubnet()

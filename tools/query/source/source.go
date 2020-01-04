@@ -7,4 +7,3 @@ type QueryGenerator interface {
 	Count() int
 	GetQuery() query.Query
 }
-

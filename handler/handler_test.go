@@ -2350,10 +2350,10 @@ var testCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "zone list update",
-		Description:    "test zone list update",
-		Enabled:        true,
-		Config:         defaultConfig,
+		Name:        "zone list update",
+		Description: "test zone list update",
+		Enabled:     true,
+		Config:      defaultConfig,
 		Initialize: func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
 			logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 			testCase.Config.ZoneReload = 1
@@ -2417,9 +2417,9 @@ var testCases = []*TestCase{
 				}
 			}
 		},
-		Zones:          []string{"zone1.zon.", "zone2.zon."},
-		ZoneConfigs:    []string{"", ""},
-		Entries:        [][][]string{
+		Zones:       []string{"zone1.zon.", "zone2.zon."},
+		ZoneConfigs: []string{"", ""},
+		Entries: [][][]string{
 			{
 				{"www",
 					`{"a":{"ttl":300, "records":[{"ip":"1.2.3.4"}]}}`,
@@ -2431,7 +2431,7 @@ var testCases = []*TestCase{
 				},
 			},
 		},
-		TestCases:      []test.Case{
+		TestCases: []test.Case{
 			{
 				Qname: "www.zone1.zon", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNotAuth,
@@ -2453,7 +2453,7 @@ var testCases = []*TestCase{
 		ApplyAndVerify: defaultApplyAndVerify,
 		Zones:          []string{"ουτοπία.δπθ.gr.", "ascii.com."},
 		ZoneConfigs:    []string{"", ""},
-		Entries:        [][][]string{
+		Entries: [][][]string{
 			{
 				{"@",
 					`{"a":{"ttl":300, "records":[{"ip":"1.2.3.4"}]}}`,
@@ -2474,7 +2474,7 @@ var testCases = []*TestCase{
 				},
 			},
 		},
-		TestCases:      []test.Case{
+		TestCases: []test.Case{
 			{
 				Qname: "ουτοπία.δπθ.gr.", Qtype: dns.TypeA,
 				Answer: []dns.RR{

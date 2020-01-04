@@ -9,12 +9,12 @@ import (
 )
 
 type Zone struct {
-	Name      string
-	Config    ZoneConfig
-	Locations map[string]struct{}
-	ZSK       *ZoneKey
-	KSK       *ZoneKey
-	DnsKeySig dns.RR
+	Name         string
+	Config       ZoneConfig
+	Locations    map[string]struct{}
+	ZSK          *ZoneKey
+	KSK          *ZoneKey
+	DnsKeySig    dns.RR
 	CacheTimeout int64
 }
 

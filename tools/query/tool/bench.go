@@ -9,19 +9,19 @@ import (
 )
 
 type BenchTool struct {
-	count int
-	totalTime time.Duration
-	min time.Duration
-	max time.Duration
-	mean float64
-	stdev float64
+	count         int
+	totalTime     time.Duration
+	min           time.Duration
+	max           time.Duration
+	mean          float64
+	stdev         float64
 	serverAddress string
-	mutex sync.Mutex
+	mutex         sync.Mutex
 }
 
 func NewBenchTool(serverAddress string) *BenchTool {
 	return &BenchTool{
-		min:       1000,
+		min:           1000,
 		serverAddress: serverAddress,
 	}
 }
@@ -38,7 +38,7 @@ func (t *BenchTool) Act(q query.Query, client *dns.Client) {
 	prevMean := t.mean
 	t.count++
 	x := rtt.Seconds()
-	t.mean = t.mean + (x-t.mean) / float64(t.count)
+	t.mean = t.mean + (x-t.mean)/float64(t.count)
 	t.stdev = t.stdev + (x-t.mean)*(x-prevMean)
 	if rtt < t.min {
 		t.min = rtt

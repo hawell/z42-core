@@ -14,14 +14,14 @@ func TestWeight(t *testing.T) {
 
 	// distribution
 	rrset := IP_RRSet{
-		FilterConfig:      IpFilterConfig{
+		FilterConfig: IpFilterConfig{
 			Count:     "single",
 			Order:     "weighted",
 			GeoFilter: "",
 		},
 		HealthCheckConfig: IpHealthCheckConfig{},
 		Ttl:               300,
-		Data:              []IP_RR{
+		Data: []IP_RR{
 			{Ip: net.ParseIP("1.2.3.4"), Weight: 4},
 			{Ip: net.ParseIP("2.3.4.5"), Weight: 1},
 			{Ip: net.ParseIP("3.4.5.6"), Weight: 5},

@@ -7,8 +7,8 @@ import (
 
 type RedisDumpQueryGenerator struct {
 	redisAddress string
-	queries []query.Query
-	pos int
+	queries      []query.Query
+	pos          int
 }
 
 func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
@@ -70,4 +70,3 @@ func (g *RedisDumpQueryGenerator) GetQuery() query.Query {
 	g.pos++
 	return q
 }
-

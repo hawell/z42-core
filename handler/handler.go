@@ -50,8 +50,8 @@ type DnsRequestHandlerConfig struct {
 }
 
 const (
-	RecordCacheSize   = 1000000
-	ZoneCacheSize     = 10000
+	RecordCacheSize = 1000000
+	ZoneCacheSize   = 10000
 )
 
 func NewHandler(config *DnsRequestHandlerConfig) *DnsRequestHandler {
@@ -141,7 +141,7 @@ func NewHandler(config *DnsRequestHandlerConfig) *DnsRequestHandler {
 					h.LoadZones()
 					modified = false
 				}
-			case <- forceReloadTicker.C:
+			case <-forceReloadTicker.C:
 				modified = true
 			}
 		}
