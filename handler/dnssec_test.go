@@ -234,14 +234,8 @@ var dnssecTestCases = []test.Case{
 	{
 		Qname: "c1.dnssec_test.com.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-			test.CNAME("c1.dnssec_test.com.	300	IN	CNAME	c2.dnssec_test.com."),
-			test.RRSIG("c1.dnssec_test.com.	300	IN	RRSIG	CNAME 5 3 300 20180731105909 20180723075909 22548 dnssec_test.com. lvcR8ruQHs3qnQd+SZEr8LsTfIbcPQr7G6xHprp0vgcjstnb+0egDgJNJfJZHanwn3Ya/72Bqww3cDpIFV/8/kSVlSYz4cMb9hJR8Cq+ttFsRAFgSEA0cFxX4fG6WG85"),
-			test.CNAME("c2.dnssec_test.com.	300	IN	CNAME	c3.dnssec_test.com."),
-			test.RRSIG("c2.dnssec_test.com.	300	IN	RRSIG	CNAME 5 3 300 20180731105909 20180723075909 22548 dnssec_test.com. YNSfNKSz5LOhhoeGmZ77aLE/Z/QZEnkz5UD8g9fxalAkogVKR/bAEYcNkxMh5u5wjTH9/HnWMBLkK56FjmXIrI5KeY3paXWJ85QJJGeTAcwj/uLgF0Qq+nVCqldudmN+"),
-			test.CNAME("c3.dnssec_test.com.	300	IN	CNAME	a.dnssec_test.com."),
-			test.RRSIG("c3.dnssec_test.com.	300	IN	RRSIG	CNAME 5 3 300 20180731105909 20180723075909 22548 dnssec_test.com. FFE4WsYh2sAsYlewm1/1/GSo0oeFwJPt+35C2k/6nB+w+9/rBcRXwS8kfEvCuJS4GxcYV/vCLncQxNY5OI7Q5Vaxyo1OV+xWYY7OKTS7MBivUdlNvquMMkgIqZwqYdFl"),
-			test.A("a.dnssec_test.com.	300	IN	A	129.0.2.1"),
-			test.RRSIG("a.dnssec_test.com.	300	IN	RRSIG	A 5 3 300 20180731105909 20180723075909 22548 dnssec_test.com. fKHuZTJgweFmBmASxDiZYr8r300CtAmJ03ICKAHS8FkATjLvUyZxWqjI/fExZz277pZ0FMGRiwIb7o6aI31fpAahtU1E0Mo7J0sXjVATCBhME0S88DDuPXgrOMzu8f7K"),
+			test.A("c1.dnssec_test.com.	300	IN	A	129.0.2.1"),
+			test.RRSIG("c1.dnssec_test.com.	300	IN	RRSIG	A 5 3 300 20200210125610 20200202095610 22548 dnssec_test.com. jlann44kdNt5V84SxQRGTA3OjU6/SEZ/eakCu39C9FrtkaLyXxsmkO5cMqJ9XuO5WY2a6TJjtiF3JbM/daVJIfnL3Qx9IckAXt/dzJBr3ymM2dRvomhtMXtbs5ftfPXa"),
 		},
 		Do: true,
 		Extra: []dns.RR{
@@ -252,14 +246,8 @@ var dnssecTestCases = []test.Case{
 	{
 		Qname: "w.dnssec_test.com.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-			test.CNAME("w.a.dnssec_test.com.	300	IN	CNAME	w.b.dnssec_test.com."),
-			test.RRSIG("w.a.dnssec_test.com.	300	IN	RRSIG	CNAME 5 4 300 20180801064612 20180724034612 22548 dnssec_test.com. OZlpQZTJH6KjNJPDuB/YPQORgwRfPpGz5FR0AReqRizAJMOjPSNjcmzpjpFXi7N5Hg+x+15RD0pnE8yL6XXSrg5pNsQo7p9XJa/6H9AL9OGMgYcOJe5FRJwHN9XXGrVr"),
-			test.CNAME("w.b.dnssec_test.com.	300	IN	CNAME	w.c.dnssec_test.com."),
-			test.RRSIG("w.b.dnssec_test.com.	300	IN	RRSIG	CNAME 5 4 300 20180801064612 20180724034612 22548 dnssec_test.com. VMs35joPFxyRrWtz1gyGRKju9j6p7MrQihOwU8m7cmCKmNT/6e58qS3OYYnp6tH34IxJnf+DZGapL07pMwSe+JyaOpsSirTmmytKU6NRQoidijKa7QkMXtXpY1l70Fga"),
-			test.A("w.c.dnssec_test.com.	300	IN	A	129.0.2.1"),
-			test.RRSIG("w.c.dnssec_test.com.	300	IN	RRSIG	A 5 4 300 20180801064612 20180724034612 22548 dnssec_test.com. LrrMYhyADHnznyVFx/DKqpteVrRqqOIgkrWzpOO3AI8Mx1xTfNqy6xMi/ngZPRfUuLHqkp9dyYhJN1qHrRwu2rJw1P+X3n7oD3hDL982ppB3hYAWPzTcwYO0C5848AQD"),
-			test.CNAME("w.dnssec_test.com.	300	IN	CNAME	w.a.dnssec_test.com."),
-			test.RRSIG("w.dnssec_test.com.	300	IN	RRSIG	CNAME 5 3 300 20180801064612 20180724034612 22548 dnssec_test.com. fgaoAooAffMg2apxMqmQBKgVVTGx+PaOo7ik61DvsG9UP7EeBQ7K0bNGxYlcQHDv7aZdLwtTU5OpLk2UCbZPhVAr69Irdr0RYOc+/Jzgw0u+iWU2o0ERxUG9ICiB+Ix8"),
+			test.A("w.dnssec_test.com.	300	IN	A	129.0.2.1"),
+			test.RRSIG("w.dnssec_test.com.	300	IN	RRSIG	A 5 3 300 20200210125029 20200202095029 22548 dnssec_test.com. Cwan6/FCm94xVeZBI9VYRLtRfW6z8/hyRjTaK53HzuluFkR61/hVvOteS0daLHiusPoLppJGWleB8LeNSA7r0frQJXpcHOQyhRiV2M7nIo2MFf+H+WPZeyLCqbV+0XK/"),
 		},
 		Do: true,
 		Extra: []dns.RR{
@@ -397,13 +385,13 @@ func TestDNSSEC(t *testing.T) {
 				if rrsig, ok := rrs[e].(*dns.RRSIG); ok {
 					// fmt.Printf("s = %d, e = %d\n", s, e)
 					if tc.Qtype == dns.TypeDNSKEY {
-						if rrsig.Verify(ksk.(*dns.DNSKEY), rrs[s:e]) != nil {
-							fmt.Println("fail")
+						if err := rrsig.Verify(ksk.(*dns.DNSKEY), rrs[s:e]); err != nil {
+							fmt.Println(err, resp.Answer, tc.Answer)
 							t.Fail()
 						}
 					} else {
-						if rrsig.Verify(zsk.(*dns.DNSKEY), rrs[s:e]) != nil {
-							fmt.Println("fail")
+						if err := rrsig.Verify(zsk.(*dns.DNSKEY), rrs[s:e]); err != nil {
+							fmt.Println(err, resp.Answer, tc.Answer)
 							t.Fail()
 						}
 					}

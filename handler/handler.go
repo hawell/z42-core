@@ -188,6 +188,9 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 	}
 	context.LogData["domain_uuid"] = zone.Config.DomainId
 
+	dnssec := context.Do() && context.Auth && zone.Config.DnsSec
+	cnameFlattening := dnssec || zone.Config.CnameFlattening
+
 	loopCount := 0
 	currentQName := context.RawName()
 	currentRecord := &Record{}
@@ -228,7 +231,7 @@ loop:
 			}
 			if currentRecord.CNAME != nil && context.QType() != dns.TypeCNAME {
 				// logger.Default.Debugf("[%d] cname chain %s -> %s", context.Req.Id, currentQName, currentRecord.CNAME.Host)
-				if !zone.Config.CnameFlattening {
+				if !cnameFlattening {
 					context.Answer = append(context.Answer, h.CNAME(currentQName, currentRecord)...)
 				} else if h.FindZone(currentRecord.CNAME.Host) != zoneName {
 					context.Answer = append(context.Answer, h.CNAME(context.RawName(), currentRecord)...)
@@ -257,7 +260,7 @@ loop:
 			}
 
 			// logger.Default.Debugf("[%d] final location : %s", context.Req.Id, currentQName)
-			if zone.Config.CnameFlattening {
+			if cnameFlattening {
 				currentQName = context.RawName()
 			}
 			var answer []dns.RR
@@ -322,7 +325,7 @@ loop:
 		}
 	}
 
-	if context.Do() && context.Auth && zone.Config.DnsSec {
+	if dnssec {
 		switch res {
 		case dns.RcodeSuccess:
 			if len(context.Answer) == 0 {
