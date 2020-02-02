@@ -29,6 +29,7 @@ func (p RRSet) Less(i, j int) bool { return p[i].String() < p[j].String() }
 // Case represents a test case that encapsulates various data from a query and response.
 // Note that is the TTL of a record is 303 we don't compare it with the TTL.
 type Case struct {
+	Desc   string
 	Qname  string
 	Qtype  uint16
 	Rcode  int

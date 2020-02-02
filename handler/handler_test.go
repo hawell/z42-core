@@ -62,6 +62,7 @@ func defaultApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler, t *te
 		resp := w.Msg
 
 		if err := test.SortAndCheck(resp, tc); err != nil {
+			fmt.Println(tc.Desc)
 			fmt.Println(i, err, tc.Qname, tc.Answer, resp.Answer)
 			t.Fail()
 		}
@@ -171,11 +172,13 @@ var testCases = []*TestCase{
 		TestCases: []test.Case{
 			// NOAUTH Test
 			{
+				Desc:  "NOAUTH Test",
 				Qname: "dsdsd.sdf.dfd.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNotAuth,
 			},
 			// A Test
 			{
+				Desc:  "A Test",
 				Qname: "x.example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("x.example.com. 300 IN A 1.2.3.4"),
@@ -184,6 +187,7 @@ var testCases = []*TestCase{
 			},
 			// AAAA Test
 			{
+				Desc:  "AAAA Test",
 				Qname: "x.example.com.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
 					test.AAAA("x.example.com. 300 IN AAAA ::1"),
@@ -191,6 +195,7 @@ var testCases = []*TestCase{
 			},
 			// TXT Test
 			{
+				Desc:  "TXT Test",
 				Qname: "x.example.com.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.TXT("x.example.com. 300 IN TXT bar"),
@@ -199,6 +204,7 @@ var testCases = []*TestCase{
 			},
 			// CNAME Test
 			{
+				Desc:  "CNAME Test",
 				Qname: "y.example.com.", Qtype: dns.TypeCNAME,
 				Answer: []dns.RR{
 					test.CNAME("y.example.com. 300 IN CNAME x.example.com."),
@@ -206,6 +212,7 @@ var testCases = []*TestCase{
 			},
 			// NS Test
 			{
+				Desc:  "NS Test",
 				Qname: "example.com.", Qtype: dns.TypeNS,
 				Answer: []dns.RR{
 					test.NS("example.com. 300 IN NS ns1.example.com."),
@@ -214,6 +221,7 @@ var testCases = []*TestCase{
 			},
 			// MX Test
 			{
+				Desc:  "MX Test",
 				Qname: "x.example.com.", Qtype: dns.TypeMX,
 				Answer: []dns.RR{
 					test.MX("x.example.com. 300 IN MX 10 mx1.example.com."),
@@ -222,6 +230,7 @@ var testCases = []*TestCase{
 			},
 			// SRV Test
 			{
+				Desc:  "SRV Test",
 				Qname: "_sip._tcp.example.com.", Qtype: dns.TypeSRV,
 				Answer: []dns.RR{
 					test.SRV("_sip._tcp.example.com. 300 IN SRV 10 100 555 sip.example.com."),
@@ -229,12 +238,14 @@ var testCases = []*TestCase{
 			},
 			// TLSA Test
 			{
+				Desc:  "TLSA Test",
 				Qname: "_443._tcp.www.example.com.", Qtype: dns.TypeTLSA,
 				Answer: []dns.RR{
 					test.TLSA("_443._tcp.www.example.com. 300 IN TLSA 0 0 1 d2abde240d7cd3ee6b4b28c54df034b97983a1d16e8a410e4561cb106618e971"),
 				},
 			},
 			{
+				Desc:  "Multiple TLSA Test",
 				Qname: "_990._tcp.example.com.", Qtype: dns.TypeTLSA,
 				Answer: []dns.RR{
 					test.TLSA("_990._tcp.example.com. 300 IN TLSA 1 1 1 1CFC98A706BCF3683015"),
@@ -243,6 +254,7 @@ var testCases = []*TestCase{
 			},
 			// NXDOMAIN Test
 			{
+				Desc:  "NXDOMAIN Test",
 				Qname: "notexists.example.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
 				Ns: []dns.RR{
@@ -251,6 +263,7 @@ var testCases = []*TestCase{
 			},
 			// NXDOMAIN through CNAME Test
 			{
+				Desc:  "NXDOMAIN through CNAME Test",
 				Qname: "cnametonx.example.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
 				Answer: []dns.RR{
@@ -262,6 +275,7 @@ var testCases = []*TestCase{
 			},
 			// SOA Test
 			{
+				Desc:  "SOA Test",
 				Qname: "example.com.", Qtype: dns.TypeSOA,
 				Answer: []dns.RR{
 					test.SOA("example.com. 300 IN SOA ns1.example.com. hostmaster.example.com. 1460498836 44 55 66 100"),
@@ -269,6 +283,7 @@ var testCases = []*TestCase{
 			},
 			// not implemented
 			{
+				Desc:  "NotImplemented Test",
 				Qname: "example.com.", Qtype: dns.TypeUNSPEC,
 				Rcode: dns.RcodeNotImplemented,
 				Ns: []dns.RR{
@@ -323,36 +338,42 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "direct name mismatch, wildcard name match, wildcard rr match",
 				Qname: "host3.example.net.", Qtype: dns.TypeMX,
 				Answer: []dns.RR{
 					test.MX("host3.example.net. 300 IN MX 10 host1.example.net."),
 				},
 			},
 			{
+				Desc:  "direct name mismatch, wildcard name match, wildcard rr mismatch",
 				Qname: "host3.example.net.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
 					test.SOA("example.net. 300 IN SOA ns1.example.net. hostmaster.example.net. 1460498836 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "two level wildcard match",
 				Qname: "foo.bar.example.net.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.TXT("foo.bar.example.net. 300 IN TXT \"this is a wildcard\""),
 				},
 			},
 			{
+				Desc:  "direct name match, direct rr mismatch",
 				Qname: "host1.example.net.", Qtype: dns.TypeMX,
 				Ns: []dns.RR{
 					test.SOA("example.net. 300 IN SOA ns1.example.net. hostmaster.example.net. 1460498836 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "name with * label",
 				Qname: "sub.*.example.net.", Qtype: dns.TypeMX,
 				Ns: []dns.RR{
 					test.SOA("example.net. 300 IN SOA ns1.example.net. hostmaster.example.net. 1460498836 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "name mismatch but non-root parent match",
 				Qname: "host.subdel.example.net.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
 				Ns: []dns.RR{
@@ -360,6 +381,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "qname with * in the middle",
 				Qname: "ghost.*.example.net.", Qtype: dns.TypeMX,
 				Rcode: dns.RcodeNameError,
 				Ns: []dns.RR{
@@ -367,6 +389,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "multi level wildcard match",
 				Qname: "f.h.g.f.t.r.e.example.net.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.TXT("f.h.g.f.t.r.e.example.net. 300 IN TXT \"this is a wildcard\""),
@@ -418,18 +441,21 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "cname query to existing name without cname",
 				Qname: "y.example.aaa.", Qtype: dns.TypeCNAME,
 				Answer: []dns.RR{
 					test.CNAME("y.example.aaa. 300 IN CNAME x.example.aaa."),
 				},
 			},
 			{
+				Desc:  "cname query to existing name with cname",
 				Qname: "z.example.aaa.", Qtype: dns.TypeCNAME,
 				Answer: []dns.RR{
 					test.CNAME("z.example.aaa. 300 IN CNAME y.example.aaa."),
 				},
 			},
 			{
+				Desc:  "A query to two level cname to matching name/type",
 				Qname: "z.example.aaa.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("x.example.aaa. 300 IN A 1.2.3.4"),
@@ -438,6 +464,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "AAAA query to two level cname to matching name/type",
 				Qname: "z.example.aaa.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
 					test.AAAA("x.example.aaa. 300 IN AAAA ::1"),
@@ -446,6 +473,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "TXT query to two level cname to matching name/type",
 				Qname: "z.example.aaa.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.TXT("x.example.aaa. 300 IN TXT bar"),
@@ -455,6 +483,26 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "MX query to two level cname to matching name/type",
+				Qname: "z.example.aaa.", Qtype: dns.TypeMX,
+				Answer: []dns.RR{
+					test.MX("x.example.aaa. 300 IN MX 10 mx1.example.aaa."),
+					test.MX("x.example.aaa. 300 IN MX 10 mx2.example.aaa."),
+					test.CNAME("y.example.aaa. 300 IN CNAME x.example.aaa."),
+					test.CNAME("z.example.aaa. 300 IN CNAME y.example.aaa."),
+				},
+			},
+			{
+				Desc:  "SRV query to two level cname to matching name/type",
+				Qname: "z.example.aaa.", Qtype: dns.TypeSRV,
+				Answer: []dns.RR{
+					test.SRV("x.example.aaa. 300 IN SRV 10 100 555 sip.example.aaa."),
+					test.CNAME("y.example.aaa. 300 IN CNAME x.example.aaa."),
+					test.CNAME("z.example.aaa. 300 IN CNAME y.example.aaa."),
+				},
+			},
+			{
+				Desc:  "query to cnamed name, name match, type mismatch",
 				Qname: "z.example.aaa.", Qtype: dns.TypeNS,
 				Answer: []dns.RR{
 					test.CNAME("y.example.aaa. 300 IN CNAME x.example.aaa."),
@@ -465,23 +513,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
-				Qname: "z.example.aaa.", Qtype: dns.TypeMX,
-				Answer: []dns.RR{
-					test.MX("x.example.aaa. 300 IN MX 10 mx1.example.aaa."),
-					test.MX("x.example.aaa. 300 IN MX 10 mx2.example.aaa."),
-					test.CNAME("y.example.aaa. 300 IN CNAME x.example.aaa."),
-					test.CNAME("z.example.aaa. 300 IN CNAME y.example.aaa."),
-				},
-			},
-			{
-				Qname: "z.example.aaa.", Qtype: dns.TypeSRV,
-				Answer: []dns.RR{
-					test.SRV("x.example.aaa. 300 IN SRV 10 100 555 sip.example.aaa."),
-					test.CNAME("y.example.aaa. 300 IN CNAME x.example.aaa."),
-					test.CNAME("z.example.aaa. 300 IN CNAME y.example.aaa."),
-				},
-			},
-			{
+				Desc:  "A query to a name containing cname rr",
 				Qname: "w.example.aaa.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.CNAME("w.example.aaa. 300 IN CNAME x.example.aaa."),
@@ -489,6 +521,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "AAAA query to a name containing cname rr",
 				Qname: "w.example.aaa.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
 					test.CNAME("w.example.aaa. 300 IN CNAME x.example.aaa."),
@@ -496,6 +529,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "TXT query to a name containing cname rr",
 				Qname: "w.example.aaa.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.CNAME("w.example.aaa. 300 IN CNAME x.example.aaa."),
@@ -504,6 +538,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "NS query to a name containing cname rr",
 				Qname: "w.example.aaa.", Qtype: dns.TypeNS,
 				Answer: []dns.RR{
 					test.CNAME("w.example.aaa. 300 IN CNAME x.example.aaa."),
@@ -513,6 +548,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "MX query to a name containing cname rr",
 				Qname: "w.example.aaa.", Qtype: dns.TypeMX,
 				Answer: []dns.RR{
 					test.CNAME("w.example.aaa. 300 IN CNAME x.example.aaa."),
@@ -521,6 +557,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "SRV query to a name containing cname rr",
 				Qname: "w.example.aaa.", Qtype: dns.TypeSRV,
 				Answer: []dns.RR{
 					test.CNAME("w.example.aaa. 300 IN CNAME x.example.aaa."),
@@ -554,6 +591,7 @@ var testCases = []*TestCase{
 		TestCases: []test.Case{
 			// empty A test
 			{
+				Desc:  "empty A test",
 				Qname: "z.example.bbb.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
 					test.SOA("example.bbb. 300 IN SOA ns1.example.bbb. hostmaster.example.bbb. 1460498836 44 55 66 100"),
@@ -561,6 +599,7 @@ var testCases = []*TestCase{
 			},
 			// empty AAAA test
 			{
+				Desc:  "empty AAAA test",
 				Qname: "z.example.bbb.", Qtype: dns.TypeAAAA,
 				Ns: []dns.RR{
 					test.SOA("example.bbb. 300 IN SOA ns1.example.bbb. hostmaster.example.bbb. 1460498836 44 55 66 100"),
@@ -568,6 +607,7 @@ var testCases = []*TestCase{
 			},
 			// empty TXT test
 			{
+				Desc:  "empty TXT test",
 				Qname: "z.example.bbb.", Qtype: dns.TypeTXT,
 				Ns: []dns.RR{
 					test.SOA("example.bbb. 300 IN SOA ns1.example.bbb. hostmaster.example.bbb. 1460498836 44 55 66 100"),
@@ -575,6 +615,7 @@ var testCases = []*TestCase{
 			},
 			// empty NS test
 			{
+				Desc:  "empty NS test",
 				Qname: "z.example.bbb.", Qtype: dns.TypeNS,
 				Ns: []dns.RR{
 					test.SOA("example.bbb. 300 IN SOA ns1.example.bbb. hostmaster.example.bbb. 1460498836 44 55 66 100"),
@@ -582,6 +623,7 @@ var testCases = []*TestCase{
 			},
 			// empty MX test
 			{
+				Desc:  "empty MX test",
 				Qname: "z.example.bbb.", Qtype: dns.TypeMX,
 				Ns: []dns.RR{
 					test.SOA("example.bbb. 300 IN SOA ns1.example.bbb. hostmaster.example.bbb. 1460498836 44 55 66 100"),
@@ -589,6 +631,7 @@ var testCases = []*TestCase{
 			},
 			// empty SRV test
 			{
+				Desc:  "empty SRV test",
 				Qname: "z.example.bbb.", Qtype: dns.TypeSRV,
 				Ns: []dns.RR{
 					test.SOA("example.bbb. 300 IN SOA ns1.example.bbb. hostmaster.example.bbb. 1460498836 44 55 66 100"),
@@ -596,6 +639,7 @@ var testCases = []*TestCase{
 			},
 			// empty CNAME test
 			{
+				Desc:  "empty CNAME test",
 				Qname: "x.example.bbb.", Qtype: dns.TypeCNAME,
 				Ns: []dns.RR{
 					test.SOA("example.bbb. 300 IN SOA ns1.example.bbb. hostmaster.example.bbb. 1460498836 44 55 66 100"),
@@ -603,6 +647,7 @@ var testCases = []*TestCase{
 			},
 			// empty A test with cname
 			{
+				Desc:  "empty A test with cname",
 				Qname: "y.example.bbb.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.CNAME("y.example.bbb.	300	IN	CNAME	x.example.bbb."),
@@ -613,6 +658,7 @@ var testCases = []*TestCase{
 			},
 			// empty AAAA test with cname
 			{
+				Desc:  "empty AAAA test with cname",
 				Qname: "y.example.bbb.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
 					test.CNAME("y.example.bbb.	300	IN	CNAME	x.example.bbb."),
@@ -623,6 +669,7 @@ var testCases = []*TestCase{
 			},
 			// empty TXT test with cname
 			{
+				Desc:  "empty TXT test with cname",
 				Qname: "y.example.bbb.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.CNAME("y.example.bbb.	300	IN	CNAME	x.example.bbb."),
@@ -633,6 +680,7 @@ var testCases = []*TestCase{
 			},
 			// empty NS test with cname
 			{
+				Desc:  "empty NS test with cname",
 				Qname: "y.example.bbb.", Qtype: dns.TypeNS,
 				Answer: []dns.RR{
 					test.CNAME("y.example.bbb.	300	IN	CNAME	x.example.bbb."),
@@ -643,6 +691,7 @@ var testCases = []*TestCase{
 			},
 			// empty MX test with cname
 			{
+				Desc:  "empty MX test with cname",
 				Qname: "y.example.bbb.", Qtype: dns.TypeMX,
 				Answer: []dns.RR{
 					test.CNAME("y.example.bbb.	300	IN	CNAME	x.example.bbb."),
@@ -653,6 +702,7 @@ var testCases = []*TestCase{
 			},
 			// empty SRV test with cname
 			{
+				Desc:  "empty SRV test with cname",
 				Qname: "y.example.bbb.", Qtype: dns.TypeSRV,
 				Answer: []dns.RR{
 					test.CNAME("y.example.bbb.	300	IN	CNAME	x.example.bbb."),
@@ -681,6 +731,7 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "long TXT value",
 				Qname: "x.example.ccc.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.TXT("x.example.ccc. 300 IN TXT \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""),
@@ -690,7 +741,7 @@ var testCases = []*TestCase{
 	},
 	{
 		Name:           "cname flattening",
-		Description:    "eliminate intermediate cname records when cname flatenning is enabled",
+		Description:    "eliminate intermediate cname records when cname flattening is enabled",
 		Enabled:        true,
 		Config:         defaultConfig,
 		Initialize:     defaultInitialize,
@@ -727,18 +778,21 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "multi cname, A query to existing name/type",
 				Qname: "e.example.ddd.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("e.example.ddd. 300 IN A 1.2.3.4"),
 				},
 			},
 			{
+				Desc:  "multi cname, AAAA query to existing name/type",
 				Qname: "e.example.ddd.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
 					test.AAAA("e.example.ddd. 300 IN AAAA ::1"),
 				},
 			},
 			{
+				Desc:  "multi cname, TXT query to existing name/type",
 				Qname: "e.example.ddd.", Qtype: dns.TypeTXT,
 				Answer: []dns.RR{
 					test.TXT("e.example.ddd. 300 IN TXT \"bar\""),
@@ -747,6 +801,7 @@ var testCases = []*TestCase{
 			},
 			// MX Test
 			{
+				Desc:  "multi cname, MX query to existing name/type",
 				Qname: "e.example.ddd.", Qtype: dns.TypeMX,
 				Answer: []dns.RR{
 					test.MX("e.example.ddd. 300 IN MX 10 mx1.example.ddd."),
@@ -755,12 +810,14 @@ var testCases = []*TestCase{
 			},
 			// SRV Test
 			{
+				Desc:  "multi cname, SRV query to existing name/type",
 				Qname: "e.example.ddd.", Qtype: dns.TypeSRV,
 				Answer: []dns.RR{
 					test.SRV("e.example.ddd. 300 IN SRV 10 100 555 sip.example.ddd."),
 				},
 			},
 			{
+				Desc:  "cname query to a name containing cname",
 				Qname: "e.example.ddd.", Qtype: dns.TypeCNAME,
 				Answer: []dns.RR{
 					test.CNAME("e.example.ddd. 300 IN CNAME d.example.ddd."),
@@ -833,12 +890,14 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "direct caa match",
 				Qname: "example.caa.", Qtype: dns.TypeCAA,
 				Answer: []dns.RR{
 					test.CAA("example.caa.	300	IN	CAA	0 issue \"godaddy.com;\""),
 				},
 			},
 			{
+				Desc:  "caa through cname",
 				Qname: "a.b.c.d.example.caa.", Qtype: dns.TypeCAA,
 				Answer: []dns.RR{
 					test.CNAME("a.b.c.d.example.caa. 300 IN CNAME b.c.d.example.caa."),
@@ -849,48 +908,56 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "match with root caa",
 				Qname: "x.y.z.example.caa.", Qtype: dns.TypeCAA,
 				Answer: []dns.RR{
 					test.CAA("x.y.z.example.caa.	300	IN	CAA	0 issue \"godaddy.com;\""),
 				},
 			},
 			{
+				Desc:  "direct subdomain caa match",
 				Qname: "h.example.caa.", Qtype: dns.TypeCAA,
 				Answer: []dns.RR{
 					test.CAA("h.example.caa.	300	IN	CAA	0 issue \"godaddy2.com;\""),
 				},
 			},
 			{
+				Desc:  "match with non-root parent caa",
 				Qname: "g.h.example.caa.", Qtype: dns.TypeCAA,
 				Answer: []dns.RR{
 					test.CAA("g.h.example.caa.	300	IN	CAA	0 issue \"godaddy2.com;\""),
 				},
 			},
 			{
+				Desc:  "multi level match with non-root parent caa",
 				Qname: "j.g.h.example.caa.", Qtype: dns.TypeCAA,
 				Answer: []dns.RR{
 					test.CAA("j.g.h.example.caa.	300	IN	CAA	0 issue \"godaddy2.com;\""),
 				},
 			},
 			{
+				Desc:  "no caa root",
 				Qname: "nocaa.caa.", Qtype: dns.TypeCAA,
 				Ns: []dns.RR{
 					test.SOA("nocaa.caa.	300	IN	SOA	ns1.nocaa.caa. hostmaster.nocaa.caa. 1570970363 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "no caa subdomain",
 				Qname: "www.nocaa.caa.", Qtype: dns.TypeCAA,
 				Ns: []dns.RR{
 					test.SOA("nocaa.caa.	300	IN	SOA	ns1.nocaa.caa. hostmaster.nocaa.caa. 1570970363 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "no caa subdomain",
 				Qname: "www2.nocaa.caa.", Qtype: dns.TypeCAA,
 				Ns: []dns.RR{
 					test.SOA("nocaa.caa.	300	IN	SOA	ns1.nocaa.caa. hostmaster.nocaa.caa. 1570970363 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "no caa subdomain",
 				Qname: "www3.nocaa.caa.", Qtype: dns.TypeCAA,
 				Ns: []dns.RR{
 					test.SOA("nocaa.caa.	300	IN	SOA	ns1.nocaa.caa. hostmaster.nocaa.caa. 1570970363 44 55 66 100"),
@@ -975,54 +1042,64 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "A aname at root",
 				Qname: "arvancloud.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("arvancloud.com. 300 IN A 6.5.6.5"),
 				},
 			},
 			{
+				Desc:  "AAAA aname at root",
 				Qname: "arvancloud.com.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
 					test.AAAA("arvancloud.com. 300 IN AAAA ::1"),
 				},
 			},
 			{
+				Desc:  "A aname at subdomain",
 				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("upstream.arvancloud.com. 303 IN A 131.107.255.255"),
 				},
 			},
 			{
+				Desc:  "AAAA aname at subdomain",
 				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
 					test.AAAA("upstream.arvancloud.com. 303 IN AAAA fd3e:4f5a:5b81::1"),
 				},
 			},
 			{
+				Desc:  "A aname to nx local",
 				Qname: "nxlocal.arvancloud.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
+				Desc:  "AAAA aname to nx local",
 				Qname: "nxlocal.arvancloud.com.", Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
+				Desc:  "A aname to empty location",
 				Qname: "empty.arvancloud.com.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
 					test.SOA("arvancloud.com.	300	IN	SOA	ns1.arvancloud.com. hostmaster.arvancloud.com. 1570970363 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "AAAA aname to empty location",
 				Qname: "empty.arvancloud.com.", Qtype: dns.TypeAAAA,
 				Ns: []dns.RR{
 					test.SOA("arvancloud.com.	300	IN	SOA	ns1.arvancloud.com. hostmaster.arvancloud.com. 1570970363 44 55 66 100"),
 				},
 			},
 			{
+				Desc:  "A aname to nx external",
 				Qname: "nxupstream.arvancloud.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
+				Desc:  "AAAA aname to nx external",
 				Qname: "nxupstream.arvancloud.com.", Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeServerFailure,
 			},
@@ -1124,9 +1201,11 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "A to weighted aname",
 				Qname: "upstream2.arvancloud.com.", Qtype: dns.TypeA,
 			},
 			{
+				Desc:  "AAAA to weighted aname",
 				Qname: "upstream2.arvancloud.com.", Qtype: dns.TypeAAAA,
 			},
 		},
@@ -1754,7 +1833,7 @@ var testCases = []*TestCase{
 	},
 	{
 		Name:           "cname outside domain",
-		Description:    "should follow cname between authoritative zones",
+		Description:    "should not follow cname between authoritative zones",
 		Enabled:        true,
 		Config:         defaultConfig,
 		Initialize:     defaultInitialize,
@@ -1793,6 +1872,7 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "cname to another authoritative zone",
 				Qname: "a.inside.cnm.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.CNAME("a.inside.cnm. 300 IN CNAME b.inside.cnm."),
@@ -1800,6 +1880,7 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "cname to another authoritative zone with flattening",
 				Qname: "a.flattening.cnm.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.CNAME("a.flattening.cnm. 300 IN CNAME a.inside.cnm."),
@@ -1915,36 +1996,6 @@ var testCases = []*TestCase{
 			{
 				Qname: "azone.zon.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNotAuth,
-			},
-		},
-	},
-	{
-		Name:           "cname noauth",
-		Description:    "cname following should stop and return results when reaching notauth zone",
-		Enabled:        true,
-		Config:         defaultConfig,
-		Initialize:     defaultInitialize,
-		ApplyAndVerify: defaultApplyAndVerify,
-		Zones:          []string{"auth.zon."},
-		ZoneConfigs:    []string{""},
-		Entries: [][][]string{
-			{
-				{"w1",
-					`{"cname":{"ttl":300, "host":"w2.auth.zon."}}`,
-				},
-				{"w2",
-					`{"cname":{"ttl":300, "host":"noauth.zon."}}`,
-				},
-			},
-		},
-		TestCases: []test.Case{
-			{
-				Qname: "w1.auth.zon.", Qtype: dns.TypeA,
-				Answer: []dns.RR{
-					test.CNAME("w1.auth.zon.	300	IN	CNAME	w2.auth.zon."),
-					test.CNAME("w2.auth.zon.	300	IN	CNAME	noauth.zon."),
-				},
-				Rcode: dns.RcodeSuccess,
 			},
 		},
 	},
@@ -2238,14 +2289,17 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  " aname to garbage",
 				Qname: "arvancloud.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
+				Desc:  "invalid json format",
 				Qname: "www.arvancloud.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
+				Desc:  "garbage",
 				Qname: "mal1.arvancloud.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
@@ -2476,12 +2530,14 @@ var testCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc:  "query to IDN root",
 				Qname: "ουτοπία.δπθ.gr.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("ουτοπία.δπθ.gr. 300 IN A 1.2.3.4"),
 				},
 			},
 			{
+				Desc:  "query to IDN subdomain",
 				Qname: "ουτοπία.ουτοπία.δπθ.gr.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("ουτοπία.ουτοπία.δπθ.gr. 300 IN A 2.3.4.5"),
@@ -2494,12 +2550,14 @@ var testCases = []*TestCase{
 				},
 			},
 			{
+				Desc:  "cname to IDN",
 				Qname: "www.ascii.com.", Qtype: dns.TypeCNAME,
 				Answer: []dns.RR{
 					test.CNAME("www.ascii.com. 300 IN CNAME ουτοπία.δπθ.gr."),
 				},
 			},
 			{
+				Desc:  "ascii zone with IDN subdomain",
 				Qname: "ουτοπία.ascii.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("ουτοπία.ascii.com. 300 IN A 1.2.3.4"),
