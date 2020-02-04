@@ -32,7 +32,7 @@ var benchTestHandler *DnsRequestHandler
 func TestMain(m *testing.M) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-	benchTestHandler = NewHandler(&defaultConfig)
+	benchTestHandler = NewHandler(&DefaultTestConfig)
 	err := benchTestHandler.Redis.Del("*")
 	log.Println(err)
 	err = benchTestHandler.Redis.SAdd("redins:zones", benchZone)
