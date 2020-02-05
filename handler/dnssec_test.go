@@ -407,7 +407,7 @@ var dnssecTestCases = []*TestCase{
 	{
 		Name:           "RFC4035",
 		Description:    "RFC4035 sample zone",
-		Enabled:        true,
+		Enabled:        false,
 		Config:         DefaultTestConfig,
 		Initialize:     DefaultDnssecInitialize,
 		ApplyAndVerify: nil,

@@ -242,7 +242,12 @@ loop:
 			}
 			if len(currentRecord.NS.Data) > 0 && currentQName != zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
+				if context.QType() == dns.TypeDS {
+					context.Answer = h.DS(currentQName, currentRecord)
+					break loop
+				}
 				context.Authority = append(context.Authority, h.NS(currentQName, currentRecord)...)
+				context.Authority = append(context.Authority, h.DS(currentQName, currentRecord)...)
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := zone.FindLocation(ns.Host)
 					if match != NoMatch {
@@ -536,6 +541,20 @@ func (h *DnsRequestHandler) TLSA(name string, record *Record) (answers []dns.RR)
 		r.Selector = tlsa.Selector
 		r.MatchingType = tlsa.MatchingType
 		r.Certificate = tlsa.Certificate
+		answers = append(answers, r)
+	}
+	return
+}
+
+func (h *DnsRequestHandler) DS(name string, record *Record) (answers []dns.RR) {
+	for _, ds := range record.DS.Data {
+		r := new(dns.DS)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeDS,
+			Class: dns.ClassINET, Ttl: h.getTtl(record.DS.Ttl)}
+		r.KeyTag = ds.KeyTag
+		r.Algorithm = ds.Algorithm
+		r.DigestType = ds.DigestType
+		r.Digest = ds.Digest
 		answers = append(answers, r)
 	}
 	return

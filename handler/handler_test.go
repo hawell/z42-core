@@ -71,6 +71,12 @@ var handlerTestCases = []*TestCase{
 				{"cnametonx",
 					`{"cname":{"ttl":300, "host":"notexists.example.com."}}`,
 				},
+				{"subdel",
+					`{
+						"ns":{"ttl":300, "records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]},
+						"ds":{"ttl":300, "records":[{"key_tag":57855, "algorithm":5, "digest_type":1, "digest":"B6DCD485719ADCA18E5F3D48A2331627FDD3636B"}]}
+					}`,
+				},
 			},
 		},
 		TestCases: []test.Case{
@@ -183,6 +189,14 @@ var handlerTestCases = []*TestCase{
 				Qname: "example.com.", Qtype: dns.TypeSOA,
 				Answer: []dns.RR{
 					test.SOA("example.com. 300 IN SOA ns1.example.com. hostmaster.example.com. 1460498836 44 55 66 100"),
+				},
+			},
+			// DS Test
+			{
+				Desc: "DS query",
+				Qname: "subdel.example.com.", Qtype: dns.TypeDS,
+				Answer: []dns.RR{
+					test.DS("subdel.example.com. 300 DS 57855 5 1 B6DCD485719ADCA18E5F3D48A2331627FDD3636B"),
 				},
 			},
 			// not implemented
@@ -1929,6 +1943,12 @@ var handlerTestCases = []*TestCase{
 				{"cname",
 					`{"cname":{"ttl":300, "host":"glue.delegation.zon."}}`,
 				},
+				{"subdel",
+					`{
+						"ns":{"ttl":300, "records":[{"host":"ns1.delegated.zon."},{"host":"ns2.delegated.zon."}]},
+						"ds":{"ttl":3600, "records":[{"key_tag":57855, "algorithm":5, "digest_type":1, "digest":"B6DCD485719ADCA18E5F3D48A2331627FDD3636B"}]}
+					}`,
+				},
 			},
 		},
 		TestCases: []test.Case{
@@ -1965,6 +1985,15 @@ var handlerTestCases = []*TestCase{
 				Extra: []dns.RR{
 					test.A("ns1.glue.delegation.zon. 300 IN A 1.2.3.4"),
 					test.A("ns2.glue.delegation.zon. 300 IN A 5.6.7.8"),
+				},
+			},
+			{
+				Qname: "subdel.delegation.zon.",
+				Qtype: dns.TypeA,
+				Ns:[]dns.RR{
+					test.DS("subdel.delegation.zon. 300 DS 57855 5 1 B6DCD485719ADCA18E5F3D48A2331627FDD3636B"),
+					test.NS("subdel.delegation.zon. 300 IN NS ns1.delegated.zon."),
+					test.NS("subdel.delegation.zon. 300 IN NS ns2.delegated.zon."),
 				},
 			},
 		},
