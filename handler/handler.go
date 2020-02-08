@@ -2,8 +2,6 @@ package handler
 
 import (
 	"arvancloud/redins/handler/logformat"
-	"errors"
-	"fmt"
 	"github.com/dgraph-io/ristretto"
 	"github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
@@ -219,6 +217,11 @@ loop:
 			res = dns.RcodeNameError
 			break loop
 
+		case EmptyNonterminalMatch:
+			context.Authority = []dns.RR{zone.Config.SOA.Data}
+			res = dns.RcodeSuccess
+			break loop
+
 		case WildCardMatch:
 			fallthrough
 
@@ -385,14 +388,6 @@ func (h *DnsRequestHandler) LogRequest(state *RequestContext, responseCode int) 
 	}
 }
 
-func reverseZone(zone string) []byte {
-	runes := []rune("." + zone)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return []byte(string(runes))
-}
-
 func (h *DnsRequestHandler) LoadZones() {
 	h.LastZoneUpdate = time.Now()
 	zones, err := h.Redis.SMembers("redins:zones")
@@ -402,7 +397,7 @@ func (h *DnsRequestHandler) LoadZones() {
 	}
 	newZones := iradix.New()
 	for _, zone := range zones {
-		newZones, _, _ = newZones.Insert(reverseZone(zone), zone)
+		newZones, _, _ = newZones.Insert(reverseName(zone), zone)
 	}
 	h.Zones = newZones
 }
@@ -595,7 +590,7 @@ func split255(s string) []string {
 }
 
 func (h *DnsRequestHandler) FindZone(qname string) string {
-	rname := reverseZone(qname)
+	rname := reverseName(qname)
 	if _, zname, ok := h.Zones.Root().LongestPrefix(rname); ok {
 		return zname.(string)
 	}
@@ -731,19 +726,12 @@ func (h *DnsRequestHandler) LoadLocation(location string, z *Zone) *Record {
 		r.Zone = z
 		r.Name = name
 
-		if _, ok := z.Locations[label]; !ok {
-			// implicit root location
+		val, err := h.Redis.HGet("redins:zones:"+z.Name, label)
+		if err != nil {
 			if label == "@" {
 				h.RecordCache.Set(key, r, 1)
 				return r, nil
 			}
-			err := errors.New(fmt.Sprintf("location %s not exists in %s", label, z.Name))
-			logger.Default.Error(err)
-			return nil, err
-		}
-
-		val, err := h.Redis.HGet("redins:zones:"+z.Name, label)
-		if err != nil {
 			logger.Default.Error(err, " : ", label, " ", z.Name)
 			return nil, err
 		}

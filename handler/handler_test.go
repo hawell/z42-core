@@ -209,12 +209,13 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			// Empty non-terminal Test
-			// FIXME: should return NOERROR instead of NXDOMAIN
-			/*
-			   {
-			       Qname:"v.w.example.com.", Qtype: dns.TypeA,
-			   },
-			*/
+			{
+		   		Desc: "non-terminal match",
+		   		Qname:"v.w.example.com.", Qtype: dns.TypeA,
+				Ns: []dns.RR{
+					test.SOA("example.com. 300 IN SOA ns1.example.com. hostmaster.example.com. 1460498836 44 55 66 100"),
+				},
+			},
 		},
 	},
 	{

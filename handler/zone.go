@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/hawell/logger"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
@@ -11,7 +13,7 @@ import (
 type Zone struct {
 	Name         string
 	Config       ZoneConfig
-	Locations    map[string]struct{}
+	Locations    *iradix.Tree
 	ZSK          *ZoneKey
 	KSK          *ZoneKey
 	DnsKeySig    dns.RR
@@ -25,13 +27,35 @@ type ZoneConfig struct {
 	CnameFlattening bool       `json:"cname_flattening,omitempty"`
 }
 
+func reverseName(zone string) []byte {
+	runes := []rune("." + zone)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return []byte(string(runes))
+}
+
 func NewZone(name string, locations []string, config string) *Zone {
 	z := new(Zone)
 	z.Name = name
-	z.Locations = make(map[string]struct{})
+	LocationsTree := iradix.New()
+	rvalues := make([][]byte, 0, len(locations))
 	for _, val := range locations {
-		z.Locations[val] = struct{}{}
+		rvalues = append(rvalues, reverseName(val))
 	}
+	for _, rvalue := range rvalues {
+		for i := 0; i < len(rvalue); i++ {
+			if rvalue[i] == '.' {
+				if _, found := LocationsTree.Get(rvalue[:i+1]); !found {
+					LocationsTree, _, _ = LocationsTree.Insert(rvalue[:i+1], nil)
+				}
+			}
+		}
+	}
+	for i, rvalue := range rvalues {
+		LocationsTree, _, _ = LocationsTree.Insert(rvalue, locations[i])
+	}
+	z.Locations = LocationsTree
 
 	z.Config = ZoneConfig{
 		DnsSec:          false,
@@ -70,16 +94,11 @@ func NewZone(name string, locations []string, config string) *Zone {
 const (
 	ExactMatch = iota
 	WildCardMatch
+	EmptyNonterminalMatch
 	NoMatch
 )
 
 func (z *Zone) FindLocation(query string) (string, int) {
-	var (
-		ok                bool
-		closestEncloser   string
-		sourceOfSynthesis string
-	)
-
 	// request for zone records
 	if query == z.Name {
 		return query, ExactMatch
@@ -87,57 +106,27 @@ func (z *Zone) FindLocation(query string) (string, int) {
 
 	query = strings.TrimSuffix(query, "."+z.Name)
 
-	if _, ok = z.Locations[query]; ok {
-		return query, ExactMatch
+	rquery := reverseName(query)
+	prefix, value, ok := z.Locations.Root().LongestPrefix(rquery)
+	if !ok {
+		value, ok = z.Locations.Get([]byte("*."))
+		if ok && value != nil {
+			return "*", WildCardMatch
+		}
+		return "", NoMatch
 	}
-
-	closestEncloser, sourceOfSynthesis, ok = splitQuery(query)
-	for ok {
-		ceExists := z.keyMatches(closestEncloser) || z.keyExists(closestEncloser)
-		ssExists := z.keyExists(sourceOfSynthesis)
-		if ceExists {
-			if ssExists {
-				return sourceOfSynthesis, WildCardMatch
-			} else {
-				return "", NoMatch
-			}
+	if bytes.Equal(prefix, rquery) {
+		if value != nil {
+			return query, ExactMatch
 		} else {
-			closestEncloser, sourceOfSynthesis, ok = splitQuery(closestEncloser)
+			return "", EmptyNonterminalMatch
 		}
 	}
-	return "", NoMatch
-}
-
-func (z *Zone) keyExists(key string) bool {
-	_, ok := z.Locations[key]
-	return ok
-}
-
-func (z *Zone) keyMatches(key string) bool {
-	for value := range z.Locations {
-		if strings.HasSuffix(value, key) {
-			return true
-		}
-	}
-	return false
-}
-
-func splitQuery(query string) (string, string, bool) {
-	if query == "" {
-		return "", "", false
-	}
-	var (
-		splits            []string
-		closestEncloser   string
-		sourceOfSynthesis string
-	)
-	splits = strings.SplitAfterN(query, ".", 2)
-	if len(splits) == 2 {
-		closestEncloser = splits[1]
-		sourceOfSynthesis = "*." + closestEncloser
+	ss := append(prefix, []byte("*.")...)
+	value, ok = z.Locations.Get(ss)
+	if ok && value != nil {
+		return value.(string), WildCardMatch
 	} else {
-		closestEncloser = ""
-		sourceOfSynthesis = "*"
+		return "", NoMatch
 	}
-	return closestEncloser, sourceOfSynthesis, true
 }
