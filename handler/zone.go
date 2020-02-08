@@ -95,6 +95,7 @@ const (
 	ExactMatch = iota
 	WildCardMatch
 	EmptyNonterminalMatch
+	CEMatch
 	NoMatch
 )
 
@@ -115,18 +116,25 @@ func (z *Zone) FindLocation(query string) (string, int) {
 		}
 		return "", NoMatch
 	}
-	if bytes.Equal(prefix, rquery) {
-		if value != nil {
+
+	if value != nil {
+		ce := value.(string)
+		if bytes.Equal(prefix, rquery) {
 			return query, ExactMatch
 		} else {
-			return "", EmptyNonterminalMatch
+			return ce, CEMatch
 		}
-	}
-	ss := append(prefix, []byte("*.")...)
-	value, ok = z.Locations.Get(ss)
-	if ok && value != nil {
-		return value.(string), WildCardMatch
 	} else {
-		return "", NoMatch
+		if bytes.Equal(prefix, rquery) {
+			return "", EmptyNonterminalMatch
+		} else {
+			ss := append(prefix, []byte("*.")...)
+			value, ok = z.Locations.Get(ss)
+			if ok && value != nil {
+				return value.(string), WildCardMatch
+			} else {
+				return "", NoMatch
+			}
+		}
 	}
 }

@@ -293,7 +293,7 @@ var handlerTestCases = []*TestCase{
 			},
 			{
 				Desc:  "name mismatch but non-root parent match",
-				Qname: "host.subdel.example.net.", Qtype: dns.TypeA,
+				Qname: "x.host1.example.net.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeNameError,
 				Ns: []dns.RR{
 					test.SOA("example.net. 300 IN SOA ns1.example.net. hostmaster.example.net. 1460498836 44 55 66 100"),
@@ -1954,6 +1954,7 @@ var handlerTestCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
+				Desc: "delegation with glue IPs",
 				Qname: "glue.delegation.zon.",
 				Qtype: dns.TypeA,
 				Ns: []dns.RR{
@@ -1966,6 +1967,7 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
+				Desc: "delegation without glue IPs",
 				Qname: "noglue.delegation.zon.",
 				Qtype: dns.TypeA,
 				Ns: []dns.RR{
@@ -1974,6 +1976,7 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
+				Desc: "cname to subdel",
 				Qname: "cname.delegation.zon.",
 				Qtype: dns.TypeA,
 				Answer: []dns.RR{
@@ -1989,7 +1992,18 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
+				Desc: "subdel with DS",
 				Qname: "subdel.delegation.zon.",
+				Qtype: dns.TypeA,
+				Ns:[]dns.RR{
+					test.DS("subdel.delegation.zon. 300 DS 57855 5 1 B6DCD485719ADCA18E5F3D48A2331627FDD3636B"),
+					test.NS("subdel.delegation.zon. 300 IN NS ns1.delegated.zon."),
+					test.NS("subdel.delegation.zon. 300 IN NS ns2.delegated.zon."),
+				},
+			},
+			{
+				Desc: "delegated query",
+				Qname: "x.y.subdel.delegation.zon.",
 				Qtype: dns.TypeA,
 				Ns:[]dns.RR{
 					test.DS("subdel.delegation.zon. 300 DS 57855 5 1 B6DCD485719ADCA18E5F3D48A2331627FDD3636B"),

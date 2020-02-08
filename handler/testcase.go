@@ -59,7 +59,10 @@ func DefaultApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler, t *te
 
 		if err := test.SortAndCheck(resp, tc); err != nil {
 			fmt.Println(tc.Desc)
-			fmt.Println(i, err, tc.Qname, tc.Answer, resp.Answer)
+			fmt.Println(i, err, tc.Qname)
+			fmt.Println(tc.Answer, resp.Answer)
+			fmt.Println(tc.Ns, resp.Ns)
+			fmt.Println(tc.Extra, resp.Extra)
 			t.Fail()
 		}
 	}

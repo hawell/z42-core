@@ -222,6 +222,40 @@ loop:
 			res = dns.RcodeSuccess
 			break loop
 
+		case CEMatch:
+			currentRecord = h.LoadLocation(location, zone)
+			if currentRecord == nil {
+				res = dns.RcodeServerFailure
+				break loop
+			}
+			if len(currentRecord.NS.Data) > 0 && currentRecord.Name != zone.Name {
+				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
+				if context.QType() == dns.TypeDS {
+					context.Answer = h.DS(currentRecord.Name, currentRecord)
+					break loop
+				}
+				context.Authority = append(context.Authority, h.NS(currentRecord.Name, currentRecord)...)
+				context.Authority = append(context.Authority, h.DS(currentRecord.Name, currentRecord)...)
+				for _, ns := range currentRecord.NS.Data {
+					glueLocation, match := zone.FindLocation(ns.Host)
+					if match != NoMatch {
+						glueRecord := h.LoadLocation(glueLocation, zone)
+						// XXX : should we return with RcodeServerFailure?
+						if glueRecord != nil {
+							ips := h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.A)
+							context.Additional = append(context.Additional, h.A(ns.Host, glueRecord, ips)...)
+							ips = h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.AAAA)
+							context.Additional = append(context.Additional, h.AAAA(ns.Host, glueRecord, ips)...)
+						}
+					}
+				}
+				break loop
+			} else {
+				context.Authority = []dns.RR{zone.Config.SOA.Data}
+				res = dns.RcodeNameError
+				break loop
+			}
+
 		case WildCardMatch:
 			fallthrough
 
