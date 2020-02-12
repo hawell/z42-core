@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	s          []dns.Server
+	s          []*dns.Server
 	h          *handler.DnsRequestHandler
 	l          *handler.RateLimiter
 	configFile string
@@ -42,7 +42,8 @@ func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	if l.CanHandle(context.IP()) {
 		h.HandleRequest(context)
 	} else {
-		context.Response(dns.RcodeRefused)
+		context.Res = dns.RcodeRefused
+		context.Response()
 	}
 }
 
