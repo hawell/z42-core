@@ -193,15 +193,15 @@ type TLSA_RR struct {
 }
 
 type DS_RRSet struct {
-	Ttl uint32 `json:"ttl,omitempty"`
+	Ttl  uint32  `json:"ttl,omitempty"`
 	Data []DS_RR `json:"records,omitempty"`
 }
 
 type DS_RR struct {
-	KeyTag uint16 `json:"key_tag"`
-	Algorithm uint8 `json:"algorithm"`
-	DigestType uint8 `json:"digest_type"`
-	Digest string `json:"digest"`
+	KeyTag     uint16 `json:"key_tag"`
+	Algorithm  uint8  `json:"algorithm"`
+	DigestType uint8  `json:"digest_type"`
+	Digest     string `json:"digest"`
 }
 
 type SOA_RRSet struct {

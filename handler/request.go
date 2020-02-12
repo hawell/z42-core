@@ -13,6 +13,8 @@ type RequestContext struct {
 	StartTime  time.Time
 	LogData    map[string]interface{}
 	Auth       bool
+	Res        int
+	dnssec     bool
 	Answer     []dns.RR
 	Authority  []dns.RR
 	Additional []dns.RR
@@ -32,6 +34,8 @@ func NewRequestContext(w dns.ResponseWriter, r *dns.Msg) *RequestContext {
 		},
 		StartTime: time.Now(),
 		Auth:      true,
+		Res:       dns.RcodeSuccess,
+		dnssec:    false,
 		name:      "",
 	}
 	context.SourceIp = context.sourceIp()
@@ -89,10 +93,10 @@ func (context *RequestContext) RawName() string {
 	return context.name
 }
 
-func (context *RequestContext) Response(rcode int) {
+func (context *RequestContext) Response() {
 	m := new(dns.Msg)
 	m.Authoritative, m.RecursionAvailable, m.Compress = context.Auth, false, true
-	m.SetRcode(context.Req, rcode)
+	m.SetRcode(context.Req, context.Res)
 	m.Answer = append(m.Answer, context.Answer...)
 	m.Ns = append(m.Ns, context.Authority...)
 	m.Extra = append(m.Extra, context.Additional...)

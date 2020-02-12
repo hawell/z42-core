@@ -157,9 +157,9 @@ func (h *DnsRequestHandler) ShutDown() {
 	// logger.Default.Debug("handler : stopped")
 }
 
-func (h *DnsRequestHandler) Response(context *RequestContext, res int) {
-	h.LogRequest(context, res)
-	context.Response(res)
+func (h *DnsRequestHandler) Response(context *RequestContext) {
+	h.LogRequest(context)
+	context.Response()
 }
 
 func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
@@ -174,38 +174,42 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 
 	zoneName := h.FindZone(context.RawName())
 	if zoneName == "" {
-		h.Response(context, dns.RcodeNotAuth)
+		context.Res = dns.RcodeNotAuth
+		h.Response(context)
 		return
 	}
 	// logger.Default.Debugf("[%d] zone name : %s", context.Req.Id, zoneName)
 
 	zone := h.LoadZone(zoneName)
 	if zone == nil {
-		h.Response(context, dns.RcodeServerFailure)
+		context.Res = dns.RcodeServerFailure
+		h.Response(context)
 		return
 	}
 	context.LogData["domain_uuid"] = zone.Config.DomainId
 
-	dnssec := context.Do() && context.Auth && zone.Config.DnsSec
-	cnameFlattening := dnssec || zone.Config.CnameFlattening
+	context.dnssec = context.Do() && context.Auth && zone.Config.DnsSec
+	cnameFlattening := context.dnssec || zone.Config.CnameFlattening
 
 	loopCount := 0
 	currentQName := context.RawName()
 	currentRecord := &Record{}
-	res := dns.RcodeSuccess
 loop:
 	for {
 		if loopCount > 10 {
 			logger.Default.Errorf("CNAME loop in request %s->%s", context.RawName(), context.Type())
 			context.Answer = []dns.RR{}
-			res = dns.RcodeServerFailure
+			context.Res = dns.RcodeServerFailure
 			break loop
 		}
 		loopCount++
 
 		if h.FindZone(currentQName) != zoneName {
 			// logger.Default.Debugf("[%d] out of zone - qname : %s, zone : %s", context.Req.Id, currentQName, zoneName)
-			res = dns.RcodeSuccess
+			context.Res = dns.RcodeSuccess
+			if len(context.Answer) == 0 {
+				NSec(context, context.RawName(), context.QType(), zone)
+			}
 			break loop
 		}
 
@@ -214,28 +218,30 @@ loop:
 		case NoMatch:
 			// logger.Default.Debugf("[%d] no location matched for %s in %s", context.Req.Id, currentQName, zoneName)
 			context.Authority = []dns.RR{zone.Config.SOA.Data}
-			res = dns.RcodeNameError
+			context.Res = dns.RcodeNameError
+			NSec(context, currentQName, dns.TypeNone, zone)
 			break loop
 
 		case EmptyNonterminalMatch:
 			context.Authority = []dns.RR{zone.Config.SOA.Data}
-			res = dns.RcodeSuccess
+			context.Res = dns.RcodeSuccess
+			NSec(context, currentQName, dns.TypeNone, zone)
 			break loop
 
 		case CEMatch:
 			currentRecord = h.LoadLocation(location, zone)
 			if currentRecord == nil {
-				res = dns.RcodeServerFailure
+				context.Res = dns.RcodeServerFailure
 				break loop
 			}
 			if len(currentRecord.NS.Data) > 0 && currentRecord.Name != zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
-				if context.QType() == dns.TypeDS {
-					context.Answer = h.DS(currentRecord.Name, currentRecord)
-					break loop
-				}
 				context.Authority = append(context.Authority, h.NS(currentRecord.Name, currentRecord)...)
-				context.Authority = append(context.Authority, h.DS(currentRecord.Name, currentRecord)...)
+				ds := h.DS(currentRecord.Name, currentRecord)
+				if len(ds) == 0 {
+					NSec(context, currentRecord.Name, dns.TypeDS, zone)
+				}
+				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := zone.FindLocation(ns.Host)
 					if match != NoMatch {
@@ -249,10 +255,12 @@ loop:
 						}
 					}
 				}
+				context.Res = dns.RcodeSuccess
 				break loop
 			} else {
 				context.Authority = []dns.RR{zone.Config.SOA.Data}
-				res = dns.RcodeNameError
+				context.Res = dns.RcodeNameError
+				NSec(context, currentQName, context.QType(), zone)
 				break loop
 			}
 
@@ -263,7 +271,7 @@ loop:
 			// logger.Default.Debugf("[%d] loading location %s", context.Req.Id, location)
 			currentRecord = h.LoadLocation(location, zone)
 			if currentRecord == nil {
-				res = dns.RcodeServerFailure
+				context.Res = dns.RcodeServerFailure
 				break loop
 			}
 			if currentRecord.CNAME != nil && context.QType() != dns.TypeCNAME {
@@ -272,6 +280,7 @@ loop:
 					context.Answer = append(context.Answer, h.CNAME(currentQName, currentRecord)...)
 				} else if h.FindZone(currentRecord.CNAME.Host) != zoneName {
 					context.Answer = append(context.Answer, h.CNAME(context.RawName(), currentRecord)...)
+					context.Res = dns.RcodeSuccess
 					break loop
 				}
 				currentQName = dns.Fqdn(currentRecord.CNAME.Host)
@@ -279,12 +288,17 @@ loop:
 			}
 			if len(currentRecord.NS.Data) > 0 && currentQName != zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
+				ds := h.DS(currentQName, currentRecord)
+				if len(ds) == 0 {
+					NSec(context, currentRecord.Name, dns.TypeDS, zone)
+				}
 				if context.QType() == dns.TypeDS {
-					context.Answer = h.DS(currentQName, currentRecord)
+					context.Answer = append(context.Answer, ds...)
+					context.Res = dns.RcodeSuccess
 					break loop
 				}
 				context.Authority = append(context.Authority, h.NS(currentQName, currentRecord)...)
-				context.Authority = append(context.Authority, h.DS(currentQName, currentRecord)...)
+				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := zone.FindLocation(ns.Host)
 					if match != NoMatch {
@@ -298,6 +312,7 @@ loop:
 						}
 					}
 				}
+				context.Res = dns.RcodeSuccess
 				break loop
 			}
 
@@ -311,7 +326,7 @@ loop:
 				var ips []net.IP
 				var ttl uint32
 				if len(currentRecord.A.Data) == 0 && currentRecord.ANAME != nil {
-					ips, res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeA)
+					ips, context.Res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeA)
 					currentRecord.A.Ttl = ttl
 				} else {
 					ips = h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.A)
@@ -321,7 +336,7 @@ loop:
 				var ips []net.IP
 				var ttl uint32
 				if len(currentRecord.AAAA.Data) == 0 && currentRecord.ANAME != nil {
-					ips, res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeAAAA)
+					ips, context.Res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeAAAA)
 					currentRecord.AAAA.Ttl = ttl
 				} else {
 					ips = h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.AAAA)
@@ -353,36 +368,28 @@ loop:
 				if zone.Config.DnsSec {
 					answer = []dns.RR{zone.ZSK.DnsKey, zone.KSK.DnsKey}
 				}
+			case dns.TypeDS:
+				answer = []dns.RR{}
 			default:
 				context.Answer = []dns.RR{}
 				context.Authority = []dns.RR{zone.Config.SOA.Data}
-				res = dns.RcodeNotImplemented
+				context.Res = dns.RcodeNotImplemented
 				break loop
 			}
 			context.Answer = append(context.Answer, answer...)
-			if len(answer) == 0 && res == dns.RcodeSuccess {
-				context.Authority = []dns.RR{zone.Config.SOA.Data}
+			if len(answer) == 0 {
+				NSec(context, currentQName, context.QType(), zone)
+				if context.Res == dns.RcodeSuccess {
+					context.Authority = append(context.Authority, zone.Config.SOA.Data)
+				}
 			}
 			break loop
 		}
 	}
 
-	if dnssec {
-		switch res {
-		case dns.RcodeSuccess:
-			if len(context.Answer) == 0 {
-				context.Authority = append(context.Authority, NSec(context.RawName(), zone))
-			}
-		case dns.RcodeNameError:
-			context.Authority = append(context.Authority, NSec(context.RawName(), zone))
-			res = dns.RcodeSuccess
-		}
-		context.Answer = Sign(context.Answer, context.RawName(), zone)
-		context.Authority = Sign(context.Authority, context.RawName(), zone)
-		context.Additional = Sign(context.Additional, context.RawName(), zone)
-	}
+	ApplyDnssec(context, zone)
 
-	h.Response(context, res)
+	h.Response(context)
 	// logger.Default.Debugf("[%d] end handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
 }
 
@@ -411,9 +418,9 @@ func (h *DnsRequestHandler) Filter(name string, sourceIp net.IP, rrset *IP_RRSet
 	return OrderIps(rrset, mask)
 }
 
-func (h *DnsRequestHandler) LogRequest(state *RequestContext, responseCode int) {
+func (h *DnsRequestHandler) LogRequest(state *RequestContext) {
 	state.LogData["process_time"] = time.Since(state.StartTime).Nanoseconds() / 1000000
-	state.LogData["response_code"] = responseCode
+	state.LogData["response_code"] = state.Res
 	state.LogData["log_type"] = "request"
 	select {
 	case h.logQueue <- state.LogData:
@@ -715,10 +722,10 @@ func (h *DnsRequestHandler) LoadZoneKeys(z *Zone) {
 			z.ZSK.DnsKey.Hdr.Ttl = z.KSK.DnsKey.Hdr.Ttl
 		}
 
-		if rrsig, err := sign([]dns.RR{z.ZSK.DnsKey, z.KSK.DnsKey}, z.Name, z.KSK, z.KSK.DnsKey.Hdr.Ttl); err == nil {
+		if rrsig := sign([]dns.RR{z.ZSK.DnsKey, z.KSK.DnsKey}, z.Name, z.KSK, z.KSK.DnsKey.Hdr.Ttl); rrsig != nil {
 			z.DnsKeySig = rrsig
 		} else {
-			logger.Default.Errorf("cannot create RRSIG for DNSKEY : %s", err)
+			logger.Default.Errorf("cannot create RRSIG for DNSKEY")
 			z.Config.DnsSec = false
 			return
 		}

@@ -69,7 +69,7 @@ func DefaultApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler, t *te
 }
 
 var DefaultTestConfig = DnsRequestHandlerConfig{
-	MaxTtl:       300,
+	MaxTtl:       3600,
 	CacheTimeout: 60,
 	ZoneReload:   600,
 	Redis: uperdis.RedisConfig{
@@ -110,4 +110,3 @@ var DefaultTestConfig = DnsRequestHandlerConfig{
 func CenterText(s string, w int) string {
 	return fmt.Sprintf("%[1]*s", -w, fmt.Sprintf("%[1]*s", (w+len(s))/2, s))
 }
-

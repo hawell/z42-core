@@ -193,7 +193,7 @@ var handlerTestCases = []*TestCase{
 			},
 			// DS Test
 			{
-				Desc: "DS query",
+				Desc:  "DS query",
 				Qname: "subdel.example.com.", Qtype: dns.TypeDS,
 				Answer: []dns.RR{
 					test.DS("subdel.example.com. 300 DS 57855 5 1 B6DCD485719ADCA18E5F3D48A2331627FDD3636B"),
@@ -210,8 +210,8 @@ var handlerTestCases = []*TestCase{
 			},
 			// Empty non-terminal Test
 			{
-		   		Desc: "non-terminal match",
-		   		Qname:"v.w.example.com.", Qtype: dns.TypeA,
+				Desc:  "non-terminal match",
+				Qname: "v.w.example.com.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
 					test.SOA("example.com. 300 IN SOA ns1.example.com. hostmaster.example.com. 1460498836 44 55 66 100"),
 				},
@@ -499,7 +499,7 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
-				Desc: "cname + wildcard",
+				Desc:  "cname + wildcard",
 				Qname: "v.example.aaa.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.CNAME("v.example.aaa. 300 IN CNAME w.a.example.aaa."),
@@ -783,9 +783,9 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
-				Desc:   "cname with wildcard",
-				Qname:  "w.example.ddd.",
-				Qtype:  dns.TypeA,
+				Desc:  "cname with wildcard",
+				Qname: "w.example.ddd.",
+				Qtype: dns.TypeA,
 				Answer: []dns.RR{
 					test.A("w.example.ddd.	300	IN	A	129.0.2.1"),
 				},
@@ -2002,7 +2002,7 @@ var handlerTestCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
-				Desc: "delegation with glue IPs",
+				Desc:  "delegation with glue IPs",
 				Qname: "glue.delegation.zon.",
 				Qtype: dns.TypeA,
 				Ns: []dns.RR{
@@ -2015,7 +2015,7 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
-				Desc: "delegation without glue IPs",
+				Desc:  "delegation without glue IPs",
 				Qname: "noglue.delegation.zon.",
 				Qtype: dns.TypeA,
 				Ns: []dns.RR{
@@ -2024,7 +2024,7 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
-				Desc: "cname to subdel",
+				Desc:  "cname to subdel",
 				Qname: "cname.delegation.zon.",
 				Qtype: dns.TypeA,
 				Answer: []dns.RR{
@@ -2040,20 +2040,20 @@ var handlerTestCases = []*TestCase{
 				},
 			},
 			{
-				Desc: "subdel with DS",
+				Desc:  "subdel with DS",
 				Qname: "subdel.delegation.zon.",
 				Qtype: dns.TypeA,
-				Ns:[]dns.RR{
+				Ns: []dns.RR{
 					test.DS("subdel.delegation.zon. 300 DS 57855 5 1 B6DCD485719ADCA18E5F3D48A2331627FDD3636B"),
 					test.NS("subdel.delegation.zon. 300 IN NS ns1.delegated.zon."),
 					test.NS("subdel.delegation.zon. 300 IN NS ns2.delegated.zon."),
 				},
 			},
 			{
-				Desc: "delegated query",
+				Desc:  "delegated query",
 				Qname: "x.y.subdel.delegation.zon.",
 				Qtype: dns.TypeA,
-				Ns:[]dns.RR{
+				Ns: []dns.RR{
 					test.DS("subdel.delegation.zon. 300 DS 57855 5 1 B6DCD485719ADCA18E5F3D48A2331627FDD3636B"),
 					test.NS("subdel.delegation.zon. 300 IN NS ns1.delegated.zon."),
 					test.NS("subdel.delegation.zon. 300 IN NS ns2.delegated.zon."),
