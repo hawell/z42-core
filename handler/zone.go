@@ -122,7 +122,13 @@ func (z *Zone) FindLocation(query string) (string, int) {
 		if bytes.Equal(prefix, rquery) {
 			return query, ExactMatch
 		} else {
-			return ce, CEMatch
+			ss := append(prefix, []byte("*.")...)
+			value, ok = z.Locations.Get(ss)
+			if ok && value != nil {
+				return value.(string), WildCardMatch
+			} else {
+				return ce, CEMatch
+			}
 		}
 	} else {
 		if bytes.Equal(prefix, rquery) {

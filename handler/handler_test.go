@@ -356,6 +356,21 @@ var handlerTestCases = []*TestCase{
 						"cname":{"ttl":300, "host":"x.example.aaa."}
 					}`,
 				},
+				{"a",
+					`{"a":{"ttl":300, "records":[{"ip":"129.0.2.2"}]}}`,
+				},
+				{"v",
+					`{"cname":{"ttl":300, "host":"w.a.example.aaa."}}`,
+				},
+				{"*.a",
+					`{"cname":{"ttl":300, "host":"w.b.example.aaa."}}`,
+				},
+				{"*.b",
+					`{"cname":{"ttl":300, "host":"w.c.example.aaa."}}`,
+				},
+				{"*.c",
+					`{"a":{"ttl":300, "records":[{"ip":"129.0.2.1"}]}}`,
+				},
 			},
 		},
 		TestCases: []test.Case{
@@ -481,6 +496,16 @@ var handlerTestCases = []*TestCase{
 				Answer: []dns.RR{
 					test.CNAME("w.example.aaa. 300 IN CNAME x.example.aaa."),
 					test.SRV("x.example.aaa. 300 IN SRV 10 100 555 sip.example.aaa."),
+				},
+			},
+			{
+				Desc: "cname + wildcard",
+				Qname: "v.example.aaa.", Qtype: dns.TypeA,
+				Answer: []dns.RR{
+					test.CNAME("v.example.aaa. 300 IN CNAME w.a.example.aaa."),
+					test.CNAME("w.a.example.aaa. 300 IN CNAME w.b.example.aaa."),
+					test.CNAME("w.b.example.aaa. 300 IN CNAME w.c.example.aaa."),
+					test.A("w.c.example.aaa. 300 IN	A 129.0.2.1"),
 				},
 			},
 		},
@@ -693,6 +718,21 @@ var handlerTestCases = []*TestCase{
 				{"e",
 					`{"cname":{"ttl":300, "host":"d.example.ddd."}}`,
 				},
+				{"x",
+					`{"a":{"ttl":300, "records":[{"ip":"129.0.2.2"}]}}`,
+				},
+				{"w",
+					`{"cname":{"ttl":300, "host":"w.x.example.ddd."}}`,
+				},
+				{"*.x",
+					`{"cname":{"ttl":300, "host":"w.y.example.ddd."}}`,
+				},
+				{"*.y",
+					`{"cname":{"ttl":300, "host":"w.z.example.ddd."}}`,
+				},
+				{"*.z",
+					`{"a":{"ttl":300, "records":[{"ip":"129.0.2.1"}]}}`,
+				},
 			},
 		},
 		TestCases: []test.Case{
@@ -740,6 +780,14 @@ var handlerTestCases = []*TestCase{
 				Qname: "e.example.ddd.", Qtype: dns.TypeCNAME,
 				Answer: []dns.RR{
 					test.CNAME("e.example.ddd. 300 IN CNAME d.example.ddd."),
+				},
+			},
+			{
+				Desc:   "cname with wildcard",
+				Qname:  "w.example.ddd.",
+				Qtype:  dns.TypeA,
+				Answer: []dns.RR{
+					test.A("w.example.ddd.	300	IN	A	129.0.2.1"),
 				},
 			},
 		},
@@ -1947,7 +1995,7 @@ var handlerTestCases = []*TestCase{
 				{"subdel",
 					`{
 						"ns":{"ttl":300, "records":[{"host":"ns1.delegated.zon."},{"host":"ns2.delegated.zon."}]},
-						"ds":{"ttl":3600, "records":[{"key_tag":57855, "algorithm":5, "digest_type":1, "digest":"B6DCD485719ADCA18E5F3D48A2331627FDD3636B"}]}
+						"ds":{"ttl":300, "records":[{"key_tag":57855, "algorithm":5, "digest_type":1, "digest":"B6DCD485719ADCA18E5F3D48A2331627FDD3636B"}]}
 					}`,
 				},
 			},
