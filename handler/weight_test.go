@@ -24,7 +24,7 @@ func TestWeight(t *testing.T) {
 		Data: []IP_RR{
 			{Ip: net.ParseIP("1.2.3.4"), Weight: 4},
 			{Ip: net.ParseIP("2.3.4.5"), Weight: 1},
-			{Ip: net.ParseIP("3.4.5.6"), Weight: 5},
+			{Ip: net.ParseIP("3.4.5.6"), Weight: 6},
 			{Ip: net.ParseIP("4.5.6.7"), Weight: 10},
 		},
 	}
