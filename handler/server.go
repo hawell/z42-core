@@ -53,14 +53,14 @@ func loadTlsConfig(cfg TlsConfig) *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{cert}, RootCAs: root}
 }
 
-func NewServer(config []ServerConfig) []dns.Server {
-	var servers []dns.Server
+func NewServer(config []ServerConfig) []*dns.Server {
+	var servers []*dns.Server
 	for _, cfg := range config {
 		if cfg.Count < 1 {
 			cfg.Count = 1
 		}
 		for i := 0; i < cfg.Count; i++ {
-			server := dns.Server{
+			server := &dns.Server{
 				Addr:      cfg.Ip + ":" + strconv.Itoa(cfg.Port),
 				Net:       cfg.Protocol,
 				ReusePort: true,

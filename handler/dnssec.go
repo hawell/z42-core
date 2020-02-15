@@ -3,15 +3,27 @@ package handler
 import (
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"errors"
 
 	"github.com/hawell/logger"
 	"github.com/miekg/dns"
 )
 
 var (
-	NSecTypes = []uint16{dns.TypeRRSIG, dns.TypeNSEC}
+	NsecBitmapZone          = []uint16{dns.TypeA, dns.TypeCNAME, dns.TypePTR, dns.TypeMX, dns.TypeTXT, dns.TypeAAAA, dns.TypeSRV, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeTLSA, dns.TypeCAA}
+	NsecBitmapAppex         = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypePTR, dns.TypeMX, dns.TypeTXT, dns.TypeAAAA, dns.TypeSRV, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeTLSA, dns.TypeCAA}
+	NsecBitmapSubDelegation = []uint16{dns.TypeNS, dns.TypeDS, dns.TypeRRSIG, dns.TypeNSEC}
+	NsecBitmapNameError     = []uint16{dns.TypeRRSIG, dns.TypeNSEC}
 )
+
+func FilterNsecBitmap(qtype uint16, bitmap []uint16) []uint16 {
+	res := make([]uint16, 0, len(bitmap))
+	for i := range bitmap {
+		if bitmap[i] != qtype {
+			res = append(res, bitmap[i])
+		}
+	}
+	return res
+}
 
 type rrset struct {
 	qname string
@@ -53,16 +65,18 @@ func Sign(rrs []dns.RR, qname string, z *Zone) []dns.RR {
 			continue
 		case dns.TypeDNSKEY:
 			res = append(res, z.DnsKeySig)
-		default:
-			if rrsig, err := sign(set, qname, z.ZSK, set[0].Header().Ttl); err == nil {
-				res = append(res, rrsig)
+		case dns.TypeNS:
+			if qname == z.Name {
+				res = append(res, sign(set, set[0].Header().Name, z.ZSK, set[0].Header().Ttl))
 			}
+		default:
+			res = append(res, sign(set, set[0].Header().Name, z.ZSK, set[0].Header().Ttl))
 		}
 	}
 	return res
 }
 
-func sign(rrs []dns.RR, name string, key *ZoneKey, ttl uint32) (*dns.RRSIG, error) {
+func sign(rrs []dns.RR, name string, key *ZoneKey, ttl uint32) *dns.RRSIG {
 	rrsig := &dns.RRSIG{
 		Hdr:        dns.RR_Header{Name: name, Rrtype: dns.TypeRRSIG, Class: dns.ClassINET, Ttl: ttl},
 		Inception:  key.KeyInception,
@@ -75,28 +89,57 @@ func sign(rrs []dns.RR, name string, key *ZoneKey, ttl uint32) (*dns.RRSIG, erro
 	case dns.RSAMD5, dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512:
 		if err := rrsig.Sign(key.PrivateKey.(*rsa.PrivateKey), rrs); err != nil {
 			logger.Default.Errorf("sign failed : %s", err)
-			return nil, err
+			return nil
 		}
 	case dns.ECDSAP256SHA256, dns.ECDSAP384SHA384:
 		if err := rrsig.Sign(key.PrivateKey.(*ecdsa.PrivateKey), rrs); err != nil {
 			logger.Default.Errorf("sign failed : %s", err)
-			return nil, err
+			return nil
 		}
 	case dns.DSA, dns.DSANSEC3SHA1:
 		//rrsig.Sign(zone.PrivateKey.(*dsa.PrivateKey), rrs)
 		fallthrough
 	default:
-		return nil, errors.New("invalid or not supported algorithm")
+		return nil
 	}
-	return rrsig, nil
+	return rrsig
 }
 
-func NSec(name string, zone *Zone) dns.RR {
+func NSec(context *RequestContext, name string, qtype uint16, zone *Zone) {
+	if !context.dnssec {
+		return
+	}
+	var bitmap []uint16
+	if name == zone.Name {
+		context.Res = dns.RcodeSuccess
+		bitmap = FilterNsecBitmap(qtype, NsecBitmapAppex)
+	} else {
+		if context.Res == dns.RcodeNameError {
+			context.Res = dns.RcodeSuccess
+			bitmap = NsecBitmapNameError
+		} else {
+			if qtype == dns.TypeDS {
+				bitmap = FilterNsecBitmap(qtype, NsecBitmapSubDelegation)
+			} else {
+				bitmap = FilterNsecBitmap(qtype, NsecBitmapZone)
+			}
+		}
+	}
+
 	nsec := &dns.NSEC{
 		Hdr:        dns.RR_Header{Name: name, Rrtype: dns.TypeNSEC, Class: dns.ClassINET, Ttl: zone.Config.SOA.MinTtl},
 		NextDomain: "\\000." + name,
-		TypeBitMap: NSecTypes,
+		TypeBitMap: bitmap,
 	}
+	context.Authority = append(context.Authority, nsec)
+}
 
-	return nsec
+func ApplyDnssec(context *RequestContext, zone *Zone) {
+	if !context.dnssec {
+		return
+	}
+	context.Answer = Sign(context.Answer, context.RawName(), zone)
+	context.Authority = Sign(context.Authority, context.RawName(), zone)
+	// context.Additional = Sign(context.Additional, context.RawName(), zone)
+
 }
