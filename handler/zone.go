@@ -108,7 +108,9 @@ func (z *Zone) FindLocation(query string) (string, int) {
 	query = strings.TrimSuffix(query, "."+z.Name)
 
 	rquery := reverseName(query)
-	prefix, value, ok := z.Locations.Root().LongestPrefix(rquery)
+	k, value, ok := z.Locations.Root().LongestPrefix(rquery)
+	prefix := make([]byte, len(k), len(k)+2)
+	copy(prefix, k)
 	if !ok {
 		value, ok = z.Locations.Get([]byte("*."))
 		if ok && value != nil {
