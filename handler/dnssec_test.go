@@ -668,8 +668,7 @@ var dnssecTestCases = []*TestCase{
 
 func TestAllDnssec(t *testing.T) {
 	for _, testCase := range dnssecTestCases {
-		if testCase.Name != "RFC4035" {
-			//if !testCase.Enabled {
+		if !testCase.Enabled {
 			continue
 		}
 		fmt.Println(">>> ", CenterText(testCase.Name, 70), " <<<")
