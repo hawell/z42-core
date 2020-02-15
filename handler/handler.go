@@ -223,12 +223,14 @@ loop:
 			break loop
 
 		case EmptyNonterminalMatch:
+			// logger.Default.Debugf("[%d] empty nonterminal match: %s", context.Req.Id)
 			context.Authority = []dns.RR{zone.Config.SOA.Data}
 			context.Res = dns.RcodeSuccess
 			NSec(context, currentQName, dns.TypeNone, zone)
 			break loop
 
 		case CEMatch:
+			// logger.Default.Debugf("[%d] ce match: %s -> %s", context.Req.Id, currentQName, location)
 			currentRecord = h.LoadLocation(location, zone)
 			if currentRecord == nil {
 				context.Res = dns.RcodeServerFailure
@@ -265,6 +267,7 @@ loop:
 			}
 
 		case WildCardMatch:
+			// logger.Default.Debugf("[%d] wildcard match: %s", context.Req.Id, currentRecord.Name)
 			fallthrough
 
 		case ExactMatch:
@@ -884,23 +887,28 @@ func (h *DnsRequestHandler) FindCAA(record *Record) *Record {
 	zone := record.Zone
 	currentRecord := record
 	currentLocation := strings.TrimSuffix(currentRecord.Name, "."+zone.Name)
+	if len(currentRecord.CAA.Data) != 0 {
+		return currentRecord
+	}
 	for {
 		// logger.Default.Debug("location : ", currentLocation)
-		if len(currentRecord.CAA.Data) != 0 {
-			return currentRecord
-		}
 		splits := strings.SplitAfterN(currentLocation, ".", 2)
 		if len(splits) != 2 {
 			break
 		}
 		var match int
 		currentLocation, match = zone.FindLocation(splits[1])
-		if match == NoMatch {
-			return nil
+		if match != ExactMatch && match != WildCardMatch {
+			currentLocation = splits[1]
+			continue
 		}
 		currentRecord = h.LoadLocation(currentLocation, zone)
 		if currentRecord == nil {
-			return nil
+			currentLocation = splits[1]
+			continue
+		}
+		if len(currentRecord.CAA.Data) != 0 {
+			return currentRecord
 		}
 	}
 	currentRecord = h.LoadLocation(zone.Name, zone)
