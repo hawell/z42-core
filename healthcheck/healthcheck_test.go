@@ -313,9 +313,9 @@ func TestSet(t *testing.T) {
 		h.redisStat.Redis.HSet("redins:zones:healthcheck.com.", str[0], a)
 		var key string
 		if str[0] == "@" {
-			key = fmt.Sprintf("arvancloud.com.:%s", str[1])
+			key = fmt.Sprintf("example.com.:%s", str[1])
 		} else {
-			key = fmt.Sprintf("%s.arvancloud.com.:%s", str[0], str[1])
+			key = fmt.Sprintf("%s.example.com.:%s", str[0], str[1])
 		}
 		h.redisStat.Redis.Set("redins:healthcheck:"+key, str[2])
 	}
@@ -323,8 +323,8 @@ func TestSet(t *testing.T) {
 	go h.Start()
 	time.Sleep(time.Second * 10)
 
-	log.Println("[DEBUG]", h.getStatus("arvancloud.com", net.ParseIP("185.143.233.2")))
-	log.Println("[DEBUG]", h.getStatus("www.arvancloud.com", net.ParseIP("185.143.234.50")))
+	log.Println("[DEBUG]", h.getStatus("example.com", net.ParseIP("185.143.233.2")))
+	log.Println("[DEBUG]", h.getStatus("www.example.com", net.ParseIP("185.143.234.50")))
 }
 
 func TestTransfer(t *testing.T) {

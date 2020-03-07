@@ -985,21 +985,21 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify:  DefaultApplyAndVerify,
-		Zones:           []string{"arvancloud.com.", "arvan.an."},
+		Zones:           []string{"example.com.", "xmpl.an."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.com.","ns":"ns1.arvancloud.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvan.an.","ns":"ns1.arvan.an.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"aname.arvan.an."}}`,
+					`{"aname":{"location":"aname.xmpl.an."}}`,
 				},
 				{"nxlocal",
-					`{"aname":{"location":"nx.arvancloud.com."}}`,
+					`{"aname":{"location":"nx.example.com."}}`,
 				},
 				{"empty",
-					`{"aname":{"location":"e.arvancloud.com."}}`,
+					`{"aname":{"location":"e.example.com."}}`,
 				},
 				{"e",
 					`{"txt":{"ttl":300, "records":[{"text":"foo"}]}}`,
@@ -1008,7 +1008,7 @@ var handlerTestCases = []*TestCase{
 					`{"aname":{"location":"dns.msftncsi.com."}}`,
 				},
 				{"nxupstream",
-					`{"aname":{"location":"anamex.arvan.an."}}`,
+					`{"aname":{"location":"anamex.xmpl.an."}}`,
 				},
 			},
 			{
@@ -1020,64 +1020,64 @@ var handlerTestCases = []*TestCase{
 		TestCases: []test.Case{
 			{
 				Desc:  "A aname at root",
-				Qname: "arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("arvancloud.com. 300 IN A 6.5.6.5"),
+					test.A("example.com. 300 IN A 6.5.6.5"),
 				},
 			},
 			{
 				Desc:  "AAAA aname at root",
-				Qname: "arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "example.com.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
-					test.AAAA("arvancloud.com. 300 IN AAAA ::1"),
+					test.AAAA("example.com. 300 IN AAAA ::1"),
 				},
 			},
 			{
 				Desc:  "A aname at subdomain",
-				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "upstream.example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("upstream.arvancloud.com. 303 IN A 131.107.255.255"),
+					test.A("upstream.example.com. 303 IN A 131.107.255.255"),
 				},
 			},
 			{
 				Desc:  "AAAA aname at subdomain",
-				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "upstream.example.com.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
-					test.AAAA("upstream.arvancloud.com. 303 IN AAAA fd3e:4f5a:5b81::1"),
+					test.AAAA("upstream.example.com. 303 IN AAAA fd3e:4f5a:5b81::1"),
 				},
 			},
 			{
 				Desc:  "A aname to nx local",
-				Qname: "nxlocal.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "nxlocal.example.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "AAAA aname to nx local",
-				Qname: "nxlocal.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "nxlocal.example.com.", Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "A aname to empty location",
-				Qname: "empty.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "empty.example.com.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.com.	300	IN	SOA	ns1.arvancloud.com. hostmaster.arvancloud.com. 1570970363 44 55 66 100"),
+					test.SOA("example.com.	300	IN	SOA	ns1.example.com. hostmaster.example.com. 1570970363 44 55 66 100"),
 				},
 			},
 			{
 				Desc:  "AAAA aname to empty location",
-				Qname: "empty.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "empty.example.com.", Qtype: dns.TypeAAAA,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.com.	300	IN	SOA	ns1.arvancloud.com. hostmaster.arvancloud.com. 1570970363 44 55 66 100"),
+					test.SOA("example.com.	300	IN	SOA	ns1.example.com. hostmaster.example.com. 1570970363 44 55 66 100"),
 				},
 			},
 			{
 				Desc:  "A aname to nx external",
-				Qname: "nxupstream.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "nxupstream.example.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "AAAA aname to nx external",
-				Qname: "nxupstream.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "nxupstream.example.com.", Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeServerFailure,
 			},
 		},
@@ -1157,15 +1157,15 @@ var handlerTestCases = []*TestCase{
 				t.Fail()
 			}
 		},
-		Zones: []string{"arvancloud.com.", "arvan.an."},
+		Zones: []string{"example.com.", "xmpl.an."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.com.","ns":"ns1.arvancloud.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvan.an.","ns":"ns1.arvan.an.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"upstream2",
-					`{"aname":{"location":"aname2.arvan.an."}}`,
+					`{"aname":{"location":"aname2.xmpl.an."}}`,
 				},
 			},
 			{
@@ -1180,11 +1180,11 @@ var handlerTestCases = []*TestCase{
 		TestCases: []test.Case{
 			{
 				Desc:  "A to weighted aname",
-				Qname: "upstream2.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "upstream2.example.com.", Qtype: dns.TypeA,
 			},
 			{
 				Desc:  "AAAA to weighted aname",
-				Qname: "upstream2.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "upstream2.example.com.", Qtype: dns.TypeAAAA,
 			},
 		},
 	},
@@ -2246,15 +2246,15 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify:  DefaultApplyAndVerify,
-		Zones:           []string{"arvancloud.com.", "arvan.an."},
+		Zones:           []string{"example.com.", "xmpl.an."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.com.","ns":"ns1.arvancloud.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvan.an.","ns":"ns1.arvan.an.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"aname.arvan.an."}}`,
+					`{"aname":{"location":"aname.xmpl.an."}}`,
 				},
 				{"upstream",
 					`{"aname":{"location":"dns.msftncsi.com."}}`,
@@ -2268,15 +2268,15 @@ var handlerTestCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
-				Qname: "arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("arvancloud.com. 180 IN A 6.5.6.5"),
+					test.A("example.com. 180 IN A 6.5.6.5"),
 				},
 			},
 			{
-				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "upstream.example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("upstream.arvancloud.com. 303 IN A 131.107.255.255"),
+					test.A("upstream.example.com. 303 IN A 131.107.255.255"),
 				},
 			},
 		},
@@ -2289,14 +2289,14 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify:  DefaultApplyAndVerify,
-		Zones:           []string{"arvancloud.mal."},
+		Zones:           []string{"example.mal."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.mal.","ns":"ns1.arvancloud.mal.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.mal.","ns":"ns1.example.mal.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"mal1.arvancloud.mal."}}`,
+					`{"aname":{"location":"mal1.example.mal."}}`,
 				},
 				{"www",
 					`{"a":{"ttl":"300", "records":[{"ip":"3.3.3.1"}]}}`,
@@ -2309,17 +2309,17 @@ var handlerTestCases = []*TestCase{
 		TestCases: []test.Case{
 			{
 				Desc:  " aname to garbage",
-				Qname: "arvancloud.mal.", Qtype: dns.TypeA,
+				Qname: "example.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "invalid json format",
-				Qname: "www.arvancloud.mal.", Qtype: dns.TypeA,
+				Qname: "www.example.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "garbage",
-				Qname: "mal1.arvancloud.mal.", Qtype: dns.TypeA,
+				Qname: "mal1.example.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 		},
@@ -2332,9 +2332,9 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify:  DefaultApplyAndVerify,
-		Zones:           []string{"arvancloud.root."},
+		Zones:           []string{"example.root."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.root.","ns":"ns1.arvancloud.root.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.root.","ns":"ns1.example.root.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
@@ -2345,22 +2345,22 @@ var handlerTestCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
-				Qname: "arvancloud.root.", Qtype: dns.TypeA,
+				Qname: "example.root.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.root. 300 IN SOA ns1.arvancloud.root. hostmaster.arvancloud.root. 1460498836 44 55 66 100"),
+					test.SOA("example.root. 300 IN SOA ns1.example.root. hostmaster.example.root. 1460498836 44 55 66 100"),
 				},
 			},
 			{
-				Qname: "arvancloud.root.", Qtype: dns.TypeSOA,
+				Qname: "example.root.", Qtype: dns.TypeSOA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SOA("arvancloud.root. 300 IN SOA ns1.arvancloud.root. hostmaster.arvancloud.root. 1460498836 44 55 66 100"),
+					test.SOA("example.root. 300 IN SOA ns1.example.root. hostmaster.example.root. 1460498836 44 55 66 100"),
 				},
 			},
 			{
-				Qname: "arvancloud.root.", Qtype: dns.TypeTXT,
+				Qname: "example.root.", Qtype: dns.TypeTXT,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.root. 300 IN SOA ns1.arvancloud.root. hostmaster.arvancloud.root. 1460498836 44 55 66 100"),
+					test.SOA("example.root. 300 IN SOA ns1.example.root. hostmaster.example.root. 1460498836 44 55 66 100"),
 				},
 			},
 		},
