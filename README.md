@@ -6,12 +6,14 @@
 
 - [Configuration](#configuration)
     - [server](#server)
-    - [handler](#handler)
-    - [healthcheck](#healthcheck)
-    - [geoip](#geoip)
-    - [upstream](#upstream)
-    - [error log](#error_log)
     - [redis](#redis)
+        - [data](#data)
+        - [stat](#stat)
+        - [redis config](#redis-config)
+    - [handler](#handler)
+        - [geoip](#geoip)
+        - [upstream](#upstream)
+    - [healthcheck](#healthcheck)
     - [log](#log)
     - [rate limit](#rate-limit)
     - [example](#example)
@@ -56,173 +58,67 @@ dns listening server configuration
 * `protocol` : protocol; can be tcp or udp, default: udp
 * `count` : number of listeners per address, default: 1
 
-### handler
-dns query handler configuration
-
+### redis
+we use two seperate redis connection. one read-only connection to get zone data, and one read-write connection for get/set stats
+#### data
 ~~~json
 {
-"handler": {
-    "max_ttl": 300,
-    "cache_timeout": 60,
-    "zone_reload": 600,
-    "log_source_location": false,
-    "redis": {
-        "address": "127.0.0.1:6379",
-        "net": "tcp",
-        "password": "",
-        "db": 0,
-        "prefix": "test_",
-        "suffix": "_test",
-        "connection": {
-          "max_idle_connections": 10,
-          "max_active_connections": 10,
-          "connect_timeout": 500,
-          "read_timeout": 500,
-          "idle_keep_alive": 30,
-          "max_keep_alive": 0,
-          "wait_for_connection": true
-        }
-    },
-    "log": {
-    "enable": true,
-    "level": "info",
-    "target": "file",
-    "format": "json",
-    "path": "/tmp/redins.log"
-    },
-    "healthcheck": {
-        "enable": true,
-        "max_requests": 10,
-        "update_interval": 600,
-        "check_interval": 600,
-        "redis": {
-            "address": "127.0.0.1:6379",
-            "net":  "tcp",
-            "db": 0,
-            "password": "",
-            "prefix": "healthcheck_",
-            "suffix": "_healthcheck"
-        },
-        "log": {
-            "enable": true,
-            "level": "info",
-            "target": "file",
-            "format": "json",
-            "path": "/tmp/healthcheck.log"
-        }
-    },
-    "geoip": {
-        "enable": true,
-        "country_db": "geoCity.mmdb",
-        "asn_db": "geoIsp.mmdb"
-    },
-    "upstream": [{
-        "ip": "1.1.1.1",
-        "port": 53,
-        "protocol": "udp",
-        "timeout": 400
-    }]
-  }
-}
-~~~
-
-* `max_ttl` : max ttl in seconds, default: 3600
-* `cache_timeout` : time in seconds before cached responses expire
-* `zone_reload` : time in seconds before zone data is reloaded from redis
-* `log_source_location` : enable logging source location of every request
-* `upstream_fallback` : enable using upstream for querying non-authoritative requests
-* `redis` : redis configuration to use for handler
-* `log` : log configuration to use for handler
-
-### healthcheck
-healthcheck configuration
-
-~~~json
-{
-  "healthcheck": {
-    "enable": true,
-    "max_requests": 10,
-    "max_pending_requests": 100,
-    "update_interval": 600,
-    "check_interval": 600,
+  "redis_data": {
+    "zone_cache_size": 10000,
+    "zone_cache_timeout": 60,
+    "zone_reload": 60,
+    "record_cache_size": 1000000,
+    "record_cache_timeout": 60,
     "redis": {
       "address": "127.0.0.1:6379",
       "net": "tcp",
       "db": 0,
       "password": "",
-      "prefix": "healthcheck_",
-      "suffix": "_healthcheck"
-    },
-    "log": {
-      "enable": true,
-      "level": "info",
-      "target": "file",
-      "format": "json",
-      "path": "/tmp/healthcheck.log"
+      "prefix": "",
+      "suffix": "_dns2",
+      "connection": {
+        "max_idle_connections": 10,
+        "max_active_connections": 10,
+        "connect_timeout": 500,
+        "read_timeout": 500,
+        "idle_keep_alive": 30,
+        "max_keep_alive": 0,
+        "wait_for_connection": false
+      }
     }
   }
 }
 ~~~
 
-* `enable` : enable/disable healthcheck, default: disable
-* `max_requests` : maximum number of simultanous healthcheck requests, deafult: 10
-* `max_pending_requests` : maximum number of requests to queue, default: 100
-* `update_interval` : time between checking for updated data from redis in seconds, default: 300
-* `check_interval` : time between two healthcheck requests in seconds, default: 600
-* `redis` : redis configuration to use for healthcheck stats
-* `log` : log configuration to use for healthcheck logs
+* `zone_cache_timeout` : time in seconds before cached responses expire
+* `zone_reload` : time in seconds before zone data is reloaded from redis
 
-### geoip
-geoip configuration
-
+#### stat
 ~~~json
 {
-  "geoip": {
-    "enable": true,
-    "country_db": "geoCity.mmdb",
-    "asn_db": "geoIsp.mmdb"
+  "redis_stat": {
+    "redis": {
+      "address": "127.0.0.1:6379",
+      "net": "tcp",
+      "db": 0,
+      "password": "",
+      "prefix": "redins_",
+      "suffix": "_redins",
+      "connection": {
+        "max_idle_connections": 10,
+        "max_active_connections": 10,
+        "connect_timeout": 500,
+        "read_timeout": 500,
+        "idle_keep_alive": 30,
+        "max_keep_alive": 0,
+        "wait_for_connection": false
+      }
+    }
   }
 }
 ~~~
 
-* `enable` : enable/disable geoip calculations, default: disable
-* `country_db` : maxminddb file for country codes to use, default: geoCity.mmdb
-* `asn_db` : maxminddb file for autonomous system numbers to use, default: geoIsp.mmdb
-
-### upstream
-
-~~~json
-{
-  "upstream": [{
-    "ip": "1.1.1.1",
-    "port": 53,
-    "protocol": "udp",
-    "timeout": 400
-  }]
-}
-~~~
-
-* `ip` : upstream ip address, default: 1.1.1.1
-* `port` : upstream port number, deafult: 53
-* `protocol` : upstream protocol, default : udp
-* `timeout` : request timeout in milliseconds, default: 400
-
-### error_log
-log configuration for error, debug, ... messages
-
-~~~json
-{
-  "log": {
-    "enable": true,
-    "level": "info",
-    "target": "file",
-    "format": "json",
-    "path": "/tmp/redins.log"
-  }
-}
-~~~
-
-### redis
+#### redis config
 redis configurations
 
 ~~~json
@@ -261,6 +157,105 @@ redis configurations
 * `idle_keep_alive`: time to keep idle connections in seconds, 0 for unlimited; default: 30
 * `max_keep_alive`: maximum time to keep a connection in seconds, 0 for unlimited; default: 0
 * `wait_for_connection`: whether or not wait for a connection to be available if connection pool is full, default: false
+
+### handler
+dns query handler configuration
+
+~~~json
+{
+"handler": {
+    "max_ttl": 300,
+    "log_source_location": false,
+    "log": {
+        "enable": true,
+        "level": "info",
+        "target": "file",
+        "format": "json",
+        "path": "/tmp/redins.log"
+    },
+    "geoip": {
+        "enable": true,
+        "country_db": "geoCity.mmdb",
+        "asn_db": "geoIsp.mmdb"
+    },
+    "upstream": [{
+        "ip": "1.1.1.1",
+        "port": 53,
+        "protocol": "udp",
+        "timeout": 400
+    }]
+  }
+}
+~~~
+
+* `max_ttl` : max ttl in seconds, default: 3600
+* `log_source_location` : enable logging source location of every request
+* `upstream_fallback` : enable using upstream for querying non-authoritative requests
+* `log` : log configuration to use for handler
+
+#### geoip
+geoip configuration
+
+~~~json
+{
+  "geoip": {
+    "enable": true,
+    "country_db": "geoCity.mmdb",
+    "asn_db": "geoIsp.mmdb"
+  }
+}
+~~~
+
+* `enable` : enable/disable geoip calculations, default: disable
+* `country_db` : maxminddb file for country codes to use, default: geoCity.mmdb
+* `asn_db` : maxminddb file for autonomous system numbers to use, default: geoIsp.mmdb
+
+#### upstream
+
+~~~json
+{
+  "upstream": [{
+    "ip": "1.1.1.1",
+    "port": 53,
+    "protocol": "udp",
+    "timeout": 400
+  }]
+}
+~~~
+
+* `ip` : upstream ip address, default: 1.1.1.1
+* `port` : upstream port number, deafult: 53
+* `protocol` : upstream protocol, default : udp
+* `timeout` : request timeout in milliseconds, default: 400
+
+### healthcheck
+healthcheck configuration
+
+~~~json
+{
+  "healthcheck": {
+    "enable": true,
+    "max_requests": 10,
+    "max_pending_requests": 100,
+    "update_interval": 600,
+    "check_interval": 600,
+    "log": {
+      "enable": true,
+      "level": "info",
+      "target": "file",
+      "format": "json",
+      "path": "/tmp/healthcheck.log"
+    }
+  }
+}
+~~~
+
+* `enable` : enable/disable healthcheck, default: disable
+* `max_requests` : maximum number of simultanous healthcheck requests, deafult: 10
+* `max_pending_requests` : maximum number of requests to queue, default: 100
+* `update_interval` : time between checking for updated data from redis in seconds, default: 300
+* `check_interval` : time between two healthcheck requests in seconds, default: 600
+* `log` : log configuration to use for healthcheck logs
 
 ### log
 log configuration
@@ -339,87 +334,111 @@ sample config:
 
 ~~~json
 {
-  "server": {
+  "server": [
+    {
       "ip": "127.0.0.1",
       "port": 1053,
       "protocol": "udp",
-      "count": 1
-    },
-  "handler": {
-    "max_ttl": 300,
-    "cache_timeout": 60,
-    "zone_reload": 600,
-    "log_source_location": false,
+      "count": 8
+    }
+  ],
+  "error_log": {
+    "enable": true,
+    "target": "stdout",
+    "level": "info",
+    "path": "/tmp/error.log",
+    "format": "text",
+    "time_format": "2006-01-02T15:04:05Z07:00"
+  },
+  "redis_data": {
+    "zone_cache_size": 10000,
+    "zone_cache_timeout": 60,
+    "zone_reload": 60,
+    "record_cache_size": 1000000,
+    "record_cache_timeout": 60,
     "redis": {
-      "ip": "127.0.0.1",
-      "port": 6379,
+      "address": "127.0.0.1:6379",
+      "net": "tcp",
+      "db": 0,
       "password": "",
-      "prefix": "test_",
-      "suffix": "_test",
+      "prefix": "",
+      "suffix": "_dns2",
       "connection": {
         "max_idle_connections": 10,
         "max_active_connections": 10,
         "connect_timeout": 500,
         "read_timeout": 500,
         "idle_keep_alive": 30,
-        "max_keep_alive": 60,
+        "max_keep_alive": 0,
         "wait_for_connection": false
       }
-    },
-    "log": {
-      "enable": true,
-      "level": "info",
-      "target": "file",
-      "format": "json",
-      "path": "/tmp/redins.log"
-    },
-    "upstream": {
-      "ip": "1.1.1.1",
-      "port": 53,
-      "protocol": "udp"
-    },
+    }
+  },
+  "redis_stat": {
+    "redis": {
+      "address": "127.0.0.1:6379",
+      "net": "tcp",
+      "db": 0,
+      "password": "",
+      "prefix": "redins_",
+      "suffix": "_redins",
+      "connection": {
+        "max_idle_connections": 10,
+        "max_active_connections": 10,
+        "connect_timeout": 500,
+        "read_timeout": 500,
+        "idle_keep_alive": 30,
+        "max_keep_alive": 0,
+        "wait_for_connection": false
+      }
+    }
+  },
+  "handler": {
+    "upstream": [
+      {
+        "ip": "1.1.1.1",
+        "port": 53,
+        "protocol": "udp",
+        "timeout": 400
+      }
+    ],
     "geoip": {
       "enable": true,
       "country_db": "geoCity.mmdb",
       "asn_db": "geoIsp.mmdb"
     },
-    "healthcheck": {
+    "max_ttl": 3600,
+    "log_source_location": false,
+    "log": {
       "enable": true,
-      "max_requests": 10,
-      "max_pending_requests": 100,
-      "update_interval": 600,
-      "check_interval": 600,
-      "redis": {
-        "ip": "127.0.0.1",
-        "port": 6379,
-        "password": "",
-        "prefix": "healthcheck_",
-        "suffix": "_healthcheck",
-        "connection": {
-          "max_idle_connections": 10,
-          "max_active_connections": 10,
-          "connect_timeout": 500,
-          "read_timeout": 500,
-          "idle_keep_alive": 30,
-          "max_keep_alive": 60,
-          "wait_for_connection": false
-        }
-      },
-      "log": {
-        "enable": true,
-        "level": "info",
-        "target": "file",
-        "format": "json",
-        "path": "/tmp/healthcheck.log"
-      }
+      "target": "file",
+      "level": "info",
+      "path": "/tmp/redins.log",
+      "format": "json",
+      "time_format": "2006-01-02T15:04:05Z07:00"
     }
   },
-  "error_log": {
+  "healthcheck": {
+    "enable": false,
+    "max_requests": 10,
+    "max_pending_requests": 100,
+    "update_interval": 600,
+    "check_interval": 600,
+    "log": {
       "enable": true,
+      "target": "file",
       "level": "info",
-      "target": "stdout",
+      "path": "/tmp/healthcheck.log",
       "format": "json",
-      "path": "/tmp/healthcheck.log"
+      "time_format": "2006-01-02T15:04:05Z07:00"
+    }
+  },
+  "ratelimit": {
+    "enable": false,
+    "burst": 10,
+    "rate": 60,
+    "whitelist": [],
+    "blacklist": []
   }
 }
 ~~~
@@ -462,13 +481,12 @@ redis-cli>GET redins:zones:XXXX.XXX.:pub
 ### dns RRs 
 
 dns RRs are stored in redis as json strings inside a hash map using address as field key.
- there are two special labels: @config for zone specific configuration and @ for TLD records.
+@ is used for TLD records.
 
 ~~~
 redis-cli>HGETALL example.com.
 1) "@"
-2) "@config"
-3) "www"
+2) "www"
 ~~~
 
 #### A
@@ -753,9 +771,11 @@ redis-cli> hgetall redins:zones:example.net.
 10) "{\"srv\":{\"ttl\":300, \"records\":[{\"target\":\"tcp.example.com.\",\"port\":123,\"priority\":10,\"weight\":100}]}}"
 11) "subdel"
 12) "{\"ns\":{\"ttl\":300, \"records\":[{\"host\":\"ns1.subdel.example.net.\"},{\"host\":\"ns2.subdel.example.net.\"}]}"
+13) "@"
+14) "{\"ns\":{\"ttl\":300, \"records\":[{\"host\":\"ns1.example.net.\"},{\"host\":\"ns2.example.net.\"}]}"
 
 redis-cli> get redins:zones:example.net.:config
-"{\"soa\":{\"ttl\":300, \"minttl\":100, \"mbox\":\"hostmaster.example.net.\",\"ns\":\"ns1.example.net.\",\"refresh\":44,\"retry\":55,\"expire\":66, \"serial\":32343},\"ns\":[{\"ttl\":300, \"host\":\"ns1.example.net.\"},{\"ttl\":300, \"host\":\"ns2.example.net.\"}]}"
+"{\"soa\":{\"ttl\":300, \"minttl\":100, \"mbox\":\"hostmaster.example.net.\",\"ns\":\"ns1.example.net.\",\"refresh\":44,\"retry\":55,\"expire\":66, \"serial\":32343}}"
 
 ~~~
 
