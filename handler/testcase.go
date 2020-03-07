@@ -1,59 +1,61 @@
 package handler
 
 import (
-	"arvancloud/redins/test"
 	"errors"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/uperdis"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/test"
 	"testing"
 )
 
 type TestCase struct {
-	Name           string
-	Description    string
-	Enabled        bool
-	Config         DnsRequestHandlerConfig
-	Initialize     func(testCase *TestCase) (*DnsRequestHandler, error)
-	ApplyAndVerify func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T)
-	Zones          []string
-	ZoneConfigs    []string
-	Entries        [][][]string
-	TestCases      []test.Case
+	Name            string
+	Description     string
+	Enabled         bool
+	RedisDataConfig redis.DataHandlerConfig
+	HandlerConfig   DnsRequestHandlerConfig
+	Initialize      func(testCase *TestCase) (*DnsRequestHandler, error)
+	ApplyAndVerify  func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T)
+	Zones           []string
+	ZoneConfigs     []string
+	Entries         [][][]string
+	TestCases       []test.Case
 }
 
 func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-	h := NewHandler(&testCase.Config)
-	if err := h.Redis.Del("*"); err != nil {
+	r := redis.NewDataHandler(&testCase.RedisDataConfig)
+	h := NewHandler(&testCase.HandlerConfig, r)
+	if err := h.RedisData.Redis.Del("*"); err != nil {
 		return nil, err
 	}
 	for i, zone := range testCase.Zones {
-		if err := h.Redis.SAdd("redins:zones", zone); err != nil {
+		if err := h.RedisData.Redis.SAdd("redins:zones", zone); err != nil {
 			return nil, err
 		}
 		for _, cmd := range testCase.Entries[i] {
-			err := h.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
+			err := h.RedisData.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
 			if err != nil {
 				return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
 			}
 		}
-		if err := h.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
+		if err := h.RedisData.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
 			return nil, err
 		}
 	}
-	h.LoadZones()
+	h.RedisData.LoadZones()
 	return h, nil
 }
 
-func DefaultApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+func DefaultApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler, t *testing.T) {
 	for i, tc := range testCase.TestCases {
 
 		r := tc.Msg()
 		w := test.NewRecorder(&test.ResponseWriter{})
 		state := NewRequestContext(w, r)
-		handler.HandleRequest(state)
+		requestHandler.HandleRequest(state)
 
 		resp := w.Msg
 
@@ -68,18 +70,20 @@ func DefaultApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler, t *te
 	}
 }
 
-var DefaultTestConfig = DnsRequestHandlerConfig{
-	MaxTtl:       3600,
-	CacheTimeout: 60,
-	ZoneReload:   600,
-	Redis: uperdis.RedisConfig{
+var DefaultRedisDataTestConfig = redis.DataHandlerConfig{
+	ZoneCacheSize:      10000,
+	ZoneCacheTimeout:   60,
+	ZoneReload:         60,
+	RecordCacheSize:    1000000,
+	RecordCacheTimeout: 60,
+	Redis: redis.RedisConfig{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
 		Prefix:   "test_",
 		Suffix:   "_test",
-		Connection: uperdis.RedisConnectionConfig{
+		Connection: redis.RedisConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       500,
@@ -89,6 +93,10 @@ var DefaultTestConfig = DnsRequestHandlerConfig{
 			WaitForConnection:    true,
 		},
 	},
+}
+
+var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
+	MaxTtl: 3600,
 	Log: logger.LogConfig{
 		Enable: false,
 	},

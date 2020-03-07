@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"arvancloud/redins/handler/logformat"
-	"arvancloud/redins/test"
 	"bytes"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/uperdis"
+	"github.com/hawell/redins/handler/logformat"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/test"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"io/ioutil"
@@ -18,12 +18,13 @@ import (
 	capnp "zombiezen.com/go/capnproto2"
 )
 
-var logTestConfig = DnsRequestHandlerConfig{
-	MaxTtl:            300,
-	CacheTimeout:      60,
-	ZoneReload:        600,
-	LogSourceLocation: true,
-	Redis: uperdis.RedisConfig{
+var logRedisDataTestConfig = redis.DataHandlerConfig{
+	ZoneCacheSize:      10000,
+	ZoneCacheTimeout:   60,
+	ZoneReload:         60,
+	RecordCacheSize:    1000000,
+	RecordCacheTimeout: 60,
+	Redis: redis.RedisConfig{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
@@ -31,6 +32,11 @@ var logTestConfig = DnsRequestHandlerConfig{
 		Prefix:   "test_",
 		Suffix:   "_test",
 	},
+}
+
+var logHandlerTestConfig = DnsRequestHandlerConfig{
+	MaxTtl:            300,
+	LogSourceLocation: true,
 	Log: logger.LogConfig{
 		Enable: true,
 		Path:   "/tmp/test.log",
@@ -76,19 +82,20 @@ func TestJsonLog(t *testing.T) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	os.Remove("/tmp/test.log")
 
-	logTestConfig.Log.Format = "json"
-	h := NewHandler(&logTestConfig)
-	h.Redis.Del("*")
-	h.Redis.SAdd("redins:zones", logZone)
+	logHandlerTestConfig.Log.Format = "json"
+	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	h := NewHandler(&logHandlerTestConfig, rd)
+	h.RedisData.Redis.Del("*")
+	h.RedisData.Redis.SAdd("redins:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
-	h.LoadZones()
+	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www.zone.log",
 		Qtype: dns.TypeA,
@@ -126,19 +133,20 @@ func TestCapnpLog(t *testing.T) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	os.Remove("/tmp/test.log")
 
-	logTestConfig.Log.Format = "capnp_request"
-	h := NewHandler(&logTestConfig)
-	h.Redis.Del("*")
-	h.Redis.SAdd("redins:zones", logZone)
+	logHandlerTestConfig.Log.Format = "capnp_request"
+	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	h := NewHandler(&logHandlerTestConfig, rd)
+	h.RedisData.Redis.Del("*")
+	h.RedisData.Redis.SAdd("redins:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
-	h.LoadZones()
+	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
 		Qtype: dns.TypeA,
@@ -182,10 +190,11 @@ func TestCapnpLogNotAuth(t *testing.T) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	os.Remove("/tmp/test.log")
 
-	logTestConfig.Log.Format = "capnp_request"
-	h := NewHandler(&logTestConfig)
-	h.Redis.Del("*")
-	h.LoadZones()
+	logHandlerTestConfig.Log.Format = "capnp_request"
+	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	h := NewHandler(&logHandlerTestConfig, rd)
+	h.RedisData.Redis.Del("*")
+	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
 		Qtype: dns.TypeA,
@@ -224,14 +233,15 @@ func TestKafkaCapnpLog(t *testing.T) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	os.Remove("/tmp/test.log")
 
-	logTestConfig.Log.Format = "text"
-	logTestConfig.Log.Kafka.Enable = true
-	logTestConfig.Log.Kafka.Format = "capnp_request"
-	h := NewHandler(&logTestConfig)
-	h.Redis.Del("*")
-	h.Redis.SAdd("redins:zones", logZone)
+	logHandlerTestConfig.Log.Format = "text"
+	logHandlerTestConfig.Log.Kafka.Enable = true
+	logHandlerTestConfig.Log.Kafka.Format = "capnp_request"
+	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	h := NewHandler(&logHandlerTestConfig, rd)
+	h.RedisData.Redis.Del("*")
+	h.RedisData.Redis.SAdd("redins:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
@@ -249,8 +259,8 @@ func TestKafkaCapnpLog(t *testing.T) {
 			},
 		},
 	}
-	h.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
-	h.LoadZones()
+	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
 		Qtype: dns.TypeA,
@@ -309,21 +319,22 @@ func TestUdpCapnpLog(t *testing.T) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	os.Remove("/tmp/test.log")
 
-	logTestConfig.Log.Format = "capnp_request"
-	logTestConfig.Log.Target = "udp"
-	logTestConfig.Log.Path = "localhost:9090"
-	h := NewHandler(&logTestConfig)
-	h.Redis.Del("*")
-	h.Redis.SAdd("redins:zones", logZone)
+	logHandlerTestConfig.Log.Format = "capnp_request"
+	logHandlerTestConfig.Log.Target = "udp"
+	logHandlerTestConfig.Log.Path = "localhost:9090"
+	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	h := NewHandler(&logHandlerTestConfig, rd)
+	h.RedisData.Redis.Del("*")
+	h.RedisData.Redis.SAdd("redins:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
-	h.LoadZones()
+	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
 		Qtype: dns.TypeA,

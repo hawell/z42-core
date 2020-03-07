@@ -1,4 +1,4 @@
-package handler
+package types
 
 import (
 	"crypto"
@@ -6,6 +6,12 @@ import (
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"net"
+)
+
+const (
+	IpMaskWhite = iota
+	IpMaskGrey
+	IpMaskBlack
 )
 
 type RRSets struct {
@@ -218,4 +224,34 @@ type SOA_RRSet struct {
 
 type ANAME_Record struct {
 	Location string `json:"location,omitempty"`
+}
+
+type RRSetKey struct {
+	QName string
+	QType uint16
+}
+
+func SplitSets(rrs []dns.RR) map[RRSetKey][]dns.RR {
+	m := make(map[RRSetKey][]dns.RR)
+
+	for _, r := range rrs {
+		if r.Header().Rrtype == dns.TypeRRSIG || r.Header().Rrtype == dns.TypeOPT {
+			continue
+		}
+
+		if s, ok := m[RRSetKey{r.Header().Name, r.Header().Rrtype}]; ok {
+			s = append(s, r)
+			m[RRSetKey{r.Header().Name, r.Header().Rrtype}] = s
+			continue
+		}
+
+		s := make([]dns.RR, 1, 3)
+		s[0] = r
+		m[RRSetKey{r.Header().Name, r.Header().Rrtype}] = s
+	}
+
+	if len(m) > 0 {
+		return m
+	}
+	return nil
 }

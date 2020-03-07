@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"github.com/hawell/redins/types"
 	"log"
 	"net"
 	"testing"
@@ -13,15 +14,15 @@ func TestWeight(t *testing.T) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
 	// distribution
-	rrset := IP_RRSet{
-		FilterConfig: IpFilterConfig{
+	rrset := types.IP_RRSet{
+		FilterConfig: types.IpFilterConfig{
 			Count:     "single",
 			Order:     "weighted",
 			GeoFilter: "",
 		},
-		HealthCheckConfig: IpHealthCheckConfig{},
+		HealthCheckConfig: types.IpHealthCheckConfig{},
 		Ttl:               300,
-		Data: []IP_RR{
+		Data: []types.IP_RR{
 			{Ip: net.ParseIP("1.2.3.4"), Weight: 4},
 			{Ip: net.ParseIP("2.3.4.5"), Weight: 1},
 			{Ip: net.ParseIP("3.4.5.6"), Weight: 6},

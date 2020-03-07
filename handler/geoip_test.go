@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/hawell/redins/types"
 	"log"
 	"net"
 	"testing"
@@ -61,13 +62,13 @@ func TestGeoIpAutomatic(t *testing.T) {
 	g := NewGeoIp(&cfg)
 
 	for i := range sip {
-		dest := new(IP_RRSet)
+		dest := new(types.IP_RRSet)
 		for j := range dip {
 			cc, _ := g.GetCountry(net.ParseIP(dip[j][0]))
 			if cc != dip[j][1] {
 				t.Fail()
 			}
-			r := IP_RR{
+			r := types.IP_RR{
 				Ip: net.ParseIP(dip[j][0]),
 			}
 			dest.Data = append(dest.Data, r)
@@ -77,7 +78,7 @@ func TestGeoIpAutomatic(t *testing.T) {
 		mask = g.GetMinimumDistance(net.ParseIP(sip[i][0]), dest.Data, mask)
 		index := 0
 		for j, x := range mask {
-			if x == IpMaskWhite {
+			if x == types.IpMaskWhite {
 				index = j
 				break
 			}
@@ -106,8 +107,8 @@ func TestGetSameCountry(t *testing.T) {
 	g := NewGeoIp(&cfg)
 
 	for i := range sip {
-		var dest IP_RRSet
-		dest.Data = []IP_RR{
+		var dest types.IP_RRSet
+		dest.Data = []types.IP_RR{
 			{Ip: net.ParseIP("1.2.3.4"), Country: []string{"DE"}},
 			{Ip: net.ParseIP("2.3.4.5"), Country: []string{"FR"}},
 			{Ip: net.ParseIP("3.4.5.6"), Country: []string{""}},
@@ -116,7 +117,7 @@ func TestGetSameCountry(t *testing.T) {
 		mask = g.GetSameCountry(net.ParseIP(sip[i][0]), dest.Data, mask)
 		index := -1
 		for j, x := range mask {
-			if x == IpMaskWhite {
+			if x == types.IpMaskWhite {
 				index = j
 				break
 			}
@@ -140,8 +141,8 @@ func TestGetSameASN(t *testing.T) {
 		"127.0.0.1",
 	}
 
-	dip := IP_RRSet{
-		Data: []IP_RR{
+	dip := types.IP_RRSet{
+		Data: []types.IP_RR{
 			{Ip: net.ParseIP("1.2.3.4"), ASN: []uint{47447}},
 			{Ip: net.ParseIP("2.3.4.5"), ASN: []uint{20766}},
 			{Ip: net.ParseIP("3.4.5.6"), ASN: []uint{852}},
@@ -167,7 +168,7 @@ func TestGetSameASN(t *testing.T) {
 		mask = g.GetSameASN(net.ParseIP(sip[i]), dip.Data, mask)
 		index := -1
 		for j, x := range mask {
-			if x == IpMaskWhite {
+			if x == types.IpMaskWhite {
 				index = j
 				break
 			}

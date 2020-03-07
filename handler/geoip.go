@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/hawell/redins/types"
 	"math"
 	"net"
 
@@ -39,7 +40,7 @@ func NewGeoIp(config *GeoIpConfig) *GeoIp {
 	return g
 }
 
-func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR, mask []int) []int {
+func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []types.IP_RR, mask []int) []int {
 	if !g.Enable || g.CountryDB == nil {
 		return mask
 	}
@@ -53,16 +54,16 @@ func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	if sourceCountry != "" {
 	outer:
 		for i, x := range mask {
-			if x == IpMaskWhite {
+			if x == types.IpMaskWhite {
 				for _, country := range ips[i].Country {
 					if country == sourceCountry {
 						passed++
 						continue outer
 					}
 				}
-				mask[i] = IpMaskGrey
+				mask[i] = types.IpMaskGrey
 			} else {
-				mask[i] = IpMaskBlack
+				mask[i] = types.IpMaskBlack
 			}
 		}
 	}
@@ -71,14 +72,14 @@ func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	}
 
 	for i, x := range mask {
-		if x != IpMaskBlack {
+		if x != types.IpMaskBlack {
 			if ips[i].Country == nil || len(ips[i].Country) == 0 {
-				mask[i] = IpMaskWhite
+				mask[i] = types.IpMaskWhite
 			} else {
-				mask[i] = IpMaskBlack
+				mask[i] = types.IpMaskBlack
 				for _, country := range ips[i].Country {
 					if country == "" {
-						mask[i] = IpMaskWhite
+						mask[i] = types.IpMaskWhite
 						break
 					}
 				}
@@ -89,7 +90,7 @@ func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	return mask
 }
 
-func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []IP_RR, mask []int) []int {
+func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []types.IP_RR, mask []int) []int {
 	if !g.Enable || g.ASNDB == nil {
 		return mask
 	}
@@ -103,16 +104,16 @@ func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	if sourceASN != 0 {
 	outer:
 		for i, x := range mask {
-			if x == IpMaskWhite {
+			if x == types.IpMaskWhite {
 				for _, asn := range ips[i].ASN {
 					if asn == sourceASN {
 						passed++
 						continue outer
 					}
 				}
-				mask[i] = IpMaskGrey
+				mask[i] = types.IpMaskGrey
 			} else {
-				mask[i] = IpMaskBlack
+				mask[i] = types.IpMaskBlack
 			}
 		}
 	}
@@ -121,14 +122,14 @@ func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 	}
 
 	for i, x := range mask {
-		if x != IpMaskBlack {
+		if x != types.IpMaskBlack {
 			if ips[i].ASN == nil || len(ips[i].ASN) == 0 {
-				mask[i] = IpMaskWhite
+				mask[i] = types.IpMaskWhite
 			} else {
-				mask[i] = IpMaskBlack
+				mask[i] = types.IpMaskBlack
 				for _, asn := range ips[i].ASN {
 					if asn == 0 {
-						mask[i] = IpMaskWhite
+						mask[i] = types.IpMaskWhite
 						break
 					}
 				}
@@ -140,7 +141,7 @@ func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []IP_RR, mask []int) []int {
 }
 
 // TODO: add a margin for minimum distance
-func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []IP_RR, mask []int) []int {
+func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []types.IP_RR, mask []int) []int {
 	if !g.Enable || g.CountryDB == nil {
 		return mask
 	}
@@ -152,7 +153,7 @@ func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []IP_RR, mask []int) []i
 		return mask
 	}
 	for i, x := range mask {
-		if x == IpMaskWhite {
+		if x == types.IpMaskWhite {
 			destinationIp := ips[i].Ip
 			dlat, dlong, _ := g.GetCoordinates(destinationIp)
 			d, err := g.getDistance(slat, slong, dlat, dlong)
@@ -168,22 +169,22 @@ func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []IP_RR, mask []int) []i
 
 	passed := 0
 	for i, x := range mask {
-		if x == IpMaskWhite {
+		if x == types.IpMaskWhite {
 			if dists[i] == minDistance {
 				passed++
 			} else {
-				mask[i] = IpMaskGrey
+				mask[i] = types.IpMaskGrey
 			}
 		} else {
-			mask[i] = IpMaskBlack
+			mask[i] = types.IpMaskBlack
 		}
 	}
 	if passed > 0 {
 		return mask
 	} else {
 		for i := range mask {
-			if mask[i] == IpMaskGrey {
-				mask[i] = IpMaskWhite
+			if mask[i] == types.IpMaskGrey {
+				mask[i] = types.IpMaskWhite
 			}
 		}
 		return mask

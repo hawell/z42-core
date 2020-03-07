@@ -1,8 +1,10 @@
-package handler
+package healthcheck
 
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/types"
 	"github.com/json-iterator/go"
 	"net"
 	"net/http"
@@ -12,7 +14,6 @@ import (
 
 	"encoding/binary"
 	"github.com/hawell/logger"
-	"github.com/hawell/uperdis"
 	"github.com/hawell/workerpool"
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -42,8 +43,8 @@ type Healthcheck struct {
 	maxPendingRequests int
 	updateInterval     time.Duration
 	checkInterval      time.Duration
-	redisConfigServer  *uperdis.Redis
-	redisStatusServer  *uperdis.Redis
+	redisData          *redis.DataHandler
+	redisStat          *redis.StatHandler
 	logger             *logger.EventLogger
 	cachedItems        *cache.Cache
 	lastUpdate         time.Time
@@ -160,16 +161,15 @@ func pingCheck(ip string, timeout time.Duration) error {
 }
 
 type HealthcheckConfig struct {
-	Enable             bool                `json:"enable"`
-	MaxRequests        int                 `json:"max_requests"`
-	MaxPendingRequests int                 `json:"max_pending_requests"`
-	UpdateInterval     int                 `json:"update_interval"`
-	CheckInterval      int                 `json:"check_interval"`
-	RedisStatusServer  uperdis.RedisConfig `json:"redis"`
-	Log                logger.LogConfig    `json:"log"`
+	Enable             bool             `json:"enable"`
+	MaxRequests        int              `json:"max_requests"`
+	MaxPendingRequests int              `json:"max_pending_requests"`
+	UpdateInterval     int              `json:"update_interval"`
+	CheckInterval      int              `json:"check_interval"`
+	Log                logger.LogConfig `json:"log"`
 }
 
-func NewHealthcheck(config *HealthcheckConfig, redisConfigServer *uperdis.Redis) *Healthcheck {
+func NewHealthcheck(config *HealthcheckConfig, redisData *redis.DataHandler, redisStat *redis.StatHandler) *Healthcheck {
 	h := &Healthcheck{
 		Enable:             config.Enable,
 		maxRequests:        config.MaxRequests,
@@ -180,8 +180,8 @@ func NewHealthcheck(config *HealthcheckConfig, redisConfigServer *uperdis.Redis)
 
 	if h.Enable {
 
-		h.redisConfigServer = redisConfigServer
-		h.redisStatusServer = uperdis.NewRedis(&config.RedisStatusServer)
+		h.redisData = redisData
+		h.redisStat = redisStat
 		h.cachedItems = cache.New(h.updateInterval, h.updateInterval*10)
 		h.dispatcher = workerpool.NewDispatcher(config.MaxPendingRequests, config.MaxRequests)
 		for i := 0; i < config.MaxRequests; i++ {
@@ -235,7 +235,7 @@ func (h *Healthcheck) loadItem(key string) *HealthCheckItem {
 	item := new(HealthCheckItem)
 	item.Host = strings.TrimSuffix(splits[0], ":")
 	item.Ip = splits[1]
-	itemStr, err := h.redisStatusServer.Get("redins:healthcheck:" + key)
+	itemStr, err := h.redisStat.Redis.Get("redins:healthcheck:" + key)
 	if err != nil {
 		logger.Default.Errorf("cannot load item %s : %s", key, err)
 		return nil
@@ -255,12 +255,12 @@ func (h *Healthcheck) storeItem(item *HealthCheckItem) {
 		return
 	}
 	// logger.Default.Debugf("setting %v in redis : %s", *item, string(itemStr))
-	h.redisStatusServer.Set("redins:healthcheck:"+key, string(itemStr))
+	h.redisStat.Redis.Set("redins:healthcheck:"+key, string(itemStr))
 }
 
 func (h *Healthcheck) getDomainId(zone string) string {
-	var cfg ZoneConfig
-	val, err := h.redisConfigServer.Get("redins:zones:" + zone + ":config")
+	var cfg types.ZoneConfig
+	val, err := h.redisData.Redis.Get("redins:zones:" + zone + ":config")
 	if err != nil {
 		logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
 	}
@@ -283,7 +283,7 @@ func (h *Healthcheck) Start() {
 
 	ticker := time.NewTicker(h.checkInterval)
 	for {
-		itemKeys, err := h.redisStatusServer.GetKeys("redins:healthcheck:*")
+		itemKeys, err := h.redisStat.Redis.GetKeys("redins:healthcheck:*")
 		if err != nil {
 			logger.Default.Errorf("cannot load keys : redins:healthcheck:* : %s", err)
 		}
@@ -348,13 +348,13 @@ func statusUp(item *HealthCheckItem) {
 	}
 }
 
-func (h *Healthcheck) FilterHealthcheck(qname string, rrset *IP_RRSet, mask []int) []int {
+func (h *Healthcheck) FilterHealthcheck(qname string, rrset *types.IP_RRSet, mask []int) []int {
 	if !h.Enable {
 		return mask
 	}
 	min := rrset.HealthCheckConfig.DownCount
 	for i, x := range mask {
-		if x == IpMaskWhite {
+		if x == types.IpMaskWhite {
 			status := h.getStatus(qname, rrset.Data[i].Ip)
 			if status > min {
 				min = status
@@ -367,13 +367,13 @@ func (h *Healthcheck) FilterHealthcheck(qname string, rrset *IP_RRSet, mask []in
 	}
 	// logger.Default.Debugf("min = %d", min)
 	for i, x := range mask {
-		if x == IpMaskWhite {
+		if x == types.IpMaskWhite {
 			// logger.Default.Debug("qname: ", rrset.Data[i].Ip.String(), " status: ", h.getStatus(qname, rrset.Data[i].Ip))
 			if h.getStatus(qname, rrset.Data[i].Ip) < min {
-				mask[i] = IpMaskBlack
+				mask[i] = types.IpMaskBlack
 			}
 		} else {
-			mask[i] = IpMaskBlack
+			mask[i] = types.IpMaskBlack
 		}
 	}
 	return mask
@@ -394,13 +394,13 @@ func (h *Healthcheck) Transfer() {
 
 	limiter := time.Tick(time.Millisecond * 50)
 	for {
-		domains, err := h.redisConfigServer.SMembers("redins:zones")
+		domains, err := h.redisData.Redis.SMembers("redins:zones")
 		if err != nil {
 			logger.Default.Errorf("cannot get members of redins:zones : %s", err)
 		}
 		for _, domain := range domains {
 			domainId := h.getDomainId(domain)
-			subdomains, err := h.redisConfigServer.GetHKeys("redins:zones:" + domain)
+			subdomains, err := h.redisData.Redis.GetHKeys("redins:zones:" + domain)
 			if err != nil {
 				logger.Default.Errorf("cannot get keys of %s : %s", domain, err)
 			}
@@ -410,12 +410,12 @@ func (h *Healthcheck) Transfer() {
 					h.quitWG.Done()
 					return
 				case <-limiter:
-					recordStr, err := h.redisConfigServer.HGet("redins:zones:"+domain, subdomain)
+					recordStr, err := h.redisData.Redis.HGet("redins:zones:"+domain, subdomain)
 					if err != nil {
 						logger.Default.Errorf("cannot get record of %s.%s : %s", subdomain, domain, err)
 					}
-					record := new(Record)
-					record.A.HealthCheckConfig = IpHealthCheckConfig{
+					record := new(types.Record)
+					record.A.HealthCheckConfig = types.IpHealthCheckConfig{
 						Timeout:   1000,
 						Port:      80,
 						UpCount:   3,
@@ -436,7 +436,7 @@ func (h *Healthcheck) Transfer() {
 					} else {
 						host = subdomain + "." + domain
 					}
-					for _, rrset := range []*IP_RRSet{&record.A, &record.AAAA} {
+					for _, rrset := range []*types.IP_RRSet{&record.A, &record.AAAA} {
 						if !rrset.HealthCheckConfig.Enable {
 							continue
 						}
@@ -458,7 +458,7 @@ func (h *Healthcheck) Transfer() {
 							if !itemsEqual(oldItem, newItem) {
 								h.storeItem(newItem)
 							}
-							h.redisStatusServer.Expire("redins:healthcheck:"+key, h.updateInterval)
+							h.redisStat.Redis.Expire("redins:healthcheck:"+key, h.updateInterval)
 						}
 					}
 				}

@@ -3,7 +3,7 @@ using Go = import "/go.capnp";
 @0x8d8d9fbdbf80710e;
 
 $Go.package("logformat");
-$Go.import("arvancloud/redins/handler/logformat");
+$Go.import("github.com/hawell/redins/handler/logformat");
 
 struct RequestLog {
   timestamp @0 :UInt64;

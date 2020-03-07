@@ -6,6 +6,11 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/raven-go"
+	"github.com/hawell/redins/handler"
+	"github.com/hawell/redins/healthcheck"
+	"github.com/hawell/redins/ratelimit"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/server"
 	"github.com/json-iterator/go"
 	"github.com/logrusorgru/aurora"
 	"github.com/oschwald/maxminddb-golang"
@@ -21,26 +26,27 @@ import (
 	"syscall"
 	"time"
 
-	"arvancloud/redins/handler"
 	"github.com/hawell/logger"
-	"github.com/hawell/uperdis"
 	"github.com/miekg/dns"
 	_ "net/http/pprof"
 )
 
 var (
-	s          []*dns.Server
-	h          *handler.DnsRequestHandler
-	l          *handler.RateLimiter
-	configFile string
+	servers           []*dns.Server
+	redisDataHandler  *redis.DataHandler
+	redisStatHandler  *redis.StatHandler
+	dnsRequestHandler *handler.DnsRequestHandler
+	healthChecker     *healthcheck.Healthcheck
+	rateLimiter       *ratelimit.RateLimiter
+	configFile        string
 )
 
 func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	context := handler.NewRequestContext(w, r)
 	// logger.Default.Debugf("handle request: [%d] %s %s", r.Id, context.RawName(), context.Type())
 
-	if l.CanHandle(context.IP()) {
-		h.HandleRequest(context)
+	if rateLimiter.CanHandle(context.IP()) {
+		dnsRequestHandler.HandleRequest(context)
 	} else {
 		context.Res = dns.RcodeRefused
 		context.Response()
@@ -48,24 +54,70 @@ func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 type RedinsConfig struct {
-	Server    []handler.ServerConfig          `json:"server"`
-	ErrorLog  logger.LogConfig                `json:"error_log"`
-	Handler   handler.DnsRequestHandlerConfig `json:"handler"`
-	RateLimit handler.RateLimiterConfig       `json:"ratelimit"`
+	Server      []server.ServerConfig           `json:"server"`
+	ErrorLog    logger.LogConfig                `json:"error_log"`
+	RedisData   redis.DataHandlerConfig         `json:"redis_data"`
+	RedisStat   redis.StatHandlerConfig         `json:"redis_stat"`
+	Handler     handler.DnsRequestHandlerConfig `json:"handler"`
+	Healthcheck healthcheck.HealthcheckConfig   `json:"healthcheck"`
+	RateLimit   ratelimit.RateLimiterConfig     `json:"ratelimit"`
 }
 
 var redinsDefaultConfig = &RedinsConfig{
-	Server: []handler.ServerConfig{
+	Server: []server.ServerConfig{
 		{
 			Ip:       "127.0.0.1",
 			Port:     1053,
 			Protocol: "udp",
 			Count:    1,
-			Tls: handler.TlsConfig{
+			Tls: server.TlsConfig{
 				Enable:   false,
 				CertPath: "",
 				KeyPath:  "",
 				CaPath:   "",
+			},
+		},
+	},
+	RedisData: redis.DataHandlerConfig{
+		ZoneCacheSize:      10000,
+		ZoneCacheTimeout:   60,
+		ZoneReload:         60,
+		RecordCacheSize:    1000000,
+		RecordCacheTimeout: 60,
+		Redis: redis.RedisConfig{
+			Address:  "127.0.0.1:6379",
+			Net:      "tcp",
+			DB:       0,
+			Password: "",
+			Prefix:   "redins_",
+			Suffix:   "_redins",
+			Connection: redis.RedisConnectionConfig{
+				MaxIdleConnections:   10,
+				MaxActiveConnections: 10,
+				ConnectTimeout:       500,
+				ReadTimeout:          500,
+				IdleKeepAlive:        30,
+				MaxKeepAlive:         0,
+				WaitForConnection:    false,
+			},
+		},
+	},
+	RedisStat: redis.StatHandlerConfig{
+		Redis: redis.RedisConfig{
+			Address:  "127.0.0.1:6379",
+			Net:      "tcp",
+			DB:       0,
+			Password: "",
+			Prefix:   "redins_",
+			Suffix:   "_redins",
+			Connection: redis.RedisConnectionConfig{
+				MaxIdleConnections:   10,
+				MaxActiveConnections: 10,
+				ConnectTimeout:       500,
+				ReadTimeout:          500,
+				IdleKeepAlive:        30,
+				MaxKeepAlive:         0,
+				WaitForConnection:    false,
 			},
 		},
 	},
@@ -83,82 +135,46 @@ var redinsDefaultConfig = &RedinsConfig{
 			CountryDB: "geoCity.mmdb",
 			ASNDB:     "geoIsp.mmdb",
 		},
-		HealthCheck: handler.HealthcheckConfig{
-			Enable:             false,
-			MaxRequests:        10,
-			MaxPendingRequests: 100,
-			UpdateInterval:     600,
-			CheckInterval:      600,
-			RedisStatusServer: uperdis.RedisConfig{
-				Address:  "127.0.0.1:6379",
-				Net:      "tcp",
-				DB:       0,
-				Password: "",
-				Prefix:   "redins_",
-				Suffix:   "_redins",
-				Connection: uperdis.RedisConnectionConfig{
-					MaxIdleConnections:   10,
-					MaxActiveConnections: 10,
-					ConnectTimeout:       500,
-					ReadTimeout:          500,
-					IdleKeepAlive:        30,
-					MaxKeepAlive:         0,
-					WaitForConnection:    false,
-				},
-			},
-			Log: logger.LogConfig{
-				Enable:     true,
-				Target:     "file",
-				Level:      "info",
-				Path:       "/tmp/healthcheck.log",
-				Format:     "json",
-				TimeFormat: time.RFC3339,
-				Sentry: logger.SentryConfig{
-					Enable: false,
-					DSN:    "",
-				},
-				Syslog: logger.SyslogConfig{
-					Enable:   false,
-					Protocol: "tcp",
-					Address:  "localhost:514",
-				},
-				Kafka: logger.KafkaConfig{
-					Enable:      false,
-					Topic:       "redins",
-					Brokers:     []string{"127.0.0.1:9092"},
-					Format:      "json",
-					Compression: "none",
-					Timeout:     3000,
-					BufferSize:  1000,
-				},
-			},
-		},
 		MaxTtl:            3600,
-		CacheTimeout:      60,
-		ZoneReload:        600,
 		LogSourceLocation: false,
-		Redis: uperdis.RedisConfig{
-			Address:  "127.0.0.1:6379",
-			Net:      "tcp",
-			DB:       0,
-			Password: "",
-			Prefix:   "redins_",
-			Suffix:   "_redins",
-			Connection: uperdis.RedisConnectionConfig{
-				MaxIdleConnections:   10,
-				MaxActiveConnections: 10,
-				ConnectTimeout:       500,
-				ReadTimeout:          500,
-				IdleKeepAlive:        30,
-				MaxKeepAlive:         0,
-				WaitForConnection:    false,
-			},
-		},
 		Log: logger.LogConfig{
 			Enable:     true,
 			Target:     "file",
 			Level:      "info",
 			Path:       "/tmp/redins.log",
+			Format:     "json",
+			TimeFormat: time.RFC3339,
+			Sentry: logger.SentryConfig{
+				Enable: false,
+				DSN:    "",
+			},
+			Syslog: logger.SyslogConfig{
+				Enable:   false,
+				Protocol: "tcp",
+				Address:  "localhost:514",
+			},
+			Kafka: logger.KafkaConfig{
+				Enable:      false,
+				Topic:       "redins",
+				Brokers:     []string{"127.0.0.1:9092"},
+				Format:      "json",
+				Compression: "none",
+				Timeout:     3000,
+				BufferSize:  1000,
+			},
+		},
+	},
+	Healthcheck: healthcheck.HealthcheckConfig{
+		Enable:             false,
+		MaxRequests:        10,
+		MaxPendingRequests: 100,
+		UpdateInterval:     600,
+		CheckInterval:      600,
+		Log: logger.LogConfig{
+			Enable:     true,
+			Target:     "file",
+			Level:      "info",
+			Path:       "/tmp/healthcheck.log",
 			Format:     "json",
 			TimeFormat: time.RFC3339,
 			Sentry: logger.SentryConfig{
@@ -207,7 +223,7 @@ var redinsDefaultConfig = &RedinsConfig{
 			BufferSize:  1000,
 		},
 	},
-	RateLimit: handler.RateLimiterConfig{
+	RateLimit: ratelimit.RateLimiterConfig{
 		Enable:    false,
 		Rate:      60,
 		Burst:     10,
@@ -243,20 +259,27 @@ func Start() {
 	logger.Default = logger.NewLogger(&cfg.ErrorLog, nil)
 	log.Printf("[INFO] logger loaded")
 
-	s = handler.NewServer(cfg.Server)
+	servers = server.NewServer(cfg.Server)
+
+	redisDataHandler = redis.NewDataHandler(&cfg.RedisData)
+	redisStatHandler = redis.NewStatHandler(&cfg.RedisStat)
 
 	logger.Default.Info("starting handler...")
-	h = handler.NewHandler(&cfg.Handler)
+	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler)
 	logger.Default.Info("handler started")
 
-	l = handler.NewRateLimiter(&cfg.RateLimit)
+	logger.Default.Info("starting health checker...")
+	healthChecker = healthcheck.NewHealthcheck(&cfg.Healthcheck, redisDataHandler, redisStatHandler)
+	logger.Default.Info("health checker started")
+
+	rateLimiter = ratelimit.NewRateLimiter(&cfg.RateLimit)
 
 	dns.HandleFunc(".", handleRequest)
 
 	logger.Default.Info("binding listeners...")
-	for i := range s {
+	for i := range servers {
 		go func(i int) {
-			err := s[i].ListenAndServe()
+			err := servers[i].ListenAndServe()
 			if err != nil {
 				logger.Default.Errorf("listener error : %s", err)
 			}
@@ -266,10 +289,13 @@ func Start() {
 }
 
 func Stop() {
-	for i := range s {
-		_ = s[i].Shutdown()
+	for i := range servers {
+		_ = servers[i].Shutdown()
 	}
-	h.ShutDown()
+	dnsRequestHandler.ShutDown()
+	healthChecker.ShutDown()
+	redisDataHandler.ShutDown()
+	redisStatHandler.ShutDown()
 }
 
 func Verify(configFile string) {
@@ -311,9 +337,9 @@ func Verify(configFile string) {
 		printResult(msg, err)
 	}
 
-	checkRedis := func(config *uperdis.RedisConfig) {
+	checkRedis := func(config *redis.RedisConfig) {
 		fmt.Println("checking redis...")
-		rd := uperdis.NewRedis(config)
+		rd := redis.NewRedis(config)
 		msg := fmt.Sprintf("checking whether %s://%s is available", config.Net, config.Address)
 		err := rd.Ping()
 		printResult(msg, err)
@@ -448,26 +474,26 @@ func Verify(configFile string) {
 	printResult(msg, err)
 
 	fmt.Println("checking listeners...")
-	for _, server := range config.Server {
-		checkAddress(server.Protocol, server.Ip, server.Port)
-		msg = fmt.Sprintf("checking port number : %d", server.Port)
-		if server.Port != 53 {
+	for _, serverConfig := range config.Server {
+		checkAddress(serverConfig.Protocol, serverConfig.Ip, serverConfig.Port)
+		msg = fmt.Sprintf("checking port number : %d", serverConfig.Port)
+		if serverConfig.Port != 53 {
 			printWarning(msg, "using non-standard port")
 		} else {
 			printResult(msg, nil)
 		}
 
-		address := server.Ip + ":" + strconv.Itoa(server.Port)
-		msg = fmt.Sprintf("checking whether %s://%s is available", server.Protocol, address)
-		if server.Protocol == "udp" {
+		address := serverConfig.Ip + ":" + strconv.Itoa(serverConfig.Port)
+		msg = fmt.Sprintf("checking whether %s://%s is available", serverConfig.Protocol, address)
+		if serverConfig.Protocol == "udp" {
 			var ln net.PacketConn
-			ln, err = net.ListenPacket(server.Protocol, address)
+			ln, err = net.ListenPacket(serverConfig.Protocol, address)
 			if err == nil {
 				_ = ln.Close()
 			}
 		} else {
 			var ln net.Listener
-			ln, err = net.Listen(server.Protocol, address)
+			ln, err = net.Listen(serverConfig.Protocol, address)
 			if err == nil {
 				_ = ln.Close()
 			}
@@ -501,7 +527,8 @@ func Verify(configFile string) {
 		}
 		printResult(msg, err)
 	}
-	checkRedis(&config.Handler.Redis)
+	checkRedis(&config.RedisData.Redis)
+	checkRedis(&config.RedisStat.Redis)
 	if config.Handler.GeoIp.Enable {
 		fmt.Println("checking geoip...")
 		var countryRecord struct {

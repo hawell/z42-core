@@ -1,11 +1,11 @@
 package main
 
 import (
-	"arvancloud/redins/tools/query/query"
-	"arvancloud/redins/tools/query/source"
-	"arvancloud/redins/tools/query/tool"
 	"flag"
 	"fmt"
+	"github.com/hawell/redins/tools/query/query"
+	"github.com/hawell/redins/tools/query/source"
+	"github.com/hawell/redins/tools/query/tool"
 	"github.com/hawell/workerpool"
 	"github.com/miekg/dns"
 	"time"
