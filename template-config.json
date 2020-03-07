@@ -4,6 +4,7 @@
       "ip": "127.0.0.1",
       "port": 1053,
       "protocol": "udp",
+      "count": 1,
       "tls": {
         "enable": false,
         "cert_path": "",
@@ -40,76 +41,12 @@
       "buffer_size": 1000
     }
   },
-  "handler": {
-    "upstream": [
-      {
-        "ip": "1.1.1.1",
-        "port": 53,
-        "protocol": "udp",
-        "timeout": 400
-      }
-    ],
-    "geoip": {
-      "enable": false,
-      "country_db": "geoCity.mmdb",
-      "asn_db": "geoIsp.mmdb"
-    },
-    "healthcheck": {
-      "enable": false,
-      "max_requests": 10,
-      "max_pending_requests": 100,
-      "update_interval": 600,
-      "check_interval": 600,
-      "redis": {
-        "address": "127.0.0.1:6379",
-        "net": "tcp",
-        "db": 0,
-        "password": "",
-        "prefix": "redins_",
-        "suffix": "_redins",
-        "connection": {
-          "max_idle_connections": 10,
-          "max_active_connections": 10,
-          "connect_timeout": 500,
-          "read_timeout": 500,
-          "idle_keep_alive": 30,
-          "max_keep_alive": 0,
-          "wait_for_connection": false
-        }
-      },
-      "log": {
-        "enable": true,
-        "target": "file",
-        "level": "info",
-        "path": "/tmp/healthcheck.log",
-        "format": "json",
-        "time_format": "2006-01-02T15:04:05Z07:00",
-        "sentry": {
-          "enable": false,
-          "dsn": ""
-        },
-        "syslog": {
-          "enable": false,
-          "protocol": "tcp",
-          "address": "localhost:514"
-        },
-        "kafka": {
-          "enable": false,
-          "topic": "redins",
-          "brokers": [
-            "127.0.0.1:9092"
-          ],
-          "format": "json",
-          "compression": "none",
-          "timeout": 3000,
-          "buffer_size": 1000
-        }
-      }
-    },
-    "max_ttl": 3600,
-    "cache_timeout": 60,
-    "zone_reload": 600,
-    "log_source_location": false,
+  "redis_data": {
+    "zone_cache_size": 10000,
+    "zone_cache_timeout": 60,
+    "zone_reload": 60,
+    "record_cache_size": 1000000,
+    "record_cache_timeout": 60,
     "redis": {
       "address": "127.0.0.1:6379",
       "net": "tcp",
@@ -126,12 +63,83 @@
         "max_keep_alive": 0,
         "wait_for_connection": false
       }
+    }
+  },
+  "redis_stat": {
+    "redis": {
+      "address": "127.0.0.1:6379",
+      "net": "tcp",
+      "db": 0,
+      "password": "",
+      "prefix": "redins_",
+      "suffix": "_redins",
+      "connection": {
+        "max_idle_connections": 10,
+        "max_active_connections": 10,
+        "connect_timeout": 500,
+        "read_timeout": 500,
+        "idle_keep_alive": 30,
+        "max_keep_alive": 0,
+        "wait_for_connection": false
+      }
+    }
+  },
+  "handler": {
+    "upstream": [
+      {
+        "ip": "1.1.1.1",
+        "port": 53,
+        "protocol": "udp",
+        "timeout": 400
+      }
+    ],
+    "geoip": {
+      "enable": false,
+      "country_db": "geoCity.mmdb",
+      "asn_db": "geoIsp.mmdb"
     },
+    "max_ttl": 3600,
+    "log_source_location": false,
     "log": {
       "enable": true,
       "target": "file",
       "level": "info",
       "path": "/tmp/redins.log",
+      "format": "json",
+      "time_format": "2006-01-02T15:04:05Z07:00",
+      "sentry": {
+        "enable": false,
+        "dsn": ""
+      },
+      "syslog": {
+        "enable": false,
+        "protocol": "tcp",
+        "address": "localhost:514"
+      },
+      "kafka": {
+        "enable": false,
+        "topic": "redins",
+        "brokers": [
+          "127.0.0.1:9092"
+        ],
+        "format": "json",
+        "compression": "none",
+        "timeout": 3000,
+        "buffer_size": 1000
+      }
+    }
+  },
+  "healthcheck": {
+    "enable": false,
+    "max_requests": 10,
+    "max_pending_requests": 100,
+    "update_interval": 600,
+    "check_interval": 600,
+    "log": {
+      "enable": true,
+      "target": "file",
+      "level": "info",
+      "path": "/tmp/healthcheck.log",
       "format": "json",
       "time_format": "2006-01-02T15:04:05Z07:00",
       "sentry": {
