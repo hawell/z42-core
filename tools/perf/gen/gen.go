@@ -77,7 +77,7 @@ func main() {
 			fmt.Println("cannot open file "+zoneName, " : ", err)
 			return
 		}
-		con.Do("SADD", "redins:zones", zoneName)
+		con.Do("SADD", "z42:zones", zoneName)
 		wz := bufio.NewWriter(fz)
 		wz.WriteString("$ORIGIN " + zoneName + "\n" +
 			"$TTL 300\n\n" +
@@ -99,10 +99,10 @@ func main() {
 				location1 := RandomString(15)
 				location2 := RandomString(15)
 
-				con.Do("HSET", "redins:zones:"+zoneName, location1, `{"cname":{"ttl":300, "host":"`+location2+"."+zoneName+`."}}`)
+				con.Do("HSET", "z42:zones:"+zoneName, location1, `{"cname":{"ttl":300, "host":"`+location2+"."+zoneName+`."}}`)
 				ip := fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
 
-				con.Do("HSET", "redins:zones:"+zoneName, location2, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
+				con.Do("HSET", "z42:zones:"+zoneName, location2, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
 
 				wq.WriteString(fmt.Sprintf("%s.%s %d %d %s\n", location1, zoneName, dns.TypeA, dns.RcodeSuccess, ip))
 
@@ -113,7 +113,7 @@ func main() {
 				location := RandomString(15)
 				txt := RandomString(200)
 
-				con.Do("HSET", "redins:zones:"+zoneName, location, `{"txt":{"ttl":300, "records:{"text":"`+txt+`"}"}}`)
+				con.Do("HSET", "z42:zones:"+zoneName, location, `{"txt":{"ttl":300, "records:{"text":"`+txt+`"}"}}`)
 
 				wq.WriteString(fmt.Sprintf("%s.%s %d %d %s\n", location, zoneName, dns.TypeTXT, dns.RcodeSuccess, txt))
 				wz.WriteString(location + ` TXT "` + txt + `"`)
@@ -129,7 +129,7 @@ func main() {
 
 				ip := fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
 
-				con.Do("HSET", "redins:zones:"+zoneName, location, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
+				con.Do("HSET", "z42:zones:"+zoneName, location, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
 
 				wq.WriteString(fmt.Sprintf("%s.%s %d %d %s\n", location, zoneName, dns.TypeA, dns.RcodeSuccess, ip))
 				wz.WriteString(location + " A " + ip + "\n")

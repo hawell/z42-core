@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hawell/redins/types"
+	"github.com/hawell/z42/types"
 	"github.com/miekg/dns"
 )
 
@@ -37,9 +37,9 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 func TestGetZone(t *testing.T) {
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	_ = dh.Redis.Del("*")
-	_ = dh.Redis.SAdd("redins:zones", "zone1.com")
-	_ = dh.Redis.HSet("redins:zones:zone1.com.", "@", "{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"5.5.5.5\"}]}}")
-	_ = dh.Redis.Set("redins:zones:zone1.com.:config", "{\"domain_id\":\"123456\", \"soa\":{\"ttl\":300, \"minttl\":100, \"mbox\":\"hostmaster.zone1.com.\",\"ns\":\"ns1.zone1.com.\",\"refresh\":44,\"retry\":55,\"expire\":66, \"serial\":32343}}")
+	_ = dh.Redis.SAdd("z42:zones", "zone1.com")
+	_ = dh.Redis.HSet("z42:zones:zone1.com.", "@", "{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"5.5.5.5\"}]}}")
+	_ = dh.Redis.Set("z42:zones:zone1.com.:config", "{\"domain_id\":\"123456\", \"soa\":{\"ttl\":300, \"minttl\":100, \"mbox\":\"hostmaster.zone1.com.\",\"ns\":\"ns1.zone1.com.\",\"refresh\":44,\"retry\":55,\"expire\":66, \"serial\":32343}}")
 
 	zone := dh.GetZone("zone1.com.")
 	if zone == nil {

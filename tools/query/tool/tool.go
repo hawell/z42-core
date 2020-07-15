@@ -1,7 +1,7 @@
 package tool
 
 import (
-	"github.com/hawell/redins/tools/query/query"
+	"github.com/hawell/z42/tools/query/query"
 	"github.com/miekg/dns"
 )
 

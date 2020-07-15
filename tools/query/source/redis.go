@@ -1,7 +1,7 @@
 package source
 
 import (
-	"github.com/hawell/redins/tools/query/query"
+	"github.com/hawell/z42/tools/query/query"
 	"github.com/hawell/uperdis"
 )
 
@@ -30,9 +30,9 @@ func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
 		},
 	})
 	g := new(RedisDumpQueryGenerator)
-	zones, _ := redis.SMembers("redins:zones")
+	zones, _ := redis.SMembers("z42:zones")
 	for _, zone := range zones {
-		locations, _ := redis.GetHKeys("redins:zones:" + zone)
+		locations, _ := redis.GetHKeys("z42:zones:" + zone)
 		for _, location := range locations {
 			qname := ""
 			if location == "@" {

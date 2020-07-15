@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/hawell/redins/types"
+	"github.com/hawell/z42/types"
 	"math"
 	"net"
 

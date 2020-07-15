@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/test"
-	"github.com/hawell/redins/types"
+	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/test"
+	"github.com/hawell/z42/types"
 	"github.com/miekg/dns"
 	"sort"
 	"strings"
@@ -104,28 +104,28 @@ func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testC
 			return nil, err
 		}
 		for i, zone := range testCase.Zones {
-			if err := h.RedisData.Redis.SAdd("redins:zones", zone); err != nil {
+			if err := h.RedisData.Redis.SAdd("z42:zones", zone); err != nil {
 				return nil, err
 			}
 			for _, cmd := range testCase.Entries[i] {
-				err := h.RedisData.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
+				err := h.RedisData.Redis.HSet("z42:zones:"+zone, cmd[0], cmd[1])
 				if err != nil {
 					return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
 				}
 			}
-			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
+			if err := h.RedisData.Redis.Set("z42:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
 				return nil, err
 			}
-			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":zsk:pub", zskPub); err != nil {
+			if err := h.RedisData.Redis.Set("z42:zones:"+zone+":zsk:pub", zskPub); err != nil {
 				fmt.Println(err)
 			}
-			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":zsk:priv", zskPriv); err != nil {
+			if err := h.RedisData.Redis.Set("z42:zones:"+zone+":zsk:priv", zskPriv); err != nil {
 				fmt.Println(err)
 			}
-			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":ksk:pub", kskPub); err != nil {
+			if err := h.RedisData.Redis.Set("z42:zones:"+zone+":ksk:pub", kskPub); err != nil {
 				fmt.Println(err)
 			}
-			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":ksk:priv", kskPriv); err != nil {
+			if err := h.RedisData.Redis.Set("z42:zones:"+zone+":ksk:priv", kskPriv); err != nil {
 				fmt.Println(err)
 			}
 		}

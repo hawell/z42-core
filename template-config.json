@@ -31,7 +31,7 @@
     },
     "kafka": {
       "enable": false,
-      "topic": "redins",
+      "topic": "z42",
       "brokers": [
         "127.0.0.1:9092"
       ],
@@ -52,8 +52,8 @@
       "net": "tcp",
       "db": 0,
       "password": "",
-      "prefix": "redins_",
-      "suffix": "_redins",
+      "prefix": "z42_",
+      "suffix": "_z42",
       "connection": {
         "max_idle_connections": 10,
         "max_active_connections": 10,
@@ -71,8 +71,8 @@
       "net": "tcp",
       "db": 0,
       "password": "",
-      "prefix": "redins_",
-      "suffix": "_redins",
+      "prefix": "z42_",
+      "suffix": "_z42",
       "connection": {
         "max_idle_connections": 10,
         "max_active_connections": 10,
@@ -104,7 +104,7 @@
       "enable": true,
       "target": "file",
       "level": "info",
-      "path": "/tmp/redins.log",
+      "path": "/tmp/z42.log",
       "format": "json",
       "time_format": "2006-01-02T15:04:05Z07:00",
       "sentry": {
@@ -118,7 +118,7 @@
       },
       "kafka": {
         "enable": false,
-        "topic": "redins",
+        "topic": "z42",
         "brokers": [
           "127.0.0.1:9092"
         ],
@@ -153,7 +153,7 @@
       },
       "kafka": {
         "enable": false,
-        "topic": "redins",
+        "topic": "z42",
         "brokers": [
           "127.0.0.1:9092"
         ],

@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hawell/redins/dnssec"
-	"github.com/hawell/redins/handler/logformat"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/types"
-	"github.com/hawell/redins/upstream"
+	"github.com/hawell/z42/dnssec"
+	"github.com/hawell/z42/handler/logformat"
+	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/upstream"
 	"github.com/sirupsen/logrus"
 
 	"github.com/hawell/logger"

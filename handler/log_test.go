@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/redins/handler/logformat"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/test"
-	"github.com/hawell/redins/upstream"
+	"github.com/hawell/z42/handler/logformat"
+	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/test"
+	"github.com/hawell/z42/upstream"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"io/ioutil"
@@ -48,7 +48,7 @@ var logHandlerTestConfig = DnsRequestHandlerConfig{
 			Enable:      false,
 			Compression: "none",
 			Brokers:     []string{"127.0.0.1:9093"},
-			Topic:       "redins",
+			Topic:       "z42",
 		},
 	},
 	Upstream: []upstream.UpstreamConfig{
@@ -87,15 +87,15 @@ func TestJsonLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("redins:zones", logZone)
+	h.RedisData.Redis.SAdd("z42:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www.zone.log",
@@ -138,15 +138,15 @@ func TestCapnpLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("redins:zones", logZone)
+	h.RedisData.Redis.SAdd("z42:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
@@ -240,9 +240,9 @@ func TestKafkaCapnpLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("redins:zones", logZone)
+	h.RedisData.Redis.SAdd("z42:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
@@ -260,7 +260,7 @@ func TestKafkaCapnpLog(t *testing.T) {
 			},
 		},
 	}
-	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
@@ -326,15 +326,15 @@ func TestUdpCapnpLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("redins:zones", logZone)
+	h.RedisData.Redis.SAdd("z42:zones", logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("redins:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.RedisData.Redis.Set("redins:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",

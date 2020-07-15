@@ -1,6 +1,6 @@
-[![Build Status](https://img.shields.io/travis/hawell/redins.svg)](https://travis-ci.org/hawell/redins)
-[![Code Coverage](https://img.shields.io/codecov/c/github/hawell/redins.svg)](https://codecov.io/github/hawell/redins?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/hawell/redins)](https://goreportcard.com/report/hawell/redins)
+[![Build Status](https://img.shields.io/travis/hawell/z42.svg)](https://travis-ci.org/hawell/z42)
+[![Code Coverage](https://img.shields.io/codecov/c/github/hawell/z42.svg)](https://codecov.io/github/hawell/z42?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/hawell/z42)](https://goreportcard.com/report/hawell/z42)
 
 # table of contents
 
@@ -35,7 +35,7 @@
     - [example](#zone-example)
     
 
-*redins* enables reading zone data from redis database.
+*z42* enables reading zone data from redis database.
 
 ## Configuration
 
@@ -102,8 +102,8 @@ we use two seperate redis connection. one read-only connection to get zone data,
       "net": "tcp",
       "db": 0,
       "password": "",
-      "prefix": "redins_",
-      "suffix": "_redins",
+      "prefix": "z42_",
+      "suffix": "_z42",
       "connection": {
         "max_idle_connections": 10,
         "max_active_connections": 10,
@@ -171,7 +171,7 @@ dns query handler configuration
         "level": "info",
         "target": "file",
         "format": "json",
-        "path": "/tmp/redins.log"
+        "path": "/tmp/z42.log"
     },
     "geoip": {
         "enable": true,
@@ -268,7 +268,7 @@ log configuration
     "target": "file",
     "format": "json",
     "time_format": "2006-01-02T15:04:05.999999-07:00",
-    "path": "/tmp/redins.log",
+    "path": "/tmp/z42.log",
     "sentry": {
       "enable": false,
       "dsn": ""
@@ -281,7 +281,7 @@ log configuration
     "kafka": {
       "enable": false,
       "brokers": ["127.0.0.1:9092"],
-      "topic": "redins",
+      "topic": "z42",
       "format": "capnp_request",
       "compression": "none",
       "timeout": 3000,
@@ -302,7 +302,7 @@ log configuration
 * `kafka` : kafka hook configurations
     * `enable`: enable/disable kafka hook, default: disable
     * `brokers`: list of brokers in "ip:port" format, default : "127.0.0.1:9092"
-    * `topic`: name of kafka topic, default : "redins"
+    * `topic`: name of kafka topic, default : "z42"
     * `format`: message format, default: "json"
     * `compression`: compression format : "snappy", "gzip", "lz4", "zstd", "none", default: "none"
     * `timeout`: kafka operation timeout (dial, read, write) in milliseconds, default : 3000
@@ -380,8 +380,8 @@ sample config:
       "net": "tcp",
       "db": 0,
       "password": "",
-      "prefix": "redins_",
-      "suffix": "_redins",
+      "prefix": "z42_",
+      "suffix": "_z42",
       "connection": {
         "max_idle_connections": 10,
         "max_active_connections": 10,
@@ -413,7 +413,7 @@ sample config:
       "enable": true,
       "target": "file",
       "level": "info",
-      "path": "/tmp/redins.log",
+      "path": "/tmp/z42.log",
       "format": "json",
       "time_format": "2006-01-02T15:04:05Z07:00"
     }
@@ -447,16 +447,16 @@ sample config:
 
 ### keys
 
-* redins:zones is a set containing all active zones
+* z42:zones is a set containing all active zones
 ~~~
-redis-cli>SMEMBERS redins:zones
+redis-cli>SMEMBERS z42:zones
 1) "example.com."
 2) "example.net."
 ~~~
 
-* redins:zones:XXXX.XXX. is a hash map containing dns RRs, @ is used for TLD records.
+* z42:zones:XXXX.XXX. is a hash map containing dns RRs, @ is used for TLD records.
 ~~~
-redis-cli>HKEYS redins:zones:example.com.
+redis-cli>HKEYS z42:zones:example.com.
 1) "@"
 2) "www"
 3) "ns"
@@ -464,15 +464,15 @@ redis-cli>HKEYS redins:zones:example.com.
 ~~~
 @ is a special case used for root data
 
-* redins:zones:XXXX.XXX.:config is a string containing zone specific configurations
+* z42:zones:XXXX.XXX.:config is a string containing zone specific configurations
 ~~~
-redis-cli>GET redins:zones:example.com.:config
+redis-cli>GET z42:zones:example.com.:config
 "{\"soa\":{\"ttl\":300, \"minttl\":100, \"mbox\":\"hostmaster.example.com.\",\"ns\":\"ns1.example.com.\",\"refresh\":44,\"retry\":55,\"expire\":66, \"serial\":23232}}"
 ~~~
 
-* redins:zones:XXXX.XXX.:pub and redins:zones:XXXX.XXX.:priv contains keypair for dnssec 
+* z42:zones:XXXX.XXX.:pub and z42:zones:XXXX.XXX.:priv contains keypair for dnssec 
 ~~~
-redis-cli>GET redins:zones:XXXX.XXX.:pub
+redis-cli>GET z42:zones:XXXX.XXX.:pub
 "dnssec_test.com. IN DNSKEY 256 3 5 AwEAAaKsF5vxBfKuqeUa4+ugW37ftFZOyo+k7r2aeJzZdIbYk//P/dpC HK4uYG8Z1dr/qeo12ECNVcf76j+XAdJD841ELiRVaZteH8TqfPQ+jdHz 10e8Sfkh7OZ4oBwSCXWj+Q=="
 ~~~
 
@@ -755,10 +755,10 @@ $ORIGIN example.net.
 above zone data should be stored at redis as follow:
 
 ~~~
-redis-cli> smembers redins:zones
+redis-cli> smembers z42:zones
  1) "example.net."
  
-redis-cli> hgetall redins:zones:example.net.
+redis-cli> hgetall z42:zones:example.net.
  1) "_ssh._tcp.host1"
  2) "{\"srv\":{\"ttl\":300, \"records\":[{\"target\":\"tcp.example.com.\",\"port\":123,\"priority\":10,\"weight\":100}]}}"
  3) "*"
@@ -774,7 +774,7 @@ redis-cli> hgetall redins:zones:example.net.
 13) "@"
 14) "{\"ns\":{\"ttl\":300, \"records\":[{\"host\":\"ns1.example.net.\"},{\"host\":\"ns2.example.net.\"}]}"
 
-redis-cli> get redins:zones:example.net.:config
+redis-cli> get z42:zones:example.net.:config
 "{\"soa\":{\"ttl\":300, \"minttl\":100, \"mbox\":\"hostmaster.example.net.\",\"ns\":\"ns1.example.net.\",\"refresh\":44,\"retry\":55,\"expire\":66, \"serial\":32343}}"
 
 ~~~

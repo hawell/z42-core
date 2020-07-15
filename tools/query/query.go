@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/hawell/redins/tools/query/query"
-	"github.com/hawell/redins/tools/query/source"
-	"github.com/hawell/redins/tools/query/tool"
+	"github.com/hawell/z42/tools/query/query"
+	"github.com/hawell/z42/tools/query/source"
+	"github.com/hawell/z42/tools/query/tool"
 	"github.com/hawell/workerpool"
 	"github.com/miekg/dns"
 	"time"

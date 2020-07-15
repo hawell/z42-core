@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/raven-go"
-	"github.com/hawell/redins/handler"
-	"github.com/hawell/redins/healthcheck"
-	"github.com/hawell/redins/ratelimit"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/server"
-	"github.com/hawell/redins/upstream"
+	"github.com/hawell/z42/handler"
+	"github.com/hawell/z42/healthcheck"
+	"github.com/hawell/z42/ratelimit"
+	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/server"
+	"github.com/hawell/z42/upstream"
 	"github.com/json-iterator/go"
 	"github.com/logrusorgru/aurora"
 	"github.com/oschwald/maxminddb-golang"
@@ -64,7 +64,7 @@ type RedinsConfig struct {
 	RateLimit   ratelimit.RateLimiterConfig     `json:"ratelimit"`
 }
 
-var redinsDefaultConfig = &RedinsConfig{
+var z42DefaultConfig = &RedinsConfig{
 	Server: []server.ServerConfig{
 		{
 			Ip:       "127.0.0.1",
@@ -90,8 +90,8 @@ var redinsDefaultConfig = &RedinsConfig{
 			Net:      "tcp",
 			DB:       0,
 			Password: "",
-			Prefix:   "redins_",
-			Suffix:   "_redins",
+			Prefix:   "z42_",
+			Suffix:   "_z42",
 			Connection: redis.RedisConnectionConfig{
 				MaxIdleConnections:   10,
 				MaxActiveConnections: 10,
@@ -109,8 +109,8 @@ var redinsDefaultConfig = &RedinsConfig{
 			Net:      "tcp",
 			DB:       0,
 			Password: "",
-			Prefix:   "redins_",
-			Suffix:   "_redins",
+			Prefix:   "z42_",
+			Suffix:   "_z42",
 			Connection: redis.RedisConnectionConfig{
 				MaxIdleConnections:   10,
 				MaxActiveConnections: 10,
@@ -142,7 +142,7 @@ var redinsDefaultConfig = &RedinsConfig{
 			Enable:     true,
 			Target:     "file",
 			Level:      "info",
-			Path:       "/tmp/redins.log",
+			Path:       "/tmp/z42.log",
 			Format:     "json",
 			TimeFormat: time.RFC3339,
 			Sentry: logger.SentryConfig{
@@ -156,7 +156,7 @@ var redinsDefaultConfig = &RedinsConfig{
 			},
 			Kafka: logger.KafkaConfig{
 				Enable:      false,
-				Topic:       "redins",
+				Topic:       "z42",
 				Brokers:     []string{"127.0.0.1:9092"},
 				Format:      "json",
 				Compression: "none",
@@ -189,7 +189,7 @@ var redinsDefaultConfig = &RedinsConfig{
 			},
 			Kafka: logger.KafkaConfig{
 				Enable:      false,
-				Topic:       "redins",
+				Topic:       "z42",
 				Brokers:     []string{"127.0.0.1:9092"},
 				Format:      "json",
 				Compression: "none",
@@ -216,7 +216,7 @@ var redinsDefaultConfig = &RedinsConfig{
 		},
 		Kafka: logger.KafkaConfig{
 			Enable:      false,
-			Topic:       "redins",
+			Topic:       "z42",
 			Brokers:     []string{"127.0.0.1:9092"},
 			Format:      "json",
 			Compression: "none",
@@ -234,7 +234,7 @@ var redinsDefaultConfig = &RedinsConfig{
 }
 
 func LoadConfig(path string) (*RedinsConfig, error) {
-	config := redinsDefaultConfig
+	config := z42DefaultConfig
 	configFile, err := os.Open(path)
 	if err != nil {
 		log.Printf("[ERROR] cannot load file %s : %s", path, err)
@@ -586,7 +586,7 @@ func main() {
 	}
 
 	if flagset["g"] {
-		data, err := jsoniter.MarshalIndent(redinsDefaultConfig, "", "  ")
+		data, err := jsoniter.MarshalIndent(z42DefaultConfig, "", "  ")
 		if err != nil {
 			fmt.Println("cannot unmarshal template config : ", err)
 			return

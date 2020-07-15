@@ -2,8 +2,8 @@ package healthcheck
 
 import (
 	"fmt"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/types"
+	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/types"
 	"log"
 	"net"
 	"strconv"
@@ -140,7 +140,7 @@ func TestGet(t *testing.T) {
 	h.redisStat.Redis.Del("*")
 	h.redisData.Redis.Del("*")
 	for _, entry := range healthcheckGetEntries {
-		h.redisStat.Redis.Set("redins:healthcheck:"+entry[0], entry[1])
+		h.redisStat.Redis.Set("z42:healthcheck:"+entry[0], entry[1])
 	}
 
 	for i := range healthcheckGetEntries {
@@ -165,7 +165,7 @@ func TestFilter(t *testing.T) {
 	h.redisStat.Redis.Del("*")
 	h.redisData.Redis.Del("*")
 	for _, entry := range healthcheckGetEntries {
-		h.redisStat.Redis.Set("redins:healthcheck:"+entry[0], entry[1])
+		h.redisStat.Redis.Set("z42:healthcheck:"+entry[0], entry[1])
 	}
 
 	w := []types.Record{
@@ -310,14 +310,14 @@ func TestSet(t *testing.T) {
 	h.redisData.Redis.Del("*")
 	for _, str := range healthCheckSetEntries {
 		a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", str[1], str[2])
-		h.redisStat.Redis.HSet("redins:zones:healthcheck.com.", str[0], a)
+		h.redisStat.Redis.HSet("z42:zones:healthcheck.com.", str[0], a)
 		var key string
 		if str[0] == "@" {
 			key = fmt.Sprintf("example.com.:%s", str[1])
 		} else {
 			key = fmt.Sprintf("%s.example.com.:%s", str[0], str[1])
 		}
-		h.redisStat.Redis.Set("redins:healthcheck:"+key, str[2])
+		h.redisStat.Redis.Set("z42:healthcheck:"+key, str[2])
 	}
 	// h.transferItems()
 	go h.Start()
@@ -336,15 +336,15 @@ func TestTransfer(t *testing.T) {
 
 	h.redisData.Redis.Del("*")
 	h.redisStat.Redis.Del("*")
-	h.redisData.Redis.SAdd("redins:zones", "healthcheck.com.")
+	h.redisData.Redis.SAdd("z42:zones", "healthcheck.com.")
 	for _, str := range healthcheckTransferItems {
 		if str[2] != "" {
 			a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", str[1], str[2])
-			h.redisData.Redis.HSet("redins:zones:healthcheck.com.", str[0], a)
+			h.redisData.Redis.HSet("z42:zones:healthcheck.com.", str[0], a)
 		}
 		if str[3] != "" {
 			key := fmt.Sprintf("%s.healthcheck.com.:%s", str[0], str[1])
-			h.redisStat.Redis.Set("redins:healthcheck:"+key, str[3])
+			h.redisStat.Redis.Set("z42:healthcheck:"+key, str[3])
 		}
 	}
 
@@ -362,7 +362,7 @@ func TestTransfer(t *testing.T) {
 	}
 
 	for i, str := range healthCheckTransferResults {
-		h.redisStat.Redis.Set("redins:healthcheck:"+str[0]+"res", str[1])
+		h.redisStat.Redis.Set("z42:healthcheck:"+str[0]+"res", str[1])
 		resItem := h.loadItem(str[0] + "res")
 		resItem.Ip = strings.TrimRight(resItem.Ip, "res")
 		storedItem := h.loadItem(str[0])
@@ -437,11 +437,11 @@ func TestHealthCheck(t *testing.T) {
 	hc := NewHealthcheck(&healthcheckConfig, dh, sh)
 	hc.redisStat.Redis.Del("*")
 	hc.redisData.Redis.Del("*")
-	hc.redisData.Redis.SAdd("redins:zones", "google.com.")
+	hc.redisData.Redis.SAdd("z42:zones", "google.com.")
 	for _, entry := range hcEntries {
-		hc.redisData.Redis.HSet("redins:zones:google.com.", entry[0], entry[1])
+		hc.redisData.Redis.HSet("z42:zones:google.com.", entry[0], entry[1])
 	}
-	hc.redisData.Redis.Set("redins:zones:google.com.:config", hcConfig)
+	hc.redisData.Redis.Set("z42:zones:google.com.:config", hcConfig)
 
 	go hc.Start()
 	time.Sleep(12 * time.Second)
@@ -509,10 +509,10 @@ func TestExpire(t *testing.T) {
 
 	a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", expireItem[1], expireItem[2])
 	log.Println(a)
-	hc.redisData.Redis.SAdd("redins:zones", "healthcheck.exp.")
-	hc.redisData.Redis.HSet("redins:zones:healthcheck.exp.", expireItem[0], a)
+	hc.redisData.Redis.SAdd("z42:zones", "healthcheck.exp.")
+	hc.redisData.Redis.HSet("z42:zones:healthcheck.exp.", expireItem[0], a)
 	key := fmt.Sprintf("%s.healthcheck.exp.:%s", expireItem[0], expireItem[1])
-	hc.redisStat.Redis.Set("redins:healthcheck:"+key, expireItem[2])
+	hc.redisStat.Redis.Set("z42:healthcheck:"+key, expireItem[2])
 
 	go hc.Start()
 	time.Sleep(time.Second * 2)
@@ -524,7 +524,7 @@ func TestExpire(t *testing.T) {
 
 	a = fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", expireItem[1], expireItem[3])
 	log.Println(a)
-	hc.redisData.Redis.HSet("redins:zones:healthcheck.exp.", expireItem[0], a)
+	hc.redisData.Redis.HSet("z42:zones:healthcheck.exp.", expireItem[0], a)
 
 	time.Sleep(time.Second * 5)
 	status = hc.getStatus("w0.healthcheck.exp.", net.ParseIP("1.2.3.4"))

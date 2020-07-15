@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/hawell/logger"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/test"
+	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/test"
 	"github.com/miekg/dns"
 )
 
@@ -2441,16 +2441,16 @@ var handlerTestCases = []*TestCase{
 				return nil, err
 			}
 			for i, zone := range testCase.Zones {
-				if err := h.RedisData.Redis.SAdd("redins:zones", zone); err != nil {
+				if err := h.RedisData.Redis.SAdd("z42:zones", zone); err != nil {
 					return nil, err
 				}
 				for _, cmd := range testCase.Entries[i] {
-					err := h.RedisData.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
+					err := h.RedisData.Redis.HSet("z42:zones:"+zone, cmd[0], cmd[1])
 					if err != nil {
 						return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
 					}
 				}
-				if err := h.RedisData.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
+				if err := h.RedisData.Redis.Set("z42:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
 					return nil, err
 				}
 			}
@@ -2460,7 +2460,7 @@ var handlerTestCases = []*TestCase{
 		},
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
 			{
-				_ = handler.RedisData.Redis.SRem("redins:zones", testCase.Zones[0])
+				_ = handler.RedisData.Redis.SRem("z42:zones", testCase.Zones[0])
 				time.Sleep(time.Millisecond * 1200)
 
 				tc := testCase.TestCases[0]
@@ -2478,7 +2478,7 @@ var handlerTestCases = []*TestCase{
 			}
 
 			{
-				_ = handler.RedisData.Redis.SAdd("redins:zones", testCase.Zones[0])
+				_ = handler.RedisData.Redis.SAdd("z42:zones", testCase.Zones[0])
 				time.Sleep(time.Millisecond * 1200)
 
 				tc := testCase.TestCases[1]

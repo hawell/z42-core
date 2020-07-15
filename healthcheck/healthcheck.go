@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/types"
+	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/types"
 	"github.com/hawell/workerpool"
 	"github.com/json-iterator/go"
 	"github.com/patrickmn/go-cache"
@@ -234,7 +234,7 @@ func (h *Healthcheck) loadItem(key string) *HealthCheckItem {
 	item := new(HealthCheckItem)
 	item.Host = strings.TrimSuffix(splits[0], ":")
 	item.Ip = splits[1]
-	itemStr, err := h.redisStat.Redis.Get("redins:healthcheck:" + key)
+	itemStr, err := h.redisStat.Redis.Get("z42:healthcheck:" + key)
 	if err != nil {
 		logger.Default.Errorf("cannot load item %s : %s", key, err)
 		return nil
@@ -254,12 +254,12 @@ func (h *Healthcheck) storeItem(item *HealthCheckItem) {
 		return
 	}
 	// logger.Default.Debugf("setting %v in redis : %s", *item, string(itemStr))
-	h.redisStat.Redis.Set("redins:healthcheck:"+key, string(itemStr))
+	h.redisStat.Redis.Set("z42:healthcheck:"+key, string(itemStr))
 }
 
 func (h *Healthcheck) getDomainId(zone string) string {
 	var cfg types.ZoneConfig
-	val, err := h.redisData.Redis.Get("redins:zones:" + zone + ":config")
+	val, err := h.redisData.Redis.Get("z42:zones:" + zone + ":config")
 	if err != nil {
 		logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
 	}
@@ -282,9 +282,9 @@ func (h *Healthcheck) Start() {
 
 	ticker := time.NewTicker(h.checkInterval)
 	for {
-		itemKeys, err := h.redisStat.Redis.GetKeys("redins:healthcheck:*")
+		itemKeys, err := h.redisStat.Redis.GetKeys("z42:healthcheck:*")
 		if err != nil {
-			logger.Default.Errorf("cannot load keys : redins:healthcheck:* : %s", err)
+			logger.Default.Errorf("cannot load keys : z42:healthcheck:* : %s", err)
 		}
 		select {
 		case <-h.quit:
@@ -293,7 +293,7 @@ func (h *Healthcheck) Start() {
 			return
 		case <-ticker.C:
 			for i := range itemKeys {
-				itemKey := strings.TrimPrefix(itemKeys[i], "redins:healthcheck:")
+				itemKey := strings.TrimPrefix(itemKeys[i], "z42:healthcheck:")
 				item := h.loadItem(itemKey)
 				if item != nil {
 					if time.Since(item.LastCheck) > h.checkInterval {
@@ -393,13 +393,13 @@ func (h *Healthcheck) Transfer() {
 
 	limiter := time.Tick(time.Millisecond * 50)
 	for {
-		domains, err := h.redisData.Redis.SMembers("redins:zones")
+		domains, err := h.redisData.Redis.SMembers("z42:zones")
 		if err != nil {
-			logger.Default.Errorf("cannot get members of redins:zones : %s", err)
+			logger.Default.Errorf("cannot get members of z42:zones : %s", err)
 		}
 		for _, domain := range domains {
 			domainId := h.getDomainId(domain)
-			subdomains, err := h.redisData.Redis.GetHKeys("redins:zones:" + domain)
+			subdomains, err := h.redisData.Redis.GetHKeys("z42:zones:" + domain)
 			if err != nil {
 				logger.Default.Errorf("cannot get keys of %s : %s", domain, err)
 			}
@@ -409,7 +409,7 @@ func (h *Healthcheck) Transfer() {
 					h.quitWG.Done()
 					return
 				case <-limiter:
-					recordStr, err := h.redisData.Redis.HGet("redins:zones:"+domain, subdomain)
+					recordStr, err := h.redisData.Redis.HGet("z42:zones:"+domain, subdomain)
 					if err != nil {
 						logger.Default.Errorf("cannot get record of %s.%s : %s", subdomain, domain, err)
 					}
@@ -457,7 +457,7 @@ func (h *Healthcheck) Transfer() {
 							if !itemsEqual(oldItem, newItem) {
 								h.storeItem(newItem)
 							}
-							h.redisStat.Redis.Expire("redins:healthcheck:"+key, h.updateInterval)
+							h.redisStat.Redis.Expire("z42:healthcheck:"+key, h.updateInterval)
 						}
 					}
 				}

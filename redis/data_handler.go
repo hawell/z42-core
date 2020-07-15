@@ -4,8 +4,8 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/hashicorp/go-immutable-radix"
 	"github.com/hawell/logger"
-	"github.com/hawell/redins/dnssec"
-	"github.com/hawell/redins/types"
+	"github.com/hawell/z42/dnssec"
+	"github.com/hawell/z42/types"
 	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"golang.org/x/sync/singleflight"
@@ -71,7 +71,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		dh.quitWG.Add(1)
 		quit := make(chan *sync.WaitGroup, 1)
 		modified := false
-		go dh.Redis.SubscribeEvent("redins:zones", func() {
+		go dh.Redis.SubscribeEvent("z42:zones", func() {
 			modified = true
 		}, func(channel string, data string) {
 			modified = true
@@ -111,7 +111,7 @@ func (dh *DataHandler) ShutDown() {
 
 func (dh *DataHandler) LoadZones() {
 	dh.LastZoneUpdate = time.Now()
-	zones, err := dh.Redis.SMembers("redins:zones")
+	zones, err := dh.Redis.SMembers("z42:zones")
 	if err != nil {
 		logger.Default.Error("cannot load zones : ", err)
 		return
@@ -142,12 +142,12 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 	}
 
 	answer, _, _ := dh.ZoneInflight.Do(zone, func() (interface{}, error) {
-		locations, err := dh.Redis.GetHKeys("redins:zones:" + zone)
+		locations, err := dh.Redis.GetHKeys("z42:zones:" + zone)
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s locations : %s", zone, err)
 			return nil, err
 		}
-		config, err := dh.Redis.Get("redins:zones:" + zone + ":config")
+		config, err := dh.Redis.Get("z42:zones:" + zone + ":config")
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
 		}
@@ -198,12 +198,12 @@ func (dh *DataHandler) loadKey(pub string, priv string) *types.ZoneKey {
 
 func (dh *DataHandler) loadZoneKeys(z *types.Zone) {
 	if z.Config.DnsSec {
-		z.ZSK = dh.loadKey("redins:zones:"+z.Name+":zsk:pub", "redins:zones:"+z.Name+":zsk:priv")
+		z.ZSK = dh.loadKey("z42:zones:"+z.Name+":zsk:pub", "z42:zones:"+z.Name+":zsk:priv")
 		if z.ZSK == nil {
 			z.Config.DnsSec = false
 			return
 		}
-		z.KSK = dh.loadKey("redins:zones:"+z.Name+":ksk:pub", "redins:zones:"+z.Name+":ksk:priv")
+		z.KSK = dh.loadKey("z42:zones:"+z.Name+":ksk:pub", "z42:zones:"+z.Name+":ksk:priv")
 		if z.KSK == nil {
 			z.Config.DnsSec = false
 			return
@@ -260,7 +260,7 @@ func (dh *DataHandler) GetLocation(location string, z *types.Zone) *types.Record
 		r.Zone = z
 		r.Name = name
 
-		val, err := dh.Redis.HGet("redins:zones:"+z.Name, label)
+		val, err := dh.Redis.HGet("z42:zones:"+z.Name, label)
 		if err != nil {
 			if label == "@" {
 				dh.RecordCache.Set(key, r, 1)

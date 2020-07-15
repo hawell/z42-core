@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/hawell/redins/test"
+	"github.com/hawell/z42/test"
 	"github.com/miekg/dns"
 	"log"
 	"net"

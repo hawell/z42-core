@@ -4,7 +4,7 @@ language: go
 go:
   - "1.12.x"
 
-go_import_path: github.com/hawell/redins
+go_import_path: github.com/hawell/z42
 
 git:
   depth: 1
