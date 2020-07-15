@@ -1,16 +1,17 @@
 package handler
 
 import (
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/hawell/redins/dnssec"
 	"github.com/hawell/redins/handler/logformat"
 	"github.com/hawell/redins/redis"
 	"github.com/hawell/redins/types"
 	"github.com/hawell/redins/upstream"
 	"github.com/sirupsen/logrus"
-	"net"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/hawell/logger"
 	"github.com/miekg/dns"
@@ -29,10 +30,10 @@ type DnsRequestHandler struct {
 
 type DnsRequestHandlerConfig struct {
 	Upstream          []upstream.UpstreamConfig `json:"upstream"`
-	GeoIp             GeoIpConfig      `json:"geoip"`
-	MaxTtl            int              `json:"max_ttl"`
-	LogSourceLocation bool             `json:"log_source_location"`
-	Log               logger.LogConfig `json:"log"`
+	GeoIp             GeoIpConfig               `json:"geoip"`
+	MaxTtl            int                       `json:"max_ttl"`
+	LogSourceLocation bool                      `json:"log_source_location"`
+	Log               logger.LogConfig          `json:"log"`
 }
 
 func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *DnsRequestHandler {
@@ -302,7 +303,7 @@ loop:
 			default:
 				context.Answer = []dns.RR{}
 				context.Authority = []dns.RR{zone.Config.SOA.Data}
-				context.Res = dns.RcodeNotImplemented
+				context.Res = dns.RcodeSuccess
 				break loop
 			}
 			context.Answer = append(context.Answer, answer...)

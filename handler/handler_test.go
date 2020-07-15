@@ -3,14 +3,15 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"github.com/hawell/logger"
-	"github.com/hawell/redins/redis"
-	"github.com/hawell/redins/test"
-	"github.com/miekg/dns"
 	"net"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hawell/logger"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/test"
+	"github.com/miekg/dns"
 )
 
 var handlerTestCases = []*TestCase{
@@ -203,9 +204,9 @@ var handlerTestCases = []*TestCase{
 			},
 			// not implemented
 			{
-				Desc:  "NotImplemented Test",
+				Desc:  "unsupported type Test",
 				Qname: "example.com.", Qtype: dns.TypeUNSPEC,
-				Rcode: dns.RcodeNotImplemented,
+				Rcode: dns.RcodeSuccess,
 				Ns: []dns.RR{
 					test.SOA("example.com. 300 IN SOA ns1.example.com. hostmaster.example.com. 1460498836 44 55 66 100"),
 				},
