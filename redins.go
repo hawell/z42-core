@@ -11,6 +11,7 @@ import (
 	"github.com/hawell/redins/ratelimit"
 	"github.com/hawell/redins/redis"
 	"github.com/hawell/redins/server"
+	"github.com/hawell/redins/upstream"
 	"github.com/json-iterator/go"
 	"github.com/logrusorgru/aurora"
 	"github.com/oschwald/maxminddb-golang"
@@ -122,7 +123,7 @@ var redinsDefaultConfig = &RedinsConfig{
 		},
 	},
 	Handler: handler.DnsRequestHandlerConfig{
-		Upstream: []handler.UpstreamConfig{
+		Upstream: []upstream.UpstreamConfig{
 			{
 				Ip:       "1.1.1.1",
 				Port:     53,
@@ -501,13 +502,13 @@ func Verify(configFile string) {
 		printResult(msg, err)
 	}
 	fmt.Println("checking upstreams...")
-	for _, upstream := range config.Handler.Upstream {
-		checkAddress(upstream.Protocol, upstream.Ip, upstream.Port)
-		address := upstream.Ip + ":" + strconv.Itoa(upstream.Port)
-		msg = fmt.Sprintf("checking whether %s://%s is available", upstream.Protocol, address)
+	for _, upstreamConfig := range config.Handler.Upstream {
+		checkAddress(upstreamConfig.Protocol, upstreamConfig.Ip, upstreamConfig.Port)
+		address := upstreamConfig.Ip + ":" + strconv.Itoa(upstreamConfig.Port)
+		msg = fmt.Sprintf("checking whether %s://%s is available", upstreamConfig.Protocol, address)
 		client := &dns.Client{
-			Net:     upstream.Protocol,
-			Timeout: time.Duration(upstream.Timeout) * time.Millisecond,
+			Net:     upstreamConfig.Protocol,
+			Timeout: time.Duration(upstreamConfig.Timeout) * time.Millisecond,
 		}
 		m := new(dns.Msg)
 		m.SetQuestion("dns.msftncsi.com.", dns.TypeA)

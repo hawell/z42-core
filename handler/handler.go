@@ -5,6 +5,7 @@ import (
 	"github.com/hawell/redins/handler/logformat"
 	"github.com/hawell/redins/redis"
 	"github.com/hawell/redins/types"
+	"github.com/hawell/redins/upstream"
 	"github.com/sirupsen/logrus"
 	"net"
 	"strings"
@@ -20,14 +21,14 @@ type DnsRequestHandler struct {
 	RedisData *redis.DataHandler
 	Logger    *logger.EventLogger
 	geoip     *GeoIp
-	upstream  *Upstream
+	upstream  *upstream.Upstream
 	quit      chan struct{}
 	quitWG    sync.WaitGroup
 	logQueue  chan map[string]interface{}
 }
 
 type DnsRequestHandlerConfig struct {
-	Upstream          []UpstreamConfig `json:"upstream"`
+	Upstream          []upstream.UpstreamConfig `json:"upstream"`
 	GeoIp             GeoIpConfig      `json:"geoip"`
 	MaxTtl            int              `json:"max_ttl"`
 	LogSourceLocation bool             `json:"log_source_location"`
@@ -59,6 +60,7 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *
 		for {
 			select {
 			case <-h.quit:
+				close(h.logQueue)
 				h.quitWG.Done()
 				return
 			case data := <-h.logQueue:
@@ -68,7 +70,7 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *
 	}()
 	h.Logger = logger.NewLogger(&config.Log, getFormatter)
 	h.geoip = NewGeoIp(&config.GeoIp)
-	h.upstream = NewUpstream(config.Upstream)
+	h.upstream = upstream.NewUpstream(config.Upstream)
 	h.quit = make(chan struct{})
 
 	return h
@@ -76,7 +78,6 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *
 
 func (h *DnsRequestHandler) ShutDown() {
 	// logger.Default.Debug("handler : stopping")
-	close(h.logQueue)
 	close(h.quit)
 	h.quitWG.Wait()
 	// logger.Default.Debug("handler : stopped")

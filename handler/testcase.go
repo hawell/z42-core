@@ -6,6 +6,7 @@ import (
 	"github.com/hawell/logger"
 	"github.com/hawell/redins/redis"
 	"github.com/hawell/redins/test"
+	"github.com/hawell/redins/upstream"
 	"testing"
 )
 
@@ -100,7 +101,7 @@ var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
 	Log: logger.LogConfig{
 		Enable: false,
 	},
-	Upstream: []UpstreamConfig{
+	Upstream: []upstream.UpstreamConfig{
 		{
 			Ip:       "1.1.1.1",
 			Port:     53,

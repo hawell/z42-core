@@ -7,6 +7,7 @@ import (
 	"github.com/hawell/redins/handler/logformat"
 	"github.com/hawell/redins/redis"
 	"github.com/hawell/redins/test"
+	"github.com/hawell/redins/upstream"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"io/ioutil"
@@ -50,7 +51,7 @@ var logHandlerTestConfig = DnsRequestHandlerConfig{
 			Topic:       "redins",
 		},
 	},
-	Upstream: []UpstreamConfig{
+	Upstream: []upstream.UpstreamConfig{
 		{
 			Ip:       "1.1.1.1",
 			Port:     53,

@@ -2,23 +2,22 @@ package healthcheck
 
 import (
 	"crypto/tls"
+	"encoding/binary"
 	"fmt"
+	"github.com/hawell/logger"
 	"github.com/hawell/redins/redis"
 	"github.com/hawell/redins/types"
+	"github.com/hawell/workerpool"
 	"github.com/json-iterator/go"
+	"github.com/patrickmn/go-cache"
+	"github.com/pkg/errors"
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
-
-	"encoding/binary"
-	"github.com/hawell/logger"
-	"github.com/hawell/workerpool"
-	"github.com/patrickmn/go-cache"
-	"github.com/pkg/errors"
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
 )
 
 type HealthCheckItem struct {
