@@ -1,9 +1,9 @@
 package source
 
 import (
-	"arvancloud/redins/tools/query/query"
 	"bufio"
 	"fmt"
+	"github.com/hawell/redins/tools/query/query"
 	"math/rand"
 	"os"
 )

@@ -1,7 +1,7 @@
 package source
 
 import (
-	"arvancloud/redins/tools/query/query"
+	"github.com/hawell/redins/tools/query/query"
 	"github.com/hawell/uperdis"
 )
 

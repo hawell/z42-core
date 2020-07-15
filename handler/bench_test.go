@@ -1,8 +1,9 @@
 package handler
 
 import (
-	"arvancloud/redins/test"
 	"github.com/hawell/logger"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/test"
 	"github.com/miekg/dns"
 	"log"
 	"os"
@@ -32,22 +33,23 @@ var benchTestHandler *DnsRequestHandler
 func TestMain(m *testing.M) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-	benchTestHandler = NewHandler(&DefaultTestConfig)
-	err := benchTestHandler.Redis.Del("*")
+	r := redis.NewDataHandler(&DefaultRedisDataTestConfig)
+	benchTestHandler = NewHandler(&DefaultHandlerTestConfig, r)
+	err := benchTestHandler.RedisData.Redis.Del("*")
 	log.Println(err)
-	err = benchTestHandler.Redis.SAdd("redins:zones", benchZone)
+	err = benchTestHandler.RedisData.Redis.SAdd("redins:zones", benchZone)
 	log.Println(err)
-	err = benchTestHandler.Redis.Set("redins:zones:"+benchZone+":config", "{\"cname_flattening\": false}")
+	err = benchTestHandler.RedisData.Redis.Set("redins:zones:"+benchZone+":config", "{\"cname_flattening\": false}")
 	log.Println(err)
 	for _, cmd := range benchEntries {
-		err := benchTestHandler.Redis.HSet("redins:zones:"+benchZone, cmd[0], cmd[1])
+		err := benchTestHandler.RedisData.Redis.HSet("redins:zones:"+benchZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			return
 		}
 	}
 
-	benchTestHandler.LoadZones()
+	benchTestHandler.RedisData.LoadZones()
 	os.Exit(m.Run())
 }
 

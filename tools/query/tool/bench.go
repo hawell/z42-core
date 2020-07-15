@@ -1,8 +1,8 @@
 package tool
 
 import (
-	"arvancloud/redins/tools/query/query"
 	"fmt"
+	"github.com/hawell/redins/tools/query/query"
 	"github.com/miekg/dns"
 	"sync"
 	"time"

@@ -1,9 +1,9 @@
 package tool
 
 import (
-	"arvancloud/redins/test"
-	"arvancloud/redins/tools/query/query"
 	"fmt"
+	"github.com/hawell/redins/test"
+	"github.com/hawell/redins/tools/query/query"
 	"github.com/miekg/dns"
 	"sort"
 )

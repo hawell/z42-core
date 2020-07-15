@@ -1,27 +1,30 @@
 package handler
 
 import (
-	"arvancloud/redins/test"
 	"errors"
 	"fmt"
-	"github.com/hawell/logger"
-	"github.com/miekg/dns"
 	"net"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hawell/logger"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/test"
+	"github.com/miekg/dns"
 )
 
 var handlerTestCases = []*TestCase{
 	{
-		Name:           "Basic Usage",
-		Description:    "Test Basic functionality",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"example.com."},
-		ZoneConfigs:    []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`},
+		Name:            "Basic Usage",
+		Description:     "Test Basic functionality",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.com."},
+		ZoneConfigs:     []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`},
 		Entries: [][][]string{
 			{
 				{"@",
@@ -201,9 +204,9 @@ var handlerTestCases = []*TestCase{
 			},
 			// not implemented
 			{
-				Desc:  "NotImplemented Test",
+				Desc:  "unsupported type Test",
 				Qname: "example.com.", Qtype: dns.TypeUNSPEC,
-				Rcode: dns.RcodeNotImplemented,
+				Rcode: dns.RcodeSuccess,
 				Ns: []dns.RR{
 					test.SOA("example.com. 300 IN SOA ns1.example.com. hostmaster.example.com. 1460498836 44 55 66 100"),
 				},
@@ -219,14 +222,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "WildCard",
-		Description:    "tests related to handling of different wildcard scenarios",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"example.net."},
-		ZoneConfigs:    []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.net.","ns":"ns1.example.net.","refresh":44,"retry":55,"expire":66}}`},
+		Name:            "WildCard",
+		Description:     "tests related to handling of different wildcard scenarios",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.net."},
+		ZoneConfigs:     []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.net.","ns":"ns1.example.net.","refresh":44,"retry":55,"expire":66}}`},
 		Entries: [][][]string{
 			{
 				{"@",
@@ -317,14 +321,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "CNAME",
-		Description:    "normal cname functionality",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"example.aaa."},
-		ZoneConfigs:    []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.aaa.","ns":"ns1.example.aaa.","refresh":44,"retry":55,"expire":66}}`},
+		Name:            "CNAME",
+		Description:     "normal cname functionality",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.aaa."},
+		ZoneConfigs:     []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.aaa.","ns":"ns1.example.aaa.","refresh":44,"retry":55,"expire":66}}`},
 		Entries: [][][]string{
 			{
 				{"@",
@@ -511,14 +516,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "empty values",
-		Description:    "test handler behaviour with empty records",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"example.bbb."},
-		ZoneConfigs:    []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.bbb.","ns":"ns1.example.bbb.","refresh":44,"retry":55,"expire":66}}`},
+		Name:            "empty values",
+		Description:     "test handler behaviour with empty records",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.bbb."},
+		ZoneConfigs:     []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.bbb.","ns":"ns1.example.bbb.","refresh":44,"retry":55,"expire":66}}`},
 		Entries: [][][]string{
 			{
 				{"x",
@@ -658,14 +664,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "long text",
-		Description:    "text field longer than 255 bytes",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"example.ccc."},
-		ZoneConfigs:    []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.ccc.","ns":"ns1.example.ccc.","refresh":44,"retry":55,"expire":66}}`},
+		Name:            "long text",
+		Description:     "text field longer than 255 bytes",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.ccc."},
+		ZoneConfigs:     []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.ccc.","ns":"ns1.example.ccc.","refresh":44,"retry":55,"expire":66}}`},
 		Entries: [][][]string{
 			{
 				{"x",
@@ -684,14 +691,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "cname flattening",
-		Description:    "eliminate intermediate cname records when cname flattening is enabled",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"example.ddd."},
-		ZoneConfigs:    []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.ddd.","ns":"ns1.example.ddd.","refresh":44,"retry":55,"expire":66},"cname_flattening":true}`},
+		Name:            "cname flattening",
+		Description:     "eliminate intermediate cname records when cname flattening is enabled",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.ddd."},
+		ZoneConfigs:     []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.ddd.","ns":"ns1.example.ddd.","refresh":44,"retry":55,"expire":66},"cname_flattening":true}`},
 		Entries: [][][]string{
 			{
 				{"@",
@@ -793,13 +801,14 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "caa test",
-		Description:    "basic caa functionality",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"example.caa.", "nocaa.caa."},
+		Name:            "caa test",
+		Description:     "basic caa functionality",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.caa.", "nocaa.caa."},
 		ZoneConfigs: []string{
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.caa.","ns":"ns1.example.caa.","refresh":44,"retry":55,"expire":66}}`,
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.nocaa.caa.","ns":"ns1.nocaa.caa.","refresh":44,"retry":55,"expire":66}}`,
@@ -933,14 +942,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "PTR test",
-		Description:    "basic ptr functionality",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"0.0.127.in-addr.arpa.", "20.127.10.in-addr.arpa."},
-		ZoneConfigs:    []string{"", ""},
+		Name:            "PTR test",
+		Description:     "basic ptr functionality",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"0.0.127.in-addr.arpa.", "20.127.10.in-addr.arpa."},
+		ZoneConfigs:     []string{"", ""},
 		Entries: [][][]string{
 			{
 				{"1",
@@ -969,27 +979,28 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "ANAME test",
-		Description:    "test aname functionality",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"arvancloud.com.", "arvan.an."},
+		Name:            "ANAME test",
+		Description:     "test aname functionality",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.com.", "xmpl.an."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.com.","ns":"ns1.arvancloud.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvan.an.","ns":"ns1.arvan.an.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"aname.arvan.an."}}`,
+					`{"aname":{"location":"aname.xmpl.an."}}`,
 				},
 				{"nxlocal",
-					`{"aname":{"location":"nx.arvancloud.com."}}`,
+					`{"aname":{"location":"nx.example.com."}}`,
 				},
 				{"empty",
-					`{"aname":{"location":"e.arvancloud.com."}}`,
+					`{"aname":{"location":"e.example.com."}}`,
 				},
 				{"e",
 					`{"txt":{"ttl":300, "records":[{"text":"foo"}]}}`,
@@ -998,7 +1009,7 @@ var handlerTestCases = []*TestCase{
 					`{"aname":{"location":"dns.msftncsi.com."}}`,
 				},
 				{"nxupstream",
-					`{"aname":{"location":"anamex.arvan.an."}}`,
+					`{"aname":{"location":"anamex.xmpl.an."}}`,
 				},
 			},
 			{
@@ -1010,74 +1021,75 @@ var handlerTestCases = []*TestCase{
 		TestCases: []test.Case{
 			{
 				Desc:  "A aname at root",
-				Qname: "arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("arvancloud.com. 300 IN A 6.5.6.5"),
+					test.A("example.com. 300 IN A 6.5.6.5"),
 				},
 			},
 			{
 				Desc:  "AAAA aname at root",
-				Qname: "arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "example.com.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
-					test.AAAA("arvancloud.com. 300 IN AAAA ::1"),
+					test.AAAA("example.com. 300 IN AAAA ::1"),
 				},
 			},
 			{
 				Desc:  "A aname at subdomain",
-				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "upstream.example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("upstream.arvancloud.com. 303 IN A 131.107.255.255"),
+					test.A("upstream.example.com. 303 IN A 131.107.255.255"),
 				},
 			},
 			{
 				Desc:  "AAAA aname at subdomain",
-				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "upstream.example.com.", Qtype: dns.TypeAAAA,
 				Answer: []dns.RR{
-					test.AAAA("upstream.arvancloud.com. 303 IN AAAA fd3e:4f5a:5b81::1"),
+					test.AAAA("upstream.example.com. 303 IN AAAA fd3e:4f5a:5b81::1"),
 				},
 			},
 			{
 				Desc:  "A aname to nx local",
-				Qname: "nxlocal.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "nxlocal.example.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "AAAA aname to nx local",
-				Qname: "nxlocal.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "nxlocal.example.com.", Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "A aname to empty location",
-				Qname: "empty.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "empty.example.com.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.com.	300	IN	SOA	ns1.arvancloud.com. hostmaster.arvancloud.com. 1570970363 44 55 66 100"),
+					test.SOA("example.com.	300	IN	SOA	ns1.example.com. hostmaster.example.com. 1570970363 44 55 66 100"),
 				},
 			},
 			{
 				Desc:  "AAAA aname to empty location",
-				Qname: "empty.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "empty.example.com.", Qtype: dns.TypeAAAA,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.com.	300	IN	SOA	ns1.arvancloud.com. hostmaster.arvancloud.com. 1570970363 44 55 66 100"),
+					test.SOA("example.com.	300	IN	SOA	ns1.example.com. hostmaster.example.com. 1570970363 44 55 66 100"),
 				},
 			},
 			{
 				Desc:  "A aname to nx external",
-				Qname: "nxupstream.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "nxupstream.example.com.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "AAAA aname to nx external",
-				Qname: "nxupstream.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "nxupstream.example.com.", Qtype: dns.TypeAAAA,
 				Rcode: dns.RcodeServerFailure,
 			},
 		},
 	},
 	{
-		Name:        "weighted aname test",
-		Description: "weight filter should be applied on aname results as well",
-		Enabled:     true,
-		Config:      DefaultTestConfig,
-		Initialize:  DefaultInitialize,
+		Name:            "weighted aname test",
+		Description:     "weight filter should be applied on aname results as well",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
 			ipsCount := []int{0, 0, 0}
 			for i := 0; i < 1000; i++ {
@@ -1146,15 +1158,15 @@ var handlerTestCases = []*TestCase{
 				t.Fail()
 			}
 		},
-		Zones: []string{"arvancloud.com.", "arvan.an."},
+		Zones: []string{"example.com.", "xmpl.an."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.com.","ns":"ns1.arvancloud.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvan.an.","ns":"ns1.arvan.an.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"upstream2",
-					`{"aname":{"location":"aname2.arvan.an."}}`,
+					`{"aname":{"location":"aname2.xmpl.an."}}`,
 				},
 			},
 			{
@@ -1169,20 +1181,21 @@ var handlerTestCases = []*TestCase{
 		TestCases: []test.Case{
 			{
 				Desc:  "A to weighted aname",
-				Qname: "upstream2.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "upstream2.example.com.", Qtype: dns.TypeA,
 			},
 			{
 				Desc:  "AAAA to weighted aname",
-				Qname: "upstream2.arvancloud.com.", Qtype: dns.TypeAAAA,
+				Qname: "upstream2.example.com.", Qtype: dns.TypeAAAA,
 			},
 		},
 	},
 	{
-		Name:        "geofilter test",
-		Description: "test various geofilter scenarios",
-		Enabled:     true,
-		Config:      DefaultTestConfig,
-		Initialize:  DefaultInitialize,
+		Name:            "geofilter test",
+		Description:     "test various geofilter scenarios",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
 			var filterGeoSourceIps = []string{
 				"127.0.0.1",
@@ -1446,11 +1459,12 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:        "filter multi ip",
-		Description: "ip filter functionality for multiple value results",
-		Enabled:     true,
-		Config:      DefaultTestConfig,
-		Initialize:  DefaultInitialize,
+		Name:            "filter multi ip",
+		Description:     "ip filter functionality for multiple value results",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
 			for i := 0; i < 10; i++ {
 				tc := testCase.TestCases[0]
@@ -1605,11 +1619,12 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:        "filter single ip",
-		Description: "ip filter functionality for single value results",
-		Enabled:     true,
-		Config:      DefaultTestConfig,
-		Initialize:  DefaultInitialize,
+		Name:            "filter single ip",
+		Description:     "ip filter functionality for single value results",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
 			for i := 0; i < 10; i++ {
 				tc := testCase.TestCases[0]
@@ -1759,11 +1774,12 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:        "cname upstream",
-		Description: "cname should not leave authoritative zone",
-		Enabled:     true,
-		Config:      DefaultTestConfig,
-		Initialize:  DefaultInitialize,
+		Name:            "cname upstream",
+		Description:     "cname should not leave authoritative zone",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
 			tc := testCase.TestCases[0]
 			r := tc.Msg()
@@ -1799,13 +1815,14 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "cname outside domain",
-		Description:    "should not follow cname between authoritative zones",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"inside.cnm.", "outside.cnm.", "flattening.cnm."},
+		Name:            "cname outside domain",
+		Description:     "should not follow cname between authoritative zones",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"inside.cnm.", "outside.cnm.", "flattening.cnm."},
 		ZoneConfigs: []string{
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.inside.cnm.","ns":"ns1.inside.cnm.","refresh":44,"retry":55,"expire":66}}`,
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.outside.cnm.","ns":"ns1.outside.cnm.","refresh":44,"retry":55,"expire":66}}`,
@@ -1856,14 +1873,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "cname loop",
-		Description:    "should properly handle cname loop",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"loop.cnm."},
-		ZoneConfigs:    []string{""},
+		Name:            "cname loop",
+		Description:     "should properly handle cname loop",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"loop.cnm."},
+		ZoneConfigs:     []string{""},
 		Entries: [][][]string{
 			{
 				{"w",
@@ -1893,14 +1911,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "zone matching",
-		Description:    "zone should match with longest prefix",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"zone.zon.", "sub1.zone.zon."},
-		ZoneConfigs:    []string{"", ""},
+		Name:            "zone matching",
+		Description:     "zone should match with longest prefix",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"zone.zon.", "sub1.zone.zon."},
+		ZoneConfigs:     []string{"", ""},
 		Entries: [][][]string{
 			{
 				{"sub3.sub2",
@@ -1967,14 +1986,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "delegation",
-		Description:    "test subdomain delegation",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"delegation.zon."},
-		ZoneConfigs:    []string{""},
+		Name:            "delegation",
+		Description:     "test subdomain delegation",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"delegation.zon."},
+		ZoneConfigs:     []string{""},
 		Entries: [][][]string{
 			{
 				{"glue",
@@ -2062,14 +2082,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "label matching",
-		Description:    "test correct label matching",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"zone1.com.", "zone2.com.", "zone3.com."},
-		ZoneConfigs:    []string{"", "", ""},
+		Name:            "label matching",
+		Description:     "test correct label matching",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"zone1.com.", "zone2.com.", "zone3.com."},
+		ZoneConfigs:     []string{"", "", ""},
 		Entries: [][][]string{
 			{
 				{"@",
@@ -2172,13 +2193,14 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "cname flattening leaving zone",
-		Description:    "test correct response when reaching a cname pointing outside current zone",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"flat.com.", "noflat.com."},
+		Name:            "cname flattening leaving zone",
+		Description:     "test correct response when reaching a cname pointing outside current zone",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"flat.com.", "noflat.com."},
 		ZoneConfigs: []string{
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.flat.com.","ns":"ns1.flat.com.","refresh":44,"retry":55,"expire":66},"cname_flattening":true}}`,
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.noflat.com.","ns":"ns1.noflat.com.","refresh":44,"retry":55,"expire":66},,"cname_flattening":false}}`,
@@ -2218,21 +2240,22 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "ANAME ttl",
-		Description:    "test ttl value for aname queries",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"arvancloud.com.", "arvan.an."},
+		Name:            "ANAME ttl",
+		Description:     "test ttl value for aname queries",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.com.", "xmpl.an."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.com.","ns":"ns1.arvancloud.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvan.an.","ns":"ns1.arvan.an.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"aname.arvan.an."}}`,
+					`{"aname":{"location":"aname.xmpl.an."}}`,
 				},
 				{"upstream",
 					`{"aname":{"location":"dns.msftncsi.com."}}`,
@@ -2246,34 +2269,35 @@ var handlerTestCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
-				Qname: "arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("arvancloud.com. 180 IN A 6.5.6.5"),
+					test.A("example.com. 180 IN A 6.5.6.5"),
 				},
 			},
 			{
-				Qname: "upstream.arvancloud.com.", Qtype: dns.TypeA,
+				Qname: "upstream.example.com.", Qtype: dns.TypeA,
 				Answer: []dns.RR{
-					test.A("upstream.arvancloud.com. 303 IN A 131.107.255.255"),
+					test.A("upstream.example.com. 303 IN A 131.107.255.255"),
 				},
 			},
 		},
 	},
 	{
-		Name:           "malformed data",
-		Description:    "test proper handling of malformed data",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"arvancloud.mal."},
+		Name:            "malformed data",
+		Description:     "test proper handling of malformed data",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.mal."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.mal.","ns":"ns1.arvancloud.mal.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.mal.","ns":"ns1.example.mal.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"mal1.arvancloud.mal."}}`,
+					`{"aname":{"location":"mal1.example.mal."}}`,
 				},
 				{"www",
 					`{"a":{"ttl":"300", "records":[{"ip":"3.3.3.1"}]}}`,
@@ -2286,31 +2310,32 @@ var handlerTestCases = []*TestCase{
 		TestCases: []test.Case{
 			{
 				Desc:  " aname to garbage",
-				Qname: "arvancloud.mal.", Qtype: dns.TypeA,
+				Qname: "example.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "invalid json format",
-				Qname: "www.arvancloud.mal.", Qtype: dns.TypeA,
+				Qname: "www.example.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 			{
 				Desc:  "garbage",
-				Qname: "mal1.arvancloud.mal.", Qtype: dns.TypeA,
+				Qname: "mal1.example.mal.", Qtype: dns.TypeA,
 				Rcode: dns.RcodeServerFailure,
 			},
 		},
 	},
 	{
-		Name:           "implicit root location",
-		Description:    "root location always exists",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"arvancloud.root."},
+		Name:            "implicit root location",
+		Description:     "root location always exists",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"example.root."},
 		ZoneConfigs: []string{
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.arvancloud.root.","ns":"ns1.arvancloud.root.","refresh":44,"retry":55,"expire":66}}`,
+			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.root.","ns":"ns1.example.root.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
@@ -2321,34 +2346,35 @@ var handlerTestCases = []*TestCase{
 		},
 		TestCases: []test.Case{
 			{
-				Qname: "arvancloud.root.", Qtype: dns.TypeA,
+				Qname: "example.root.", Qtype: dns.TypeA,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.root. 300 IN SOA ns1.arvancloud.root. hostmaster.arvancloud.root. 1460498836 44 55 66 100"),
+					test.SOA("example.root. 300 IN SOA ns1.example.root. hostmaster.example.root. 1460498836 44 55 66 100"),
 				},
 			},
 			{
-				Qname: "arvancloud.root.", Qtype: dns.TypeSOA,
+				Qname: "example.root.", Qtype: dns.TypeSOA,
 				Rcode: dns.RcodeSuccess,
 				Answer: []dns.RR{
-					test.SOA("arvancloud.root. 300 IN SOA ns1.arvancloud.root. hostmaster.arvancloud.root. 1460498836 44 55 66 100"),
+					test.SOA("example.root. 300 IN SOA ns1.example.root. hostmaster.example.root. 1460498836 44 55 66 100"),
 				},
 			},
 			{
-				Qname: "arvancloud.root.", Qtype: dns.TypeTXT,
+				Qname: "example.root.", Qtype: dns.TypeTXT,
 				Ns: []dns.RR{
-					test.SOA("arvancloud.root. 300 IN SOA ns1.arvancloud.root. hostmaster.arvancloud.root. 1460498836 44 55 66 100"),
+					test.SOA("example.root. 300 IN SOA ns1.example.root. hostmaster.example.root. 1460498836 44 55 66 100"),
 				},
 			},
 		},
 	},
 	{
-		Name:        "cache stale",
-		Description: "use stale data from cache when redis is not available",
-		Enabled:     true,
-		Config:      DefaultTestConfig,
+		Name:            "cache stale",
+		Description:     "use stale data from cache when redis is not available",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize: func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
-			testCase.Config.Redis.Connection.WaitForConnection = false
-			testCase.Config.CacheTimeout = 1
+			testCase.RedisDataConfig.Redis.Connection.WaitForConnection = false
+			testCase.RedisDataConfig.RecordCacheTimeout = 1
 			return DefaultInitialize(testCase)
 		},
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
@@ -2365,8 +2391,8 @@ var handlerTestCases = []*TestCase{
 				t.Fail()
 			}
 
-			for i := 0; i < testCase.Config.Redis.Connection.MaxActiveConnections; i++ {
-				handler.Redis.Pool.Get()
+			for i := 0; i < testCase.RedisDataConfig.Redis.Connection.MaxActiveConnections; i++ {
+				handler.RedisData.Redis.Pool.Get()
 			}
 			time.Sleep(time.Duration(1200) * time.Millisecond)
 
@@ -2400,39 +2426,41 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:        "zone list update",
-		Description: "test zone list update",
-		Enabled:     true,
-		Config:      DefaultTestConfig,
+		Name:            "zone list update",
+		Description:     "test zone list update",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize: func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
 			logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-			testCase.Config.ZoneReload = 1
-			h := NewHandler(&testCase.Config)
-			_ = h.Redis.SetConfig("notify-keyspace-events", "AKE")
-			if err := h.Redis.Del("*"); err != nil {
+			testCase.RedisDataConfig.ZoneReload = 1
+			r := redis.NewDataHandler(&testCase.RedisDataConfig)
+			h := NewHandler(&testCase.HandlerConfig, r)
+			_ = h.RedisData.Redis.SetConfig("notify-keyspace-events", "AKE")
+			if err := h.RedisData.Redis.Del("*"); err != nil {
 				return nil, err
 			}
 			for i, zone := range testCase.Zones {
-				if err := h.Redis.SAdd("redins:zones", zone); err != nil {
+				if err := h.RedisData.Redis.SAdd("redins:zones", zone); err != nil {
 					return nil, err
 				}
 				for _, cmd := range testCase.Entries[i] {
-					err := h.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
+					err := h.RedisData.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
 					if err != nil {
 						return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
 					}
 				}
-				if err := h.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
+				if err := h.RedisData.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
 					return nil, err
 				}
 			}
-			h.LoadZones()
+			h.RedisData.LoadZones()
 			time.Sleep(time.Second)
 			return h, nil
 		},
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
 			{
-				_ = handler.Redis.SRem("redins:zones", testCase.Zones[0])
+				_ = handler.RedisData.Redis.SRem("redins:zones", testCase.Zones[0])
 				time.Sleep(time.Millisecond * 1200)
 
 				tc := testCase.TestCases[0]
@@ -2450,7 +2478,7 @@ var handlerTestCases = []*TestCase{
 			}
 
 			{
-				_ = handler.Redis.SAdd("redins:zones", testCase.Zones[0])
+				_ = handler.RedisData.Redis.SAdd("redins:zones", testCase.Zones[0])
 				time.Sleep(time.Millisecond * 1200)
 
 				tc := testCase.TestCases[1]
@@ -2495,14 +2523,15 @@ var handlerTestCases = []*TestCase{
 		},
 	},
 	{
-		Name:           "IDN zones",
-		Description:    "test zone names with IDN values (internationalized domain names)",
-		Enabled:        true,
-		Config:         DefaultTestConfig,
-		Initialize:     DefaultInitialize,
-		ApplyAndVerify: DefaultApplyAndVerify,
-		Zones:          []string{"ουτοπία.δπθ.gr.", "ascii.com."},
-		ZoneConfigs:    []string{"", ""},
+		Name:            "IDN zones",
+		Description:     "test zone names with IDN values (internationalized domain names)",
+		Enabled:         true,
+		RedisDataConfig: DefaultRedisDataTestConfig,
+		HandlerConfig:   DefaultHandlerTestConfig,
+		Initialize:      DefaultInitialize,
+		ApplyAndVerify:  DefaultApplyAndVerify,
+		Zones:           []string{"ουτοπία.δπθ.gr.", "ascii.com."},
+		ZoneConfigs:     []string{"", ""},
 		Entries: [][][]string{
 			{
 				{"@",

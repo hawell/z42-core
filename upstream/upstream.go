@@ -1,4 +1,4 @@
-package handler
+package upstream
 
 import (
 	"errors"

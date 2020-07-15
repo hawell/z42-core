@@ -1,8 +1,9 @@
-package handler
+package dnssec
 
 import (
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"github.com/hawell/redins/types"
 
 	"github.com/hawell/logger"
 	"github.com/miekg/dns"
@@ -25,39 +26,9 @@ func FilterNsecBitmap(qtype uint16, bitmap []uint16) []uint16 {
 	return res
 }
 
-type rrset struct {
-	qname string
-	qtype uint16
-}
-
-func splitSets(rrs []dns.RR) map[rrset][]dns.RR {
-	m := make(map[rrset][]dns.RR)
-
-	for _, r := range rrs {
-		if r.Header().Rrtype == dns.TypeRRSIG || r.Header().Rrtype == dns.TypeOPT {
-			continue
-		}
-
-		if s, ok := m[rrset{r.Header().Name, r.Header().Rrtype}]; ok {
-			s = append(s, r)
-			m[rrset{r.Header().Name, r.Header().Rrtype}] = s
-			continue
-		}
-
-		s := make([]dns.RR, 1, 3)
-		s[0] = r
-		m[rrset{r.Header().Name, r.Header().Rrtype}] = s
-	}
-
-	if len(m) > 0 {
-		return m
-	}
-	return nil
-}
-
-func Sign(rrs []dns.RR, qname string, z *Zone) []dns.RR {
+func SignResponse(rrs []dns.RR, qname string, z *types.Zone) []dns.RR {
 	var res []dns.RR
-	sets := splitSets(rrs)
+	sets := types.SplitSets(rrs)
 	for _, set := range sets {
 		res = append(res, set...)
 		switch set[0].Header().Rrtype {
@@ -67,16 +38,16 @@ func Sign(rrs []dns.RR, qname string, z *Zone) []dns.RR {
 			res = append(res, z.DnsKeySig)
 		case dns.TypeNS:
 			if qname == z.Name {
-				res = append(res, sign(set, set[0].Header().Name, z.ZSK, set[0].Header().Ttl))
+				res = append(res, SignRRSet(set, set[0].Header().Name, z.ZSK, set[0].Header().Ttl))
 			}
 		default:
-			res = append(res, sign(set, set[0].Header().Name, z.ZSK, set[0].Header().Ttl))
+			res = append(res, SignRRSet(set, set[0].Header().Name, z.ZSK, set[0].Header().Ttl))
 		}
 	}
 	return res
 }
 
-func sign(rrs []dns.RR, name string, key *ZoneKey, ttl uint32) *dns.RRSIG {
+func SignRRSet(rrs []dns.RR, name string, key *types.ZoneKey, ttl uint32) *dns.RRSIG {
 	rrsig := &dns.RRSIG{
 		Hdr:        dns.RR_Header{Name: name, Rrtype: dns.TypeRRSIG, Class: dns.ClassINET, Ttl: ttl},
 		Inception:  key.KeyInception,
@@ -103,43 +74,4 @@ func sign(rrs []dns.RR, name string, key *ZoneKey, ttl uint32) *dns.RRSIG {
 		return nil
 	}
 	return rrsig
-}
-
-func NSec(context *RequestContext, name string, qtype uint16, zone *Zone) {
-	if !context.dnssec {
-		return
-	}
-	var bitmap []uint16
-	if name == zone.Name {
-		context.Res = dns.RcodeSuccess
-		bitmap = FilterNsecBitmap(qtype, NsecBitmapAppex)
-	} else {
-		if context.Res == dns.RcodeNameError {
-			context.Res = dns.RcodeSuccess
-			bitmap = NsecBitmapNameError
-		} else {
-			if qtype == dns.TypeDS {
-				bitmap = FilterNsecBitmap(qtype, NsecBitmapSubDelegation)
-			} else {
-				bitmap = FilterNsecBitmap(qtype, NsecBitmapZone)
-			}
-		}
-	}
-
-	nsec := &dns.NSEC{
-		Hdr:        dns.RR_Header{Name: name, Rrtype: dns.TypeNSEC, Class: dns.ClassINET, Ttl: zone.Config.SOA.MinTtl},
-		NextDomain: "\\000." + name,
-		TypeBitMap: bitmap,
-	}
-	context.Authority = append(context.Authority, nsec)
-}
-
-func ApplyDnssec(context *RequestContext, zone *Zone) {
-	if !context.dnssec {
-		return
-	}
-	context.Answer = Sign(context.Answer, context.RawName(), zone)
-	context.Authority = Sign(context.Authority, context.RawName(), zone)
-	// context.Additional = Sign(context.Additional, context.RawName(), zone)
-
 }

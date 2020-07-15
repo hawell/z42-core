@@ -1,10 +1,12 @@
 package handler
 
 import (
-	"arvancloud/redins/test"
 	"errors"
 	"fmt"
 	"github.com/hawell/logger"
+	"github.com/hawell/redins/redis"
+	"github.com/hawell/redins/test"
+	"github.com/hawell/redins/types"
 	"github.com/miekg/dns"
 	"sort"
 	"strings"
@@ -91,47 +93,48 @@ Publish: 20200204092439
 Activate: 20200204092439
 `
 
-func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
-	return func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
+func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testCase *TestCase) (requestHandler *DnsRequestHandler, e error) {
+	return func(testCase *TestCase) (requestHandler *DnsRequestHandler, e error) {
 
 		logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-		h := NewHandler(&testCase.Config)
-		if err := h.Redis.Del("*"); err != nil {
+		r := redis.NewDataHandler(&DefaultRedisDataTestConfig)
+		h := NewHandler(&testCase.HandlerConfig, r)
+		if err := h.RedisData.Redis.Del("*"); err != nil {
 			return nil, err
 		}
 		for i, zone := range testCase.Zones {
-			if err := h.Redis.SAdd("redins:zones", zone); err != nil {
+			if err := h.RedisData.Redis.SAdd("redins:zones", zone); err != nil {
 				return nil, err
 			}
 			for _, cmd := range testCase.Entries[i] {
-				err := h.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
+				err := h.RedisData.Redis.HSet("redins:zones:"+zone, cmd[0], cmd[1])
 				if err != nil {
 					return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
 				}
 			}
-			if err := h.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
+			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":config", testCase.ZoneConfigs[i]); err != nil {
 				return nil, err
 			}
-			if err := h.Redis.Set("redins:zones:"+zone+":zsk:pub", zskPub); err != nil {
+			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":zsk:pub", zskPub); err != nil {
 				fmt.Println(err)
 			}
-			if err := h.Redis.Set("redins:zones:"+zone+":zsk:priv", zskPriv); err != nil {
+			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":zsk:priv", zskPriv); err != nil {
 				fmt.Println(err)
 			}
-			if err := h.Redis.Set("redins:zones:"+zone+":ksk:pub", kskPub); err != nil {
+			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":ksk:pub", kskPub); err != nil {
 				fmt.Println(err)
 			}
-			if err := h.Redis.Set("redins:zones:"+zone+":ksk:priv", kskPriv); err != nil {
+			if err := h.RedisData.Redis.Set("redins:zones:"+zone+":ksk:priv", kskPriv); err != nil {
 				fmt.Println(err)
 			}
 		}
-		h.LoadZones()
+		h.RedisData.LoadZones()
 		return h, nil
 	}
 }
 
-func DefaultDnssecApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler, t *testing.T) {
 	var zsk dns.RR
 	var ksk dns.RR
 	{
@@ -142,7 +145,7 @@ func DefaultDnssecApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler,
 		r := dnskeyQuery.Msg()
 		w := test.NewRecorder(&test.ResponseWriter{})
 		state := NewRequestContext(w, r)
-		handler.HandleRequest(state)
+		requestHandler.HandleRequest(state)
 		resp := w.Msg
 		// fmt.Println(resp.Answer)
 		for _, answer := range resp.Answer {
@@ -181,19 +184,19 @@ func DefaultDnssecApplyAndVerify(testCase *TestCase, handler *DnsRequestHandler,
 		r := tc.Msg()
 		w := test.NewRecorder(&test.ResponseWriter{})
 		state := NewRequestContext(w, r)
-		handler.HandleRequest(state)
+		requestHandler.HandleRequest(state)
 		resp := w.Msg
 	next:
 		for _, rrs := range [][]dns.RR{tc0.Answer, tc0.Ns, resp.Answer, resp.Ns} {
-			sets := splitSets(rrs)
-			rrsigs := make(map[rrset]*dns.RRSIG)
+			sets := types.SplitSets(rrs)
+			rrsigs := make(map[types.RRSetKey]*dns.RRSIG)
 			for _, rr := range rrs {
 				if rrsig, ok := rr.(*dns.RRSIG); ok {
-					rrsigs[rrset{qname: rrsig.Hdr.Name, qtype: rrsig.TypeCovered}] = rrsig
+					rrsigs[types.RRSetKey{QName: rrsig.Hdr.Name, QType: rrsig.TypeCovered}] = rrsig
 				}
 			}
 			for _, set := range sets {
-				rrsig := rrsigs[rrset{qname: set[0].Header().Name, qtype: set[0].Header().Rrtype}]
+				rrsig := rrsigs[types.RRSetKey{QName: set[0].Header().Name, QType: set[0].Header().Rrtype}]
 				if rrsig == nil {
 					continue
 				}
@@ -237,7 +240,7 @@ var dnssecTestCases = []*TestCase{
 		Name:           "dnssec test",
 		Description:    "test basic dnssec functionality",
 		Enabled:        true,
-		Config:         DefaultTestConfig,
+		HandlerConfig:  DefaultHandlerTestConfig,
 		Initialize:     DefaultDnssecInitialize(zone1ZskPub, zone1ZskPriv, zone1KskPub, zone1KskPriv),
 		ApplyAndVerify: DefaultDnssecApplyAndVerify,
 		Zones:          []string{"dnssec_test.com."},
@@ -474,7 +477,7 @@ var dnssecTestCases = []*TestCase{
 		Name:           "RFC4035",
 		Description:    "RFC4035 sample zone",
 		Enabled:        true,
-		Config:         DefaultTestConfig,
+		HandlerConfig:  DefaultHandlerTestConfig,
 		Initialize:     DefaultDnssecInitialize(zone2ZskPub, zone2ZskPriv, zone2KskPub, zone2KskPriv),
 		ApplyAndVerify: DefaultDnssecApplyAndVerify,
 		Zones:          []string{"example."},

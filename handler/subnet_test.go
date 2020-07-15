@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"arvancloud/redins/test"
+	"github.com/hawell/redins/test"
 	"github.com/miekg/dns"
 	"log"
 	"net"

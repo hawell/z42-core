@@ -1,4 +1,4 @@
-package handler
+package types
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ type ZoneConfig struct {
 	CnameFlattening bool       `json:"cname_flattening,omitempty"`
 }
 
-func reverseName(zone string) []byte {
+func ReverseName(zone string) []byte {
 	runes := []rune("." + zone)
 	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
 		runes[i], runes[j] = runes[j], runes[i]
@@ -41,7 +41,7 @@ func NewZone(name string, locations []string, config string) *Zone {
 	LocationsTree := iradix.New()
 	rvalues := make([][]byte, 0, len(locations))
 	for _, val := range locations {
-		rvalues = append(rvalues, reverseName(val))
+		rvalues = append(rvalues, ReverseName(val))
 	}
 	for _, rvalue := range rvalues {
 		for i := 0; i < len(rvalue); i++ {
@@ -107,7 +107,7 @@ func (z *Zone) FindLocation(query string) (string, int) {
 
 	query = strings.TrimSuffix(query, "."+z.Name)
 
-	rquery := reverseName(query)
+	rquery := ReverseName(query)
 	k, value, ok := z.Locations.Root().LongestPrefix(rquery)
 	prefix := make([]byte, len(k), len(k)+2)
 	copy(prefix, k)
