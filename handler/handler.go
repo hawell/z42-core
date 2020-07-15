@@ -56,6 +56,11 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *
 	}
 
 	h.logQueue = make(chan map[string]interface{}, 1000)
+	h.Logger = logger.NewLogger(&config.Log, getFormatter)
+	h.geoip = NewGeoIp(&config.GeoIp)
+	h.upstream = upstream.NewUpstream(config.Upstream)
+	h.quit = make(chan struct{})
+
 	go func() {
 		h.quitWG.Add(1)
 		for {
@@ -69,10 +74,6 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *
 			}
 		}
 	}()
-	h.Logger = logger.NewLogger(&config.Log, getFormatter)
-	h.geoip = NewGeoIp(&config.GeoIp)
-	h.upstream = upstream.NewUpstream(config.Upstream)
-	h.quit = make(chan struct{})
 
 	return h
 }
