@@ -2,11 +2,12 @@ package redis
 
 import (
 	"fmt"
-	"github.com/hawell/logger"
 	"log"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/hawell/logger"
 )
 
 func TestRedis(t *testing.T) {
@@ -55,8 +56,9 @@ func TestRedis(t *testing.T) {
 		t.Fail()
 	}
 	hkeys, _ := r.GetHKeys("2")
-	if hkeys[0] != "key1" || hkeys[1] != "key2" {
+	if !(hkeys[0] == "key1" && hkeys[1] == "key2") && !(hkeys[0] == "key2" && hkeys[1] == "key1") {
 		fmt.Println("2")
+		fmt.Println(hkeys[0], hkeys[1])
 		t.Fail()
 	}
 
