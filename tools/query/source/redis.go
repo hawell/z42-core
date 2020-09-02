@@ -1,8 +1,8 @@
 package source
 
 import (
+	"github.com/hawell/z42/redis"
 	"github.com/hawell/z42/tools/query/query"
-	"github.com/hawell/uperdis"
 )
 
 type RedisDumpQueryGenerator struct {
@@ -12,14 +12,14 @@ type RedisDumpQueryGenerator struct {
 }
 
 func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
-	redis := uperdis.NewRedis(&uperdis.RedisConfig{
+	redisConn := redis.NewRedis(&redis.RedisConfig{
 		Address:  redisAddress,
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
 		Prefix:   "",
 		Suffix:   "_dns2",
-		Connection: uperdis.RedisConnectionConfig{
+		Connection: redis.RedisConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       500,
@@ -30,9 +30,9 @@ func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
 		},
 	})
 	g := new(RedisDumpQueryGenerator)
-	zones, _ := redis.SMembers("z42:zones")
+	zones, _ := redisConn.SMembers("z42:zones")
 	for _, zone := range zones {
-		locations, _ := redis.GetHKeys("z42:zones:" + zone)
+		locations, _ := redisConn.GetHKeys("z42:zones:" + zone)
 		for _, location := range locations {
 			qname := ""
 			if location == "@" {
