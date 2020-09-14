@@ -31,7 +31,6 @@ type RRSets struct {
 
 type Record struct {
 	RRSets
-	Zone         *Zone  `json:"-"`
 	Name         string `json:"-"`
 	CacheTimeout int64  `json:"-"`
 }

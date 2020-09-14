@@ -102,7 +102,6 @@ func TestGetZone(t *testing.T) {
 				},
 			},
 		},
-		Zone: nil,
 		Name: "zone1.com.",
 	}
 	l := dh.GetLocation("zone1.com.", zone)

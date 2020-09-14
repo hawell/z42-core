@@ -257,7 +257,6 @@ func (dh *DataHandler) GetLocation(location string, z *types.Zone) *types.Record
 			},
 		}
 		r.AAAA = r.A
-		r.Zone = z
 		r.Name = name
 
 		val, err := dh.Redis.HGet("z42:zones:"+z.Name, label)

@@ -285,7 +285,7 @@ loop:
 				answer = h.SRV(currentQName, currentRecord)
 			case dns.TypeCAA:
 				// TODO: handle FindCAA error response
-				caaRecord := h.FindCAA(currentRecord)
+				caaRecord := h.FindCAA(context, currentRecord)
 				if caaRecord != nil {
 					answer = h.CAA(currentQName, caaRecord)
 				}
@@ -611,8 +611,8 @@ func OrderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 	}
 }
 
-func (h *DnsRequestHandler) FindCAA(record *types.Record) *types.Record {
-	zone := record.Zone
+func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Record) *types.Record {
+	zone := context.zone
 	currentRecord := record
 	currentLocation := strings.TrimSuffix(currentRecord.Name, "."+zone.Name)
 	if len(currentRecord.CAA.Data) != 0 {
