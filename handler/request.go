@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/coredns/coredns/request"
+	"github.com/hawell/z42/types"
 	"github.com/miekg/dns"
 	"net"
 	"strings"
@@ -23,6 +24,8 @@ type RequestContext struct {
 	SourceSubnet string
 
 	name string
+
+	zone *types.Zone
 }
 
 func NewRequestContext(w dns.ResponseWriter, r *dns.Msg) *RequestContext {

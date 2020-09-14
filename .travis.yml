@@ -11,7 +11,7 @@ git:
 
 branches:
   only:
-  - master
+    - master
 
 before_install:
   - sudo systemctl restart redis-server

@@ -108,16 +108,16 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 	}
 	// logger.Default.Debugf("[%d] zone name : %s", context.Req.Id, zoneName)
 
-	zone := h.RedisData.GetZone(zoneName)
-	if zone == nil {
+	context.zone = h.RedisData.GetZone(zoneName)
+	if context.zone == nil {
 		context.Res = dns.RcodeServerFailure
 		h.Response(context)
 		return
 	}
-	context.LogData["domain_uuid"] = zone.Config.DomainId
+	context.LogData["domain_uuid"] = context.zone.Config.DomainId
 
-	context.dnssec = context.Do() && context.Auth && zone.Config.DnsSec
-	cnameFlattening := context.dnssec || zone.Config.CnameFlattening
+	context.dnssec = context.Do() && context.Auth && context.zone.Config.DnsSec
+	cnameFlattening := context.dnssec || context.zone.Config.CnameFlattening
 
 	loopCount := 0
 	currentQName := context.RawName()
@@ -136,46 +136,46 @@ loop:
 			// logger.Default.Debugf("[%d] out of zone - qname : %s, zone : %s", context.Req.Id, currentQName, zoneName)
 			context.Res = dns.RcodeSuccess
 			if len(context.Answer) == 0 {
-				NSec(context, context.RawName(), context.QType(), zone)
+				NSec(context, context.RawName(), context.QType())
 			}
 			break loop
 		}
 
-		location, match := zone.FindLocation(currentQName)
+		location, match := context.zone.FindLocation(currentQName)
 		switch match {
 		case types.NoMatch:
 			// logger.Default.Debugf("[%d] no location matched for %s in %s", context.Req.Id, currentQName, zoneName)
-			context.Authority = []dns.RR{zone.Config.SOA.Data}
+			context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 			context.Res = dns.RcodeNameError
-			NSec(context, currentQName, dns.TypeNone, zone)
+			NSec(context, currentQName, dns.TypeNone)
 			break loop
 
 		case types.EmptyNonterminalMatch:
 			// logger.Default.Debugf("[%d] empty nonterminal match: %s", context.Req.Id)
-			context.Authority = []dns.RR{zone.Config.SOA.Data}
+			context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 			context.Res = dns.RcodeSuccess
-			NSec(context, currentQName, dns.TypeNone, zone)
+			NSec(context, currentQName, dns.TypeNone)
 			break loop
 
 		case types.CEMatch:
 			// logger.Default.Debugf("[%d] ce match: %s -> %s", context.Req.Id, currentQName, location)
-			currentRecord = h.RedisData.GetLocation(location, zone)
+			currentRecord = h.RedisData.GetLocation(location, context.zone)
 			if currentRecord == nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
-			if len(currentRecord.NS.Data) > 0 && currentRecord.Name != zone.Name {
+			if len(currentRecord.NS.Data) > 0 && currentRecord.Name != context.zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
 				context.Authority = append(context.Authority, h.NS(currentRecord.Name, currentRecord)...)
 				ds := h.DS(currentRecord.Name, currentRecord)
 				if len(ds) == 0 {
-					NSec(context, currentRecord.Name, dns.TypeDS, zone)
+					NSec(context, currentRecord.Name, dns.TypeDS)
 				}
 				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
-					glueLocation, match := zone.FindLocation(ns.Host)
+					glueLocation, match := context.zone.FindLocation(ns.Host)
 					if match != types.NoMatch {
-						glueRecord := h.RedisData.GetLocation(glueLocation, zone)
+						glueRecord := h.RedisData.GetLocation(glueLocation, context.zone)
 						// XXX : should we return with RcodeServerFailure?
 						if glueRecord != nil {
 							ips := h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.A)
@@ -188,9 +188,9 @@ loop:
 				context.Res = dns.RcodeSuccess
 				break loop
 			} else {
-				context.Authority = []dns.RR{zone.Config.SOA.Data}
+				context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 				context.Res = dns.RcodeNameError
-				NSec(context, currentQName, context.QType(), zone)
+				NSec(context, currentQName, context.QType())
 				break loop
 			}
 
@@ -200,7 +200,7 @@ loop:
 
 		case types.ExactMatch:
 			// logger.Default.Debugf("[%d] loading location %s", context.Req.Id, location)
-			currentRecord = h.RedisData.GetLocation(location, zone)
+			currentRecord = h.RedisData.GetLocation(location, context.zone)
 			if currentRecord == nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
@@ -217,11 +217,11 @@ loop:
 				currentQName = dns.Fqdn(currentRecord.CNAME.Host)
 				continue
 			}
-			if len(currentRecord.NS.Data) > 0 && currentQName != zone.Name {
+			if len(currentRecord.NS.Data) > 0 && currentQName != context.zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
 				ds := h.DS(currentQName, currentRecord)
 				if len(ds) == 0 {
-					NSec(context, currentRecord.Name, dns.TypeDS, zone)
+					NSec(context, currentRecord.Name, dns.TypeDS)
 				}
 				if context.QType() == dns.TypeDS {
 					context.Answer = append(context.Answer, ds...)
@@ -231,9 +231,9 @@ loop:
 				context.Authority = append(context.Authority, h.NS(currentQName, currentRecord)...)
 				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
-					glueLocation, match := zone.FindLocation(ns.Host)
+					glueLocation, match := context.zone.FindLocation(ns.Host)
 					if match != types.NoMatch {
-						glueRecord := h.RedisData.GetLocation(glueLocation, zone)
+						glueRecord := h.RedisData.GetLocation(glueLocation, context.zone)
 						// XXX : should we return with RcodeServerFailure?
 						if glueRecord != nil {
 							ips := h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.A)
@@ -294,31 +294,31 @@ loop:
 			case dns.TypeTLSA:
 				answer = h.TLSA(currentQName, currentRecord)
 			case dns.TypeSOA:
-				answer = []dns.RR{zone.Config.SOA.Data}
+				answer = []dns.RR{context.zone.Config.SOA.Data}
 			case dns.TypeDNSKEY:
-				if zone.Config.DnsSec {
-					answer = []dns.RR{zone.ZSK.DnsKey, zone.KSK.DnsKey}
+				if context.zone.Config.DnsSec {
+					answer = []dns.RR{context.zone.ZSK.DnsKey, context.zone.KSK.DnsKey}
 				}
 			case dns.TypeDS:
 				answer = []dns.RR{}
 			default:
 				context.Answer = []dns.RR{}
-				context.Authority = []dns.RR{zone.Config.SOA.Data}
+				context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 				context.Res = dns.RcodeSuccess
 				break loop
 			}
 			context.Answer = append(context.Answer, answer...)
 			if len(answer) == 0 {
-				NSec(context, currentQName, context.QType(), zone)
+				NSec(context, currentQName, context.QType())
 				if context.Res == dns.RcodeSuccess {
-					context.Authority = append(context.Authority, zone.Config.SOA.Data)
+					context.Authority = append(context.Authority, context.zone.Config.SOA.Data)
 				}
 			}
 			break loop
 		}
 	}
 
-	ApplyDnssec(context, zone)
+	ApplyDnssec(context)
 
 	h.Response(context)
 	// logger.Default.Debugf("[%d] end handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
@@ -728,12 +728,12 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 	}
 }
 
-func NSec(context *RequestContext, name string, qtype uint16, zone *types.Zone) {
+func NSec(context *RequestContext, name string, qtype uint16) {
 	if !context.dnssec {
 		return
 	}
 	var bitmap []uint16
-	if name == zone.Name {
+	if name == context.zone.Name {
 		context.Res = dns.RcodeSuccess
 		bitmap = dnssec.FilterNsecBitmap(qtype, dnssec.NsecBitmapAppex)
 	} else {
@@ -750,19 +750,19 @@ func NSec(context *RequestContext, name string, qtype uint16, zone *types.Zone) 
 	}
 
 	nsec := &dns.NSEC{
-		Hdr:        dns.RR_Header{Name: name, Rrtype: dns.TypeNSEC, Class: dns.ClassINET, Ttl: zone.Config.SOA.MinTtl},
+		Hdr:        dns.RR_Header{Name: name, Rrtype: dns.TypeNSEC, Class: dns.ClassINET, Ttl: context.zone.Config.SOA.MinTtl},
 		NextDomain: "\\000." + name,
 		TypeBitMap: bitmap,
 	}
 	context.Authority = append(context.Authority, nsec)
 }
 
-func ApplyDnssec(context *RequestContext, zone *types.Zone) {
+func ApplyDnssec(context *RequestContext) {
 	if !context.dnssec {
 		return
 	}
-	context.Answer = dnssec.SignResponse(context.Answer, context.RawName(), zone)
-	context.Authority = dnssec.SignResponse(context.Authority, context.RawName(), zone)
+	context.Answer = dnssec.SignResponse(context.Answer, context.RawName(), context.zone)
+	context.Authority = dnssec.SignResponse(context.Authority, context.RawName(), context.zone)
 	// context.Additional = Sign(context.Additional, context.RawName(), zone)
 
 }
