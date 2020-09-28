@@ -663,7 +663,7 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 
 		zoneName := h.RedisData.FindZone(currentQName)
 		// logger.Default.Debug("zone : ", zoneName, " qname : ", currentQName, " record : ", currentRecord.Name)
-		if zoneName == "" {
+		if zoneName == "" || zoneName != context.zone.Name {
 			// logger.Default.Debug("non-authoritative zone, using upstream")
 			upstreamAnswers, upstreamRes := h.upstream.Query(currentQName, qtype)
 			if upstreamRes == dns.RcodeSuccess {
@@ -689,18 +689,13 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 			}
 		}
 
-		zone := h.RedisData.GetZone(zoneName)
-		if zone == nil {
-			// logger.Default.Debugf("error loading zone : %s", zoneName)
-			return []net.IP{}, dns.RcodeServerFailure, 0
-		}
-		location, _ := zone.FindLocation(currentQName)
+		location, _ := context.zone.FindLocation(currentQName)
 		if location == "" {
 			// logger.Default.Debugf("location not found for %s", currentQName)
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 
-		currentRecord = h.RedisData.GetLocation(location, zone)
+		currentRecord = h.RedisData.GetLocation(location, context.zone)
 		if currentRecord == nil {
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}

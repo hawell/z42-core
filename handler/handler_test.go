@@ -986,15 +986,14 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify:  DefaultApplyAndVerify,
-		Zones:           []string{"example.com.", "xmpl.an."},
+		Zones:           []string{"example.com."},
 		ZoneConfigs: []string{
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"aname.xmpl.an."}}`,
+					`{"aname":{"location":"aname.example.com."}}`,
 				},
 				{"nxlocal",
 					`{"aname":{"location":"nx.example.com."}}`,
@@ -1011,8 +1010,6 @@ var handlerTestCases = []*TestCase{
 				{"nxupstream",
 					`{"aname":{"location":"anamex.xmpl.an."}}`,
 				},
-			},
-			{
 				{"aname",
 					`{"a":{"ttl":300, "records":[{"ip":"6.5.6.5"}]}, "aaaa":{"ttl":300, "records":[{"ip":"::1"}]}}`,
 				},
@@ -1158,18 +1155,15 @@ var handlerTestCases = []*TestCase{
 				t.Fail()
 			}
 		},
-		Zones: []string{"example.com.", "xmpl.an."},
+		Zones: []string{"example.com."},
 		ZoneConfigs: []string{
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"upstream2",
-					`{"aname":{"location":"aname2.xmpl.an."}}`,
+					`{"aname":{"location":"aname2.example.com."}}`,
 				},
-			},
-			{
 				{"aname2",
 					`{
 						"a":{"ttl":300, "filter": {"count":"single", "order": "weighted", "geo_filter":"none"}, "records":[{"ip":"1.1.1.1", "weight":1},{"ip":"2.2.2.2", "weight":5},{"ip":"3.3.3.3", "weight":10}]},
@@ -2247,21 +2241,18 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify:  DefaultApplyAndVerify,
-		Zones:           []string{"example.com.", "xmpl.an."},
+		Zones:           []string{"example.com."},
 		ZoneConfigs: []string{
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.com.","ns":"ns1.example.com.","refresh":44,"retry":55,"expire":66}}`,
-			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.xmpl.an.","ns":"ns1.xmpl.an.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"aname.xmpl.an."}}`,
+					`{"aname":{"location":"aname.example.com."}}`,
 				},
 				{"upstream",
 					`{"aname":{"location":"dns.msftncsi.com."}}`,
 				},
-			},
-			{
 				{"aname",
 					`{"a":{"ttl":180, "records":[{"ip":"6.5.6.5"}]}, "aaaa":{"ttl":300, "records":[{"ip":"::1"}]}}`,
 				},
@@ -2543,7 +2534,7 @@ var handlerTestCases = []*TestCase{
 			},
 			{
 				{"@",
-					`{"aname":{"location":"ουτοπία.δπθ.gr."}}`,
+					`{"aname":{"location":"ουτοπία.ascii.com."}}`,
 				},
 				{"www",
 					`{"cname":{"ttl":300, "host":"ουτοπία.δπθ.gr."}}`,
