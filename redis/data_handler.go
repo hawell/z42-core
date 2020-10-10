@@ -165,6 +165,29 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 	return z
 }
 
+func (dh *DataHandler) EnableZone(zone string) error {
+	return dh.Redis.SAdd("z42:zones", zone)
+}
+
+func (dh *DataHandler) DisableZone(zone string) error {
+	return dh.Redis.SRem("z42:zones", zone)
+}
+
+func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) error {
+	json, err := jsoniter.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return dh.Redis.Set("z42:zones:"+zone+":config", string(json))
+}
+
+func (dh *DataHandler) SetZoneKey(zone string, keyType string, pub string, priv string) error {
+	if err := dh.Redis.Set("z42:zones:"+zone+":"+keyType+":pub", pub); err != nil {
+		return err
+	}
+	return dh.Redis.Set("z42:zones:"+zone+":"+keyType+":priv", priv)
+}
+
 func (dh *DataHandler) loadKey(pub string, priv string) *types.ZoneKey {
 	pubStr, _ := dh.Redis.Get(pub)
 	if pubStr == "" {
@@ -225,24 +248,24 @@ func (dh *DataHandler) loadZoneKeys(z *types.Zone) {
 	}
 }
 
-func (dh *DataHandler) GetLocation(location string, z *types.Zone) *types.Record {
-	key := location + "." + z.Name
+func (dh *DataHandler) GetLocation(location string, zone string) (*types.Record, error) {
+	key := location + "." + zone
 	var r *types.Record = nil
 	cachedRecord, found := dh.RecordCache.Get(key)
 	if found && cachedRecord != nil {
 		r = cachedRecord.(*types.Record)
 		if time.Now().Unix() <= r.CacheTimeout {
-			return r
+			return r, nil
 		}
 	}
 
-	answer, _, _ := dh.RecordInflight.Do(key, func() (interface{}, error) {
+	answer, err, _ := dh.RecordInflight.Do(key, func() (interface{}, error) {
 		var label, name string
-		if location == z.Name {
-			name = z.Name
+		if location == zone {
+			name = zone
 			label = "@"
 		} else {
-			name = location + "." + z.Name
+			name = location + "." + zone
 			label = location
 		}
 		r := new(types.Record)
@@ -259,19 +282,19 @@ func (dh *DataHandler) GetLocation(location string, z *types.Zone) *types.Record
 		r.AAAA = r.A
 		r.Name = name
 
-		val, err := dh.Redis.HGet("z42:zones:"+z.Name, label)
+		val, err := dh.Redis.HGet("z42:zones:"+zone, label)
 		if err != nil {
 			if label == "@" {
 				dh.RecordCache.Set(key, r, 1)
 				return r, nil
 			}
-			logger.Default.Error(err, " : ", label, " ", z.Name)
+			logger.Default.Error(err, " : ", label, " ", zone)
 			return nil, err
 		}
 		if val != "" {
 			err := jsoniter.Unmarshal([]byte(val), r)
 			if err != nil {
-				logger.Default.Errorf("cannot parse json : zone -> %s, location -> %s, \"%s\" -> %s", z.Name, location, val, err)
+				logger.Default.Errorf("cannot parse json : zone -> %s, location -> %s, \"%s\" -> %s", zone, location, val, err)
 				return nil, err
 			}
 		}
@@ -280,25 +303,25 @@ func (dh *DataHandler) GetLocation(location string, z *types.Zone) *types.Record
 		return r, nil
 	})
 
-	if answer != nil {
-		return answer.(*types.Record)
+	if answer == nil {
+		return nil, err
 	}
-	return r
+	return answer.(*types.Record), nil
 }
 
-func (dh *DataHandler) SetLocation(location string, z *types.Zone, val *types.Record) {
+func (dh *DataHandler) SetLocation(location string, zone string, val *types.Record) error {
 	jsonValue, err := jsoniter.Marshal(val)
 	if err != nil {
-		logger.Default.Errorf("cannot encode to json : %s", err)
-		return
+		return err
 	}
 	var label string
-	if location == z.Name {
+	if location == zone {
 		label = "@"
 	} else {
 		label = location
 	}
-	if err = dh.Redis.HSet(z.Name, label, string(jsonValue)); err != nil {
-		logger.Default.Error("redis error : ", err)
+	if err = dh.Redis.HSet("z42:zones:"+zone, label, string(jsonValue)); err != nil {
+		return err
 	}
+	return nil
 }

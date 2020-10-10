@@ -121,7 +121,6 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 
 	loopCount := 0
 	currentQName := context.RawName()
-	currentRecord := &types.Record{}
 loop:
 	for {
 		if loopCount > 10 {
@@ -159,8 +158,8 @@ loop:
 
 		case types.CEMatch:
 			// logger.Default.Debugf("[%d] ce match: %s -> %s", context.Req.Id, currentQName, location)
-			currentRecord = h.RedisData.GetLocation(location, context.zone)
-			if currentRecord == nil {
+			currentRecord, err := h.RedisData.GetLocation(location, context.zone.Name)
+			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
@@ -175,12 +174,12 @@ loop:
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := context.zone.FindLocation(ns.Host)
 					if match != types.NoMatch {
-						glueRecord := h.RedisData.GetLocation(glueLocation, context.zone)
+						glueRecord, err := h.RedisData.GetLocation(glueLocation, context.zone.Name)
 						// XXX : should we return with RcodeServerFailure?
-						if glueRecord != nil {
-							ips := h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.A)
+						if err == nil {
+							ips := h.Filter(context.SourceIp, &glueRecord.A)
 							context.Additional = append(context.Additional, h.A(ns.Host, glueRecord, ips)...)
-							ips = h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.AAAA)
+							ips = h.Filter(context.SourceIp, &glueRecord.AAAA)
 							context.Additional = append(context.Additional, h.AAAA(ns.Host, glueRecord, ips)...)
 						}
 					}
@@ -200,8 +199,8 @@ loop:
 
 		case types.ExactMatch:
 			// logger.Default.Debugf("[%d] loading location %s", context.Req.Id, location)
-			currentRecord = h.RedisData.GetLocation(location, context.zone)
-			if currentRecord == nil {
+			currentRecord, err := h.RedisData.GetLocation(location, context.zone.Name)
+			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
@@ -233,12 +232,12 @@ loop:
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := context.zone.FindLocation(ns.Host)
 					if match != types.NoMatch {
-						glueRecord := h.RedisData.GetLocation(glueLocation, context.zone)
+						glueRecord, err := h.RedisData.GetLocation(glueLocation, context.zone.Name)
 						// XXX : should we return with RcodeServerFailure?
-						if glueRecord != nil {
-							ips := h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.A)
+						if err == nil {
+							ips := h.Filter(context.SourceIp, &glueRecord.A)
 							context.Additional = append(context.Additional, h.A(ns.Host, glueRecord, ips)...)
-							ips = h.Filter(glueRecord.Name, context.SourceIp, &glueRecord.AAAA)
+							ips = h.Filter(context.SourceIp, &glueRecord.AAAA)
 							context.Additional = append(context.Additional, h.AAAA(ns.Host, glueRecord, ips)...)
 						}
 					}
@@ -260,7 +259,7 @@ loop:
 					ips, context.Res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeA)
 					currentRecord.A.Ttl = ttl
 				} else {
-					ips = h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.A)
+					ips = h.Filter(context.SourceIp, &currentRecord.A)
 				}
 				answer = h.A(currentQName, currentRecord, ips)
 			case dns.TypeAAAA:
@@ -270,7 +269,7 @@ loop:
 					ips, context.Res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeAAAA)
 					currentRecord.AAAA.Ttl = ttl
 				} else {
-					ips = h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.AAAA)
+					ips = h.Filter(context.SourceIp, &currentRecord.AAAA)
 				}
 				answer = h.AAAA(currentQName, currentRecord, ips)
 			case dns.TypeCNAME:
@@ -324,7 +323,7 @@ loop:
 	// logger.Default.Debugf("[%d] end handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
 }
 
-func (h *DnsRequestHandler) Filter(name string, sourceIp net.IP, rrset *types.IP_RRSet) []net.IP {
+func (h *DnsRequestHandler) Filter(sourceIp net.IP, rrset *types.IP_RRSet) []net.IP {
 	mask := make([]int, len(rrset.Data))
 	// TODO: filterHealthCheck in redisStat
 	//mask = h.healthcheck.FilterHealthcheck(name, rrset, mask)
@@ -630,8 +629,8 @@ func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Recor
 			currentLocation = splits[1]
 			continue
 		}
-		currentRecord = h.RedisData.GetLocation(currentLocation, zone)
-		if currentRecord == nil {
+		currentRecord, err := h.RedisData.GetLocation(currentLocation, zone.Name)
+		if err != nil {
 			currentLocation = splits[1]
 			continue
 		}
@@ -639,8 +638,8 @@ func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Recor
 			return currentRecord
 		}
 	}
-	currentRecord = h.RedisData.GetLocation(zone.Name, zone)
-	if currentRecord == nil {
+	currentRecord, err := h.RedisData.GetLocation(zone.Name, zone.Name)
+	if err != nil {
 		return nil
 	}
 	if len(currentRecord.CAA.Data) != 0 {
@@ -652,7 +651,6 @@ func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Recor
 func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qtype uint16) ([]net.IP, int, uint32) {
 	// logger.Default.Debug("finding aname")
 	currentQName := aname
-	currentRecord := &types.Record{}
 	loopCount := 0
 	for {
 		if loopCount > 10 {
@@ -695,8 +693,8 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 
-		currentRecord = h.RedisData.GetLocation(location, context.zone)
-		if currentRecord == nil {
+		currentRecord, err := h.RedisData.GetLocation(location, context.zone.Name)
+		if err != nil {
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 		if currentRecord.CNAME != nil {
@@ -707,10 +705,10 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 
 		if qtype == dns.TypeA && len(currentRecord.A.Data) > 0 {
 			// logger.Default.Debug("found a")
-			return h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.A), dns.RcodeSuccess, currentRecord.A.Ttl
+			return h.Filter(context.SourceIp, &currentRecord.A), dns.RcodeSuccess, currentRecord.A.Ttl
 		} else if qtype == dns.TypeAAAA && len(currentRecord.AAAA.Data) > 0 {
 			// logger.Default.Debug("found aaaa")
-			return h.Filter(currentRecord.Name, context.SourceIp, &currentRecord.AAAA), dns.RcodeSuccess, currentRecord.AAAA.Ttl
+			return h.Filter(context.SourceIp, &currentRecord.AAAA), dns.RcodeSuccess, currentRecord.AAAA.Ttl
 		}
 
 		if currentRecord.ANAME != nil {
