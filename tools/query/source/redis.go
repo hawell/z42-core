@@ -12,27 +12,33 @@ type RedisDumpQueryGenerator struct {
 }
 
 func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
-	redisConn := redis.NewRedis(&redis.RedisConfig{
-		Address:  redisAddress,
-		Net:      "tcp",
-		DB:       0,
-		Password: "",
-		Prefix:   "",
-		Suffix:   "_dns2",
-		Connection: redis.RedisConnectionConfig{
-			MaxIdleConnections:   10,
-			MaxActiveConnections: 10,
-			ConnectTimeout:       500,
-			ReadTimeout:          500,
-			IdleKeepAlive:        30,
-			MaxKeepAlive:         0,
-			WaitForConnection:    false,
+	dh := redis.NewDataHandler(&redis.DataHandlerConfig{
+		ZoneCacheSize:      10000,
+		ZoneCacheTimeout:   60,
+		ZoneReload:         1,
+		RecordCacheSize:    1000000,
+		RecordCacheTimeout: 60,
+		Redis: redis.RedisConfig{
+			Suffix:  "_redis2",
+			Prefix:  "",
+			Address: redisAddress,
+			Net:     "tcp",
+			DB:      0,
+			Connection: redis.RedisConnectionConfig{
+				MaxIdleConnections:   10,
+				MaxActiveConnections: 10,
+				ConnectTimeout:       500,
+				ReadTimeout:          500,
+				IdleKeepAlive:        30,
+				MaxKeepAlive:         0,
+				WaitForConnection:    false,
+			},
 		},
 	})
 	g := new(RedisDumpQueryGenerator)
-	zones, _ := redisConn.SMembers("z42:zones")
+	zones := dh.GetZones()
 	for _, zone := range zones {
-		locations, _ := redisConn.GetHKeys("z42:zones:" + zone)
+		locations := dh.GetZoneLocations(zone)
 		for _, location := range locations {
 			qname := ""
 			if location == "@" {

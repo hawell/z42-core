@@ -98,7 +98,7 @@ var healthcheckRedisDataConfig = redis.DataHandlerConfig{
 	ZoneCacheTimeout:   60,
 	ZoneReload:         60,
 	RecordCacheSize:    10000000,
-	RecordCacheTimeout: 60,
+	RecordCacheTimeout: 1,
 	Redis: redis.RedisConfig{
 		Address:  "redis:6379",
 		Net:      "tcp",
@@ -310,7 +310,7 @@ func TestSet(t *testing.T) {
 	h.redisData.Redis.Del("*")
 	for _, str := range healthCheckSetEntries {
 		a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", str[1], str[2])
-		h.redisStat.Redis.HSet("z42:zones:healthcheck.com.", str[0], a)
+		h.redisData.SetLocationFromJson("healthcheck.com.", str[0], a)
 		var key string
 		if str[0] == "@" {
 			key = fmt.Sprintf("example.com.:%s", str[1])
@@ -336,11 +336,11 @@ func TestTransfer(t *testing.T) {
 
 	h.redisData.Redis.Del("*")
 	h.redisStat.Redis.Del("*")
-	h.redisData.Redis.SAdd("z42:zones", "healthcheck.com.")
+	h.redisData.EnableZone("healthcheck.com.")
 	for _, str := range healthcheckTransferItems {
 		if str[2] != "" {
 			a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", str[1], str[2])
-			h.redisData.Redis.HSet("z42:zones:healthcheck.com.", str[0], a)
+			h.redisData.SetLocationFromJson("healthcheck.com.", str[0], a)
 		}
 		if str[3] != "" {
 			key := fmt.Sprintf("%s.healthcheck.com.:%s", str[0], str[1])
@@ -437,11 +437,11 @@ func TestHealthCheck(t *testing.T) {
 	hc := NewHealthcheck(&healthcheckConfig, dh, sh)
 	hc.redisStat.Redis.Del("*")
 	hc.redisData.Redis.Del("*")
-	hc.redisData.Redis.SAdd("z42:zones", "google.com.")
+	hc.redisData.EnableZone("google.com.")
 	for _, entry := range hcEntries {
-		hc.redisData.Redis.HSet("z42:zones:google.com.", entry[0], entry[1])
+		hc.redisData.SetLocationFromJson("google.com.", entry[0], entry[1])
 	}
-	hc.redisData.Redis.Set("z42:zones:google.com.:config", hcConfig)
+	hc.redisData.SetZoneConfigFromJson("google.com.", hcConfig)
 
 	go hc.Start()
 	time.Sleep(12 * time.Second)
@@ -509,8 +509,8 @@ func TestExpire(t *testing.T) {
 
 	a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", expireItem[1], expireItem[2])
 	log.Println(a)
-	hc.redisData.Redis.SAdd("z42:zones", "healthcheck.exp.")
-	hc.redisData.Redis.HSet("z42:zones:healthcheck.exp.", expireItem[0], a)
+	hc.redisData.EnableZone("healthcheck.exp.")
+	hc.redisData.SetLocationFromJson("healthcheck.exp.", expireItem[0], a)
 	key := fmt.Sprintf("%s.healthcheck.exp.:%s", expireItem[0], expireItem[1])
 	hc.redisStat.Redis.Set("z42:healthcheck:"+key, expireItem[2])
 
@@ -524,12 +524,12 @@ func TestExpire(t *testing.T) {
 
 	a = fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", expireItem[1], expireItem[3])
 	log.Println(a)
-	hc.redisData.Redis.HSet("z42:zones:healthcheck.exp.", expireItem[0], a)
+	hc.redisData.SetLocationFromJson("healthcheck.exp.", expireItem[0], a)
 
 	time.Sleep(time.Second * 5)
 	status = hc.getStatus("w0.healthcheck.exp.", net.ParseIP("1.2.3.4"))
 	if status != 0 {
-		fmt.Println("2")
+		fmt.Println("2", status)
 		t.Fail()
 	}
 }

@@ -3,21 +3,19 @@ package types
 import (
 	"bytes"
 	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/hawell/logger"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"strings"
-	"time"
 )
 
 type Zone struct {
-	Name         string
-	Config       ZoneConfig
-	Locations    *iradix.Tree
-	ZSK          *ZoneKey
-	KSK          *ZoneKey
-	DnsKeySig    dns.RR
-	CacheTimeout int64
+	Name          string
+	Config        *ZoneConfig
+	LocationsTree *iradix.Tree
+	LocationsList []string
+	ZSK           *ZoneKey
+	KSK           *ZoneKey
+	DnsKeySig     dns.RR
+	CacheTimeout  int64
 }
 
 type ZoneConfig struct {
@@ -35,7 +33,7 @@ func ReverseName(zone string) []byte {
 	return []byte(string(runes))
 }
 
-func NewZone(name string, locations []string, config string) *Zone {
+func NewZone(name string, locations []string, config *ZoneConfig) *Zone {
 	z := new(Zone)
 	z.Name = name
 	LocationsTree := iradix.New()
@@ -55,39 +53,11 @@ func NewZone(name string, locations []string, config string) *Zone {
 	for i, rvalue := range rvalues {
 		LocationsTree, _, _ = LocationsTree.Insert(rvalue, locations[i])
 	}
-	z.Locations = LocationsTree
+	z.LocationsTree = LocationsTree
+	z.LocationsList = locations
 
-	z.Config = ZoneConfig{
-		DnsSec:          false,
-		CnameFlattening: false,
-		SOA: &SOA_RRSet{
-			Ns:      "ns1." + z.Name,
-			MinTtl:  300,
-			Refresh: 86400,
-			Retry:   7200,
-			Expire:  3600,
-			MBox:    "hostmaster." + z.Name,
-			Serial:  uint32(time.Now().Unix()),
-			Ttl:     300,
-		},
-	}
-	if len(config) > 0 {
-		err := jsoniter.Unmarshal([]byte(config), &z.Config)
-		if err != nil {
-			logger.Default.Errorf("cannot parse zone config : %s", err)
-		}
-	}
-	z.Config.SOA.Ns = dns.Fqdn(z.Config.SOA.Ns)
-	z.Config.SOA.Data = &dns.SOA{
-		Hdr:     dns.RR_Header{Name: z.Name, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: z.Config.SOA.Ttl, Rdlength: 0},
-		Ns:      z.Config.SOA.Ns,
-		Mbox:    z.Config.SOA.MBox,
-		Refresh: z.Config.SOA.Refresh,
-		Retry:   z.Config.SOA.Retry,
-		Expire:  z.Config.SOA.Expire,
-		Minttl:  z.Config.SOA.MinTtl,
-		Serial:  z.Config.SOA.Serial,
-	}
+	z.Config = config
+
 	return z
 }
 
@@ -102,17 +72,17 @@ const (
 func (z *Zone) FindLocation(query string) (string, int) {
 	// request for zone records
 	if query == z.Name {
-		return query, ExactMatch
+		return "@", ExactMatch
 	}
 
 	query = strings.TrimSuffix(query, "."+z.Name)
 
 	rquery := ReverseName(query)
-	k, value, ok := z.Locations.Root().LongestPrefix(rquery)
+	k, value, ok := z.LocationsTree.Root().LongestPrefix(rquery)
 	prefix := make([]byte, len(k), len(k)+2)
 	copy(prefix, k)
 	if !ok {
-		value, ok = z.Locations.Get([]byte("*."))
+		value, ok = z.LocationsTree.Get([]byte("*."))
 		if ok && value != nil {
 			return "*", WildCardMatch
 		}
@@ -125,7 +95,7 @@ func (z *Zone) FindLocation(query string) (string, int) {
 			return query, ExactMatch
 		} else {
 			ss := append(prefix, []byte("*.")...)
-			value, ok = z.Locations.Get(ss)
+			value, ok = z.LocationsTree.Get(ss)
 			if ok && value != nil {
 				return value.(string), WildCardMatch
 			} else {
@@ -137,7 +107,7 @@ func (z *Zone) FindLocation(query string) (string, int) {
 			return "", EmptyNonterminalMatch
 		} else {
 			ss := append(prefix, []byte("*.")...)
-			value, ok = z.Locations.Get(ss)
+			value, ok = z.LocationsTree.Get(ss)
 			if ok && value != nil {
 				return value.(string), WildCardMatch
 			} else {

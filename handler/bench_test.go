@@ -37,12 +37,12 @@ func TestMain(m *testing.M) {
 	benchTestHandler = NewHandler(&DefaultHandlerTestConfig, r)
 	err := benchTestHandler.RedisData.Redis.Del("*")
 	log.Println(err)
-	err = benchTestHandler.RedisData.Redis.SAdd("z42:zones", benchZone)
+	err = benchTestHandler.RedisData.EnableZone(benchZone)
 	log.Println(err)
-	err = benchTestHandler.RedisData.Redis.Set("z42:zones:"+benchZone+":config", "{\"cname_flattening\": false}")
+	err = benchTestHandler.RedisData.SetZoneConfigFromJson(benchZone, "{\"cname_flattening\": false}")
 	log.Println(err)
 	for _, cmd := range benchEntries {
-		err := benchTestHandler.RedisData.Redis.HSet("z42:zones:"+benchZone, cmd[0], cmd[1])
+		err := benchTestHandler.RedisData.SetLocationFromJson(benchZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			return

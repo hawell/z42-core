@@ -158,23 +158,23 @@ loop:
 
 		case types.CEMatch:
 			// logger.Default.Debugf("[%d] ce match: %s -> %s", context.Req.Id, currentQName, location)
-			currentRecord, err := h.RedisData.GetLocation(location, context.zone.Name)
+			currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
 			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
-			if len(currentRecord.NS.Data) > 0 && currentRecord.Name != context.zone.Name {
+			if len(currentRecord.NS.Data) > 0 && currentRecord.Fqdn != context.zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
-				context.Authority = append(context.Authority, h.NS(currentRecord.Name, currentRecord)...)
-				ds := h.DS(currentRecord.Name, currentRecord)
+				context.Authority = append(context.Authority, h.NS(currentRecord.Fqdn, currentRecord)...)
+				ds := h.DS(currentRecord.Fqdn, currentRecord)
 				if len(ds) == 0 {
-					NSec(context, currentRecord.Name, dns.TypeDS)
+					NSec(context, currentRecord.Fqdn, dns.TypeDS)
 				}
 				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := context.zone.FindLocation(ns.Host)
 					if match != types.NoMatch {
-						glueRecord, err := h.RedisData.GetLocation(glueLocation, context.zone.Name)
+						glueRecord, err := h.RedisData.GetLocation(context.zone.Name, glueLocation)
 						// XXX : should we return with RcodeServerFailure?
 						if err == nil {
 							ips := h.Filter(context.SourceIp, &glueRecord.A)
@@ -199,7 +199,7 @@ loop:
 
 		case types.ExactMatch:
 			// logger.Default.Debugf("[%d] loading location %s", context.Req.Id, location)
-			currentRecord, err := h.RedisData.GetLocation(location, context.zone.Name)
+			currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
 			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
@@ -220,7 +220,7 @@ loop:
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
 				ds := h.DS(currentQName, currentRecord)
 				if len(ds) == 0 {
-					NSec(context, currentRecord.Name, dns.TypeDS)
+					NSec(context, currentRecord.Fqdn, dns.TypeDS)
 				}
 				if context.QType() == dns.TypeDS {
 					context.Answer = append(context.Answer, ds...)
@@ -232,7 +232,7 @@ loop:
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := context.zone.FindLocation(ns.Host)
 					if match != types.NoMatch {
-						glueRecord, err := h.RedisData.GetLocation(glueLocation, context.zone.Name)
+						glueRecord, err := h.RedisData.GetLocation(context.zone.Name, glueLocation)
 						// XXX : should we return with RcodeServerFailure?
 						if err == nil {
 							ips := h.Filter(context.SourceIp, &glueRecord.A)
@@ -613,7 +613,7 @@ func OrderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Record) *types.Record {
 	zone := context.zone
 	currentRecord := record
-	currentLocation := strings.TrimSuffix(currentRecord.Name, "."+zone.Name)
+	currentLocation := strings.TrimSuffix(currentRecord.Fqdn, "."+zone.Name)
 	if len(currentRecord.CAA.Data) != 0 {
 		return currentRecord
 	}
@@ -629,7 +629,7 @@ func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Recor
 			currentLocation = splits[1]
 			continue
 		}
-		currentRecord, err := h.RedisData.GetLocation(currentLocation, zone.Name)
+		currentRecord, err := h.RedisData.GetLocation(zone.Name, currentLocation)
 		if err != nil {
 			currentLocation = splits[1]
 			continue
@@ -638,7 +638,7 @@ func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Recor
 			return currentRecord
 		}
 	}
-	currentRecord, err := h.RedisData.GetLocation(zone.Name, zone.Name)
+	currentRecord, err := h.RedisData.GetLocation(zone.Name, "@")
 	if err != nil {
 		return nil
 	}
@@ -687,13 +687,13 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 			}
 		}
 
-		location, _ := context.zone.FindLocation(currentQName)
-		if location == "" {
+		location, matchType := context.zone.FindLocation(currentQName)
+		if matchType == types.NoMatch {
 			// logger.Default.Debugf("location not found for %s", currentQName)
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 
-		currentRecord, err := h.RedisData.GetLocation(location, context.zone.Name)
+		currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
 		if err != nil {
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}

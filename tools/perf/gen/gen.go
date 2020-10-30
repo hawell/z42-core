@@ -4,12 +4,11 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/hawell/z42/redis"
 	"github.com/miekg/dns"
 	"math/rand"
 	"os"
 	"time"
-
-	"github.com/gomodule/redigo/redis"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"
@@ -51,15 +50,33 @@ func main() {
 
 	flag.Parse()
 
-	opts := []redis.DialOption{}
+	// opts := []redis.DialOption{}
 	// opts = append(opts, redis.DialPassword(*redisAuthPtr))
-	con, err := redis.Dial("tcp", *redisAddrPtr, opts...)
-	if err != nil {
-		fmt.Println("redis connection error")
-		return
-	}
+	dh := redis.NewDataHandler(&redis.DataHandlerConfig{
+		ZoneCacheSize:      10000,
+		ZoneCacheTimeout:   60,
+		ZoneReload:         1,
+		RecordCacheSize:    1000000,
+		RecordCacheTimeout: 60,
+		Redis: redis.RedisConfig{
+			Suffix:  "",
+			Prefix:  "",
+			Address: *redisAddrPtr,
+			Net:     "tcp",
+			DB:      0,
+			Connection: redis.RedisConnectionConfig{
+				MaxIdleConnections:   10,
+				MaxActiveConnections: 10,
+				ConnectTimeout:       600,
+				ReadTimeout:          600,
+				IdleKeepAlive:        6000,
+				MaxKeepAlive:         6000,
+				WaitForConnection:    true,
+			},
+		},
+	})
 
-	con.Do("EVAL", "return redis.call('del', unpack(redis.call('keys', ARGV[1])))", 0, "*")
+	dh.Redis.Del("*")
 
 	fq, err := os.Create("../query.txt")
 	if err != nil {
@@ -77,7 +94,7 @@ func main() {
 			fmt.Println("cannot open file "+zoneName, " : ", err)
 			return
 		}
-		con.Do("SADD", "z42:zones", zoneName)
+		dh.EnableZone(zoneName)
 		wz := bufio.NewWriter(fz)
 		wz.WriteString("$ORIGIN " + zoneName + "\n" +
 			"$TTL 300\n\n" +
@@ -99,10 +116,10 @@ func main() {
 				location1 := RandomString(15)
 				location2 := RandomString(15)
 
-				con.Do("HSET", "z42:zones:"+zoneName, location1, `{"cname":{"ttl":300, "host":"`+location2+"."+zoneName+`."}}`)
-				ip := fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
+				dh.SetLocationFromJson(zoneName, location1, `{"cname":{"ttl":300, "host":"`+location2+"."+zoneName+`."}}`)
 
-				con.Do("HSET", "z42:zones:"+zoneName, location2, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
+				ip := fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
+				dh.SetLocationFromJson(zoneName, location2, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
 
 				wq.WriteString(fmt.Sprintf("%s.%s %d %d %s\n", location1, zoneName, dns.TypeA, dns.RcodeSuccess, ip))
 
@@ -113,7 +130,7 @@ func main() {
 				location := RandomString(15)
 				txt := RandomString(200)
 
-				con.Do("HSET", "z42:zones:"+zoneName, location, `{"txt":{"ttl":300, "records:{"text":"`+txt+`"}"}}`)
+				dh.SetLocationFromJson(zoneName, location, `{"txt":{"ttl":300, "records:{"text":"`+txt+`"}"}}`)
 
 				wq.WriteString(fmt.Sprintf("%s.%s %d %d %s\n", location, zoneName, dns.TypeTXT, dns.RcodeSuccess, txt))
 				wz.WriteString(location + ` TXT "` + txt + `"`)
@@ -129,7 +146,7 @@ func main() {
 
 				ip := fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
 
-				con.Do("HSET", "z42:zones:"+zoneName, location, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
+				dh.SetLocationFromJson(zoneName, location, `{"a":{"ttl":300, "records":[{"ip":"`+ip+`"}]}}`)
 
 				wq.WriteString(fmt.Sprintf("%s.%s %d %d %s\n", location, zoneName, dns.TypeA, dns.RcodeSuccess, ip))
 				wz.WriteString(location + " A " + ip + "\n")

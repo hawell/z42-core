@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"net"
 	"reflect"
 	"testing"
@@ -54,17 +55,22 @@ func TestGetLocation(t *testing.T) {
 				},
 			},
 		},
-		Name: "zone1.com.",
+		Label: "@",
+		Fqdn:  "zone1.com.",
 	}
-	l, err := dh.GetLocation("zone1.com.", "zone1.com.")
+	l, err := dh.GetLocation("zone1.com.", "@")
 	if err != nil {
 		t.Fail()
 	}
 	if l == nil {
 		t.Fail()
 	}
-	if l.Name != location.Name {
-		fmt.Println("location name mismatch")
+	if l.Fqdn != location.Fqdn {
+		fmt.Println("fqdn name mismatch", l.Fqdn, location.Fqdn)
+		t.Fail()
+	}
+	if l.Label != location.Label {
+		fmt.Println("label name mismatch", l.Label, location.Label)
 		t.Fail()
 	}
 	if reflect.DeepEqual(l.A, location.A) == false {
@@ -77,7 +83,7 @@ func TestGetLocation(t *testing.T) {
 func TestSetLocation(t *testing.T) {
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	_ = dh.Redis.Del("*")
-	_ = dh.Redis.SAdd("z42:zones", "zone1.com")
+	_ = dh.Redis.SAdd("z42:zones", "zone1.com.")
 	location := types.Record{
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
@@ -92,20 +98,27 @@ func TestSetLocation(t *testing.T) {
 				},
 			},
 		},
-		Name: "zone1.com.",
+		Label: "@",
+		Fqdn:  "zone1.com.",
 	}
-	err := dh.SetLocation("zone1.com.", "zone1.com.", &location)
+	err := dh.SetLocation("zone1.com.", "@", &location)
 	if err != nil {
 		t.Fail()
 	}
-	l, err := dh.GetLocation("zone1.com.", "zone1.com.")
+	l, err := dh.GetLocation("zone1.com.", "@")
 	if err != nil {
 		t.Fail()
 	}
-	if l.Name != location.Name {
+	if l.Fqdn != location.Fqdn {
+		fmt.Println("fqdn name mismatch", l.Fqdn, location.Fqdn)
+		t.Fail()
+	}
+	if l.Label != location.Label {
+		fmt.Println("label name mismatch", l.Label, location.Label)
 		t.Fail()
 	}
 	if reflect.DeepEqual(l.A, location.A) == false {
+		fmt.Println("l.A not equal location.A", l.A, location.A)
 		t.Fail()
 	}
 }
@@ -202,9 +215,8 @@ func TestGetZone(t *testing.T) {
 		DnsSec:          true,
 		CnameFlattening: false,
 	}
-	if reflect.DeepEqual(zone.Config, zoneConfig) == false {
-		fmt.Printf("%#v\n", zone.Config.SOA)
-		fmt.Printf("%#v\n", zoneConfig.SOA)
+	if cmp.Equal(zone.Config, &zoneConfig) == false {
+		fmt.Println(cmp.Diff(zone.Config, zoneConfig))
 		fmt.Println("config mismatch")
 		t.Fail()
 	}
@@ -244,7 +256,7 @@ func TestSetZoneConfig(t *testing.T) {
 		t.Fail()
 	}
 	zone.Config.DomainId = "12345"
-	dh.SetZoneConfig(zoneName, &zone.Config)
+	dh.SetZoneConfig(zoneName, zone.Config)
 	time.Sleep(time.Second * 2)
 	zone = dh.GetZone(zoneName)
 	if zone.Config.DomainId != "12345" {

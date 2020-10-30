@@ -258,16 +258,9 @@ func (h *Healthcheck) storeItem(item *HealthCheckItem) {
 }
 
 func (h *Healthcheck) getDomainId(zone string) string {
-	var cfg types.ZoneConfig
-	val, err := h.redisData.Redis.Get("z42:zones:" + zone + ":config")
+	cfg, err := h.redisData.GetZoneConfig(zone)
 	if err != nil {
-		logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
-	}
-	if len(val) > 0 {
-		err := jsoniter.Unmarshal([]byte(val), &cfg)
-		if err != nil {
-			logger.Default.Errorf("cannot parse zone config : %s", err)
-		}
+		return ""
 	}
 	return cfg.DomainId
 }
@@ -393,58 +386,31 @@ func (h *Healthcheck) Transfer() {
 
 	limiter := time.Tick(time.Millisecond * 50)
 	for {
-		domains, err := h.redisData.Redis.SMembers("z42:zones")
-		if err != nil {
-			logger.Default.Errorf("cannot get members of z42:zones : %s", err)
-		}
+		domains := h.redisData.GetZones()
 		for _, domain := range domains {
 			domainId := h.getDomainId(domain)
-			subdomains, err := h.redisData.Redis.GetHKeys("z42:zones:" + domain)
-			if err != nil {
-				logger.Default.Errorf("cannot get keys of %s : %s", domain, err)
-			}
+			subdomains := h.redisData.GetZoneLocations(domain)
 			for _, subdomain := range subdomains {
 				select {
 				case <-h.quit:
 					h.quitWG.Done()
 					return
 				case <-limiter:
-					recordStr, err := h.redisData.Redis.HGet("z42:zones:"+domain, subdomain)
+					record, err := h.redisData.GetLocation(domain, subdomain)
 					if err != nil {
-						logger.Default.Errorf("cannot get record of %s.%s : %s", subdomain, domain, err)
-					}
-					record := new(types.Record)
-					record.A.HealthCheckConfig = types.IpHealthCheckConfig{
-						Timeout:   1000,
-						Port:      80,
-						UpCount:   3,
-						DownCount: -3,
-						Protocol:  "http",
-						Uri:       "/",
-						Enable:    false,
-					}
-					record.AAAA = record.A
-					err = jsoniter.Unmarshal([]byte(recordStr), record)
-					if err != nil {
-						logger.Default.Errorf("cannot parse json : zone -> %s, location -> %s, %s -> %s", domain, subdomain, recordStr, err)
+						logger.Default.Errorf("cannot get location : zone -> %s, location -> %s", domain, subdomain)
 						continue
-					}
-					var host string
-					if subdomain == "@" {
-						host = domain
-					} else {
-						host = subdomain + "." + domain
 					}
 					for _, rrset := range []*types.IP_RRSet{&record.A, &record.AAAA} {
 						if !rrset.HealthCheckConfig.Enable {
 							continue
 						}
 						for i := range rrset.Data {
-							key := host + ":" + rrset.Data[i].Ip.String()
+							key := record.Fqdn + ":" + rrset.Data[i].Ip.String()
 							newItem := &HealthCheckItem{
 								Ip:        rrset.Data[i].Ip.String(),
 								Port:      rrset.HealthCheckConfig.Port,
-								Host:      host,
+								Host:      record.Fqdn,
 								Enable:    rrset.HealthCheckConfig.Enable,
 								DownCount: rrset.HealthCheckConfig.DownCount,
 								UpCount:   rrset.HealthCheckConfig.UpCount,

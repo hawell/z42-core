@@ -87,15 +87,15 @@ func TestJsonLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("z42:zones", logZone)
+	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.SetZoneConfigFromJson(logZone, logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www.zone.log",
@@ -138,15 +138,15 @@ func TestCapnpLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("z42:zones", logZone)
+	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.SetZoneConfigFromJson(logZone, logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
@@ -240,9 +240,9 @@ func TestKafkaCapnpLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("z42:zones", logZone)
+	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
@@ -260,7 +260,7 @@ func TestKafkaCapnpLog(t *testing.T) {
 			},
 		},
 	}
-	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.SetZoneConfigFromJson(logZone, logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
@@ -326,15 +326,15 @@ func TestUdpCapnpLog(t *testing.T) {
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Redis.Del("*")
-	h.RedisData.Redis.SAdd("z42:zones", logZone)
+	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
-		err := h.RedisData.Redis.HSet("z42:zones:"+logZone, cmd[0], cmd[1])
+		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] cannot connect to redis: %s", err)
 			t.Fail()
 		}
 	}
-	h.RedisData.Redis.Set("z42:zones:"+logZone+":config", logZoneConfig)
+	h.RedisData.SetZoneConfigFromJson(logZone, logZoneConfig)
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
