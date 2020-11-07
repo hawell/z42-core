@@ -4,36 +4,36 @@ import (
 	"fmt"
 	"github.com/hawell/z42/redis"
 	"github.com/hawell/z42/types"
+	jsoniter "github.com/json-iterator/go"
 	"log"
 	"net"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/hawell/logger"
 )
 
-var healthcheckGetEntries = [][]string{
-	{"w0.healthcheck.com.:1.2.3.4", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":3}`},
-	{"w0.healthcheck.com.:2.3.4.5", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":1}`},
-	{"w0.healthcheck.com.:3.4.5.6", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":0}`},
-	{"w0.healthcheck.com.:4.5.6.7", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-1}`},
-	{"w0.healthcheck.com.:5.6.7.8", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-3}`},
+var healthcheckGetEntries = []*types.HealthCheckItem{
+	{Host: "w0.healthcheck.com.", Ip: "1.2.3.4", Protocol: "http", Uri: "/", Port: 80, Status: 3, Enable: true},
+	{Host: "w0.healthcheck.com.", Ip: "2.3.4.5", Protocol: "http", Uri: "/", Port: 80, Status: 1, Enable: true},
+	{Host: "w0.healthcheck.com.", Ip: "3.4.5.6", Protocol: "http", Uri: "/", Port: 80, Status: 0, Enable: true},
+	{Host: "w0.healthcheck.com.", Ip: "4.5.6.7", Protocol: "http", Uri: "/", Port: 80, Status: -1, Enable: true},
+	{Host: "w0.healthcheck.com.", Ip: "5.6.7.8", Protocol: "http", Uri: "/", Port: 80, Status: -3, Enable: true},
 
-	{"w1.healthcheck.com.:2.3.4.5", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":1}`},
-	{"w1.healthcheck.com.:3.4.5.6", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":0}`},
-	{"w1.healthcheck.com.:4.5.6.7", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-1}`},
-	{"w1.healthcheck.com.:5.6.7.8", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-3}`},
+	{Host: "w1.healthcheck.com.", Ip: "2.3.4.5", Protocol: "http", Uri: "/", Port: 80, Status: 1, Enable: true},
+	{Host: "w1.healthcheck.com.", Ip: "3.4.5.6", Protocol: "http", Uri: "/", Port: 80, Status: 0, Enable: true},
+	{Host: "w1.healthcheck.com.", Ip: "4.5.6.7", Protocol: "http", Uri: "/", Port: 80, Status: -1, Enable: true},
+	{Host: "w1.healthcheck.com.", Ip: "5.6.7.8", Protocol: "http", Uri: "/", Port: 80, Status: -3, Enable: true},
 
-	{"w2.healthcheck.com.:3.4.5.6", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":0}`},
-	{"w2.healthcheck.com.:4.5.6.7", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-1}`},
-	{"w2.healthcheck.com.:5.6.7.8", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-3}`},
+	{Host: "w2.healthcheck.com.", Ip: "3.4.5.6", Protocol: "http", Uri: "/", Port: 80, Status: 0, Enable: true},
+	{Host: "w2.healthcheck.com.", Ip: "4.5.6.7", Protocol: "http", Uri: "/", Port: 80, Status: -1, Enable: true},
+	{Host: "w2.healthcheck.com.", Ip: "5.6.7.8", Protocol: "http", Uri: "/", Port: 80, Status: -3, Enable: true},
 
-	{"w3.healthcheck.com.:4.5.6.7", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-1}`},
-	{"w3.healthcheck.com.:5.6.7.8", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-3}`},
+	{Host: "w3.healthcheck.com.", Ip: "4.5.6.7", Protocol: "http", Uri: "/", Port: 80, Status: -1, Enable: true},
+	{Host: "w3.healthcheck.com.", Ip: "5.6.7.8", Protocol: "http", Uri: "/", Port: 80, Status: -3, Enable: true},
 
-	{"w4.healthcheck.com.:5.6.7.8", `{"enable":true,"protocol":"http","uri":"/","port":80, "status":-3}`},
+	{Host: "w4.healthcheck.com.", Ip: "5.6.7.8", Protocol: "http", Uri: "/", Port: 80, Status: -3, Enable: true},
 }
 
 var stats = []int{3, 1, 0, -1, -3, 1, 0, -1, -3, 0, -1, -3, -1, -3, -3}
@@ -41,36 +41,11 @@ var filterResult = []int{1, 3, 2, 1, 1}
 
 var healthCheckSetEntries = [][]string{
 	{"@", "185.143.233.2",
-		`{"enable":true,"protocol":"http","uri":"","port":80, "timeout": 1000}`,
+		`{"host": "healthcheck.com.", "ip": "185.143.233.2", enable":true,"protocol":"http","uri":"","port":80, "timeout": 1000}`,
 	},
 	{"www", "185.143.234.50",
-		`{"enable":true,"protocol":"http","uri":"","port":80, "timeout": 1000}`,
+		`{"host": "www.healthcheck.com.", "ip": "185.143.233.2", "enable":true,"protocol":"http","uri":"","port":80, "timeout": 1000}`,
 	},
-}
-
-var healthcheckTransferItems = [][]string{
-	{"w0", "1.2.3.4",
-		`{"enable":true,"protocol":"http","uri":"/uri0","port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
-		`{"enable":true,"protocol":"http","uri":"/uri0","port":80, "status":2, "up_count": 3, "down_count": -3, "timeout":1000}`,
-	},
-	{"w1", "2.3.4.5",
-		`{"enable":true,"protocol":"https","uri":"/uri111","port":8081, "up_count": 3, "down_count": -3, "timeout":1000}`,
-		`{"enable":true,"protocol":"http","uri":"/uri1","port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
-	},
-	{"w2", "3.4.5.6",
-		"",
-		`{"enable":true,"protocol":"http","uri":"/uri2","port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
-	},
-	{"w3", "4.5.6.7",
-		`{"enable":true,"protocol":"http","uri":"/uri3","port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
-		``,
-	},
-}
-
-var healthCheckTransferResults = [][]string{
-	{"w0.healthcheck.com.:1.2.3.4", `{"enable":true,"protocol":"http","uri":"/uri0","port":80, "status":2, "up_count": 3, "down_count": -3, "timeout":1000}`},
-	{"w1.healthcheck.com.:2.3.4.5", `{"enable":true,"protocol":"https","uri":"/uri111","port":8081, "status":0, "up_count": 3, "down_count": -3, "timeout":1000}`},
-	{"w3.healthcheck.com.:4.5.6.7", `{"enable":true,"protocol":"http","uri":"/uri3","port":80, "status":0, "up_count": 3, "down_count": -3, "timeout":1000}`},
 }
 
 var healthcheckRedisStatConfig = redis.StatHandlerConfig{
@@ -140,12 +115,11 @@ func TestGet(t *testing.T) {
 	h.redisStat.Redis.Del("*")
 	h.redisData.Redis.Del("*")
 	for _, entry := range healthcheckGetEntries {
-		h.redisStat.Redis.Set("z42:healthcheck:"+entry[0], entry[1])
+		h.redisStat.SetHealthcheckItem(entry)
 	}
 
-	for i := range healthcheckGetEntries {
-		hostIp := strings.Split(healthcheckGetEntries[i][0], ":")
-		stat := h.getStatus(hostIp[0], net.ParseIP(hostIp[1]))
+	for i, item := range healthcheckGetEntries {
+		stat := h.redisStat.GetHealthStatus(item.Host, item.Ip)
 		log.Println("[DEBUG]", stat, " ", stats[i])
 		if stat != stats[i] {
 			t.Fail()
@@ -165,7 +139,7 @@ func TestFilter(t *testing.T) {
 	h.redisStat.Redis.Del("*")
 	h.redisData.Redis.Del("*")
 	for _, entry := range healthcheckGetEntries {
-		h.redisStat.Redis.Set("z42:healthcheck:"+entry[0], entry[1])
+		h.redisStat.SetHealthcheckItem(entry)
 	}
 
 	w := []types.Record{
@@ -311,24 +285,46 @@ func TestSet(t *testing.T) {
 	for _, str := range healthCheckSetEntries {
 		a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", str[1], str[2])
 		h.redisData.SetLocationFromJson("healthcheck.com.", str[0], a)
-		var key string
-		if str[0] == "@" {
-			key = fmt.Sprintf("example.com.:%s", str[1])
-		} else {
-			key = fmt.Sprintf("%s.example.com.:%s", str[0], str[1])
-		}
-		h.redisStat.Redis.Set("z42:healthcheck:"+key, str[2])
+		var item types.HealthCheckItem
+		jsoniter.Unmarshal([]byte(str[2]), &item)
+		h.redisStat.SetHealthcheckItem(&item)
 	}
 	// h.transferItems()
 	go h.Start()
 	time.Sleep(time.Second * 10)
 
-	log.Println("[DEBUG]", h.getStatus("example.com", net.ParseIP("185.143.233.2")))
-	log.Println("[DEBUG]", h.getStatus("www.example.com", net.ParseIP("185.143.234.50")))
+	log.Println("[DEBUG]", h.redisStat.GetHealthStatus("example.com", "185.143.233.2"))
+	log.Println("[DEBUG]", h.redisStat.GetHealthStatus("www.example.com", "185.143.234.50"))
 }
 
 func TestTransfer(t *testing.T) {
 	log.Printf("TestTransfer")
+
+	var healthcheckTransferItems = [][]string{
+		{"w0", "1.2.3.4",
+			`{"host":"w0.healthcheck.com.", "ip":"1.2.3.4", "enable":true, "protocol":"http", "uri":"/uri0", "port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
+			`{"host":"w0.healthcheck.com.", "ip":"1.2.3.4", "enable":true, "protocol":"http", "uri":"/uri0", "port":80, "status":2, "up_count": 3, "down_count": -3, "timeout":1000}`,
+		},
+		{"w1", "2.3.4.5",
+			`{"host":"w1.healthcheck.com.", "ip":"2.3.4.5", "enable":true, "protocol":"https", "uri":"/uri111", "port":8081, "up_count": 3, "down_count": -3, "timeout":1000}`,
+			`{"host":"w1.healthcheck.com.", "ip":"2.3.4.5", "enable":true, "protocol":"http", "uri":"/uri1", "port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
+		},
+		{"w2", "3.4.5.6",
+			"",
+			`{"host":"w2.healthcheck.com.", "ip":"3.4.5.6", "enable":true, "protocol":"http", "uri":"/uri2", "port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
+		},
+		{"w3", "4.5.6.7",
+			`{"host":"w3.healthcheck.com.", "ip":"4.5.6.7", "enable":true, "protocol":"http", "uri":"/uri3", "port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
+			``,
+		},
+	}
+
+	var healthCheckTransferResults = []*types.HealthCheckItem{
+		{Host: "w0.healthcheck.com.", Ip: "1.2.3.4", Protocol: "http", Uri: "/uri0", Port: 80, Status: 2, Timeout: 1000, UpCount: 3, DownCount: -3, Enable: true},
+		{Host: "w1.healthcheck.com.", Ip: "2.3.4.5", Protocol: "https", Uri: "/uri111", Port: 8081, Status: 0, Timeout: 1000, UpCount: 3, DownCount: -3, Enable: true},
+		{Host: "w3.healthcheck.com.", Ip: "4.5.6.7", Protocol: "http", Uri: "/uri3", Port: 80, Status: 0, Timeout: 1000, UpCount: 3, DownCount: -3, Enable: true},
+	}
+
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
@@ -343,8 +339,9 @@ func TestTransfer(t *testing.T) {
 			h.redisData.SetLocationFromJson("healthcheck.com.", str[0], a)
 		}
 		if str[3] != "" {
-			key := fmt.Sprintf("%s.healthcheck.com.:%s", str[0], str[1])
-			h.redisStat.Redis.Set("z42:healthcheck:"+key, str[3])
+			var item types.HealthCheckItem
+			jsoniter.Unmarshal([]byte(str[3]), &item)
+			h.redisStat.SetHealthcheckItem(&item)
 		}
 	}
 
@@ -352,7 +349,7 @@ func TestTransfer(t *testing.T) {
 	go h.Start()
 	time.Sleep(time.Second * 10)
 
-	itemsEqual := func(item1 *HealthCheckItem, item2 *HealthCheckItem) bool {
+	itemsEqual := func(item1 *types.HealthCheckItem, item2 *types.HealthCheckItem) bool {
 		if item1.Ip != item2.Ip || item1.Uri != item2.Uri || item1.Port != item2.Port ||
 			item1.Protocol != item2.Protocol || item1.Enable != item2.Enable ||
 			item1.UpCount != item2.UpCount || item1.DownCount != item2.DownCount || item1.Timeout != item2.Timeout {
@@ -361,16 +358,14 @@ func TestTransfer(t *testing.T) {
 		return true
 	}
 
-	for i, str := range healthCheckTransferResults {
-		h.redisStat.Redis.Set("z42:healthcheck:"+str[0]+"res", str[1])
-		resItem := h.loadItem(str[0] + "res")
-		resItem.Ip = strings.TrimRight(resItem.Ip, "res")
-		storedItem := h.loadItem(str[0])
-		log.Println("** key : ", str[0])
-		log.Println("** expected : ", resItem)
-		log.Println("** stored : ", storedItem)
-		if !itemsEqual(resItem, storedItem) {
+	for i, item := range healthCheckTransferResults {
+		key := item.Host + ":" + item.Ip
+		storedItem, _ := h.redisStat.GetHealthcheckItem(key)
+		if !itemsEqual(item, storedItem) {
 			log.Println(i, "failed")
+			log.Println("** key : ", key)
+			log.Println("** expected : ", item)
+			log.Println("** stored : ", storedItem)
 			t.Fail()
 		}
 	}
@@ -445,8 +440,8 @@ func TestHealthCheck(t *testing.T) {
 
 	go hc.Start()
 	time.Sleep(12 * time.Second)
-	h1 := hc.getStatus("www.google.com.", net.ParseIP("172.217.17.78"))
-	h2 := hc.getStatus("ddd.google.com.", net.ParseIP("3.3.3.3"))
+	h1 := hc.redisStat.GetHealthStatus("www.google.com.", "172.217.17.78")
+	h2 := hc.redisStat.GetHealthStatus("ddd.google.com.", "3.3.3.3")
 	/*
 		h3 := hc.getStatus("y.google.com.", net.ParseIP("4.2.2.4"))
 		h4 := hc.getStatus("z.google.com.", net.ParseIP("192.168.200.2"))
@@ -503,20 +498,21 @@ func TestExpire(t *testing.T) {
 
 	expireItem := []string{
 		"w0", "1.2.3.4",
-		`{"enable":true,"protocol":"http","uri":"/uri0","port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
-		`{"enable":false,"protocol":"http","uri":"/uri0","port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
+		`{"host":"w0.healthcheck.exp.", "ip":"1.2.3.4", "enable":true, "protocol":"http", "uri":"/uri0", "port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
+		`{"host":"w0.healthcheck.exp.", "ip":"1.2.3.4", "enable":false, "protocol":"http", "uri":"/uri0", "port":80, "status":3, "up_count": 3, "down_count": -3, "timeout":1000}`,
 	}
 
 	a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", expireItem[1], expireItem[2])
 	log.Println(a)
 	hc.redisData.EnableZone("healthcheck.exp.")
 	hc.redisData.SetLocationFromJson("healthcheck.exp.", expireItem[0], a)
-	key := fmt.Sprintf("%s.healthcheck.exp.:%s", expireItem[0], expireItem[1])
-	hc.redisStat.Redis.Set("z42:healthcheck:"+key, expireItem[2])
+	var item types.HealthCheckItem
+	jsoniter.Unmarshal([]byte(expireItem[2]), &item)
+	hc.redisStat.SetHealthcheckItem(&item)
 
 	go hc.Start()
 	time.Sleep(time.Second * 2)
-	status := hc.getStatus("w0.healthcheck.exp.", net.ParseIP("1.2.3.4"))
+	status := hc.redisStat.GetHealthStatus("w0.healthcheck.exp.", "1.2.3.4")
 	if status != 3 {
 		fmt.Println("1")
 		t.Fail()
@@ -527,9 +523,9 @@ func TestExpire(t *testing.T) {
 	hc.redisData.SetLocationFromJson("healthcheck.exp.", expireItem[0], a)
 
 	time.Sleep(time.Second * 5)
-	status = hc.getStatus("w0.healthcheck.exp.", net.ParseIP("1.2.3.4"))
-	if status != 0 {
-		fmt.Println("2", status)
+	newItem, err := hc.redisStat.GetHealthcheckItem("w0.healthcheck.exp.:1.2.3.4")
+	if err == nil {
+		fmt.Println("2", newItem)
 		t.Fail()
 	}
 }

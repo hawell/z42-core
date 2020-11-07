@@ -8,8 +8,6 @@ import (
 	"github.com/hawell/workerpool"
 	"github.com/hawell/z42/redis"
 	"github.com/hawell/z42/types"
-	"github.com/json-iterator/go"
-	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -20,22 +18,6 @@ import (
 	"time"
 )
 
-type HealthCheckItem struct {
-	Protocol  string    `json:"protocol,omitempty"`
-	Uri       string    `json:"uri,omitempty"`
-	Port      int       `json:"port,omitempty"`
-	Status    int       `json:"status,omitempty"`
-	LastCheck time.Time `json:"lastcheck,omitempty"`
-	Timeout   int       `json:"timeout,omitempty"`
-	UpCount   int       `json:"up_count,omitempty"`
-	DownCount int       `json:"down_count,omitempty"`
-	Enable    bool      `json:"enable,omitempty"`
-	DomainId  string    `json:"domain_uuid,omitempty"`
-	Host      string    `json:"-"`
-	Ip        string    `json:"-"`
-	Error     error     `json:"-"`
-}
-
 type Healthcheck struct {
 	Enable             bool
 	maxRequests        int
@@ -45,7 +27,6 @@ type Healthcheck struct {
 	redisData          *redis.DataHandler
 	redisStat          *redis.StatHandler
 	logger             *logger.EventLogger
-	cachedItems        *cache.Cache
 	lastUpdate         time.Time
 	dispatcher         *workerpool.Dispatcher
 	quit               chan struct{}
@@ -54,7 +35,7 @@ type Healthcheck struct {
 
 func HandleHealthCheck(h *Healthcheck) workerpool.JobHandler {
 	return func(worker *workerpool.Worker, job workerpool.Job) {
-		item := job.(*HealthCheckItem)
+		item := job.(*types.HealthCheckItem)
 		// logger.Default.Debugf("item %v received", item)
 		var err error
 		switch item.Protocol {
@@ -76,7 +57,7 @@ func HandleHealthCheck(h *Healthcheck) workerpool.JobHandler {
 			statusDown(item)
 		}
 		item.LastCheck = time.Now()
-		h.storeItem(item)
+		h.redisStat.SetHealthcheckItem(item)
 		h.logHealthcheck(item)
 	}
 }
@@ -181,7 +162,6 @@ func NewHealthcheck(config *HealthcheckConfig, redisData *redis.DataHandler, red
 
 		h.redisData = redisData
 		h.redisStat = redisStat
-		h.cachedItems = cache.New(h.updateInterval, h.updateInterval*10)
 		h.dispatcher = workerpool.NewDispatcher(config.MaxPendingRequests, config.MaxRequests)
 		for i := 0; i < config.MaxRequests; i++ {
 			h.dispatcher.AddWorker(HandleHealthCheck(h))
@@ -205,58 +185,6 @@ func (h *Healthcheck) ShutDown() {
 	// fmt.Println("healthcheck : stopped")
 }
 
-func (h *Healthcheck) getStatus(host string, ip net.IP) int {
-	if !h.Enable {
-		return 0
-	}
-	key := host + ":" + ip.String()
-	var item *HealthCheckItem
-	val, found := h.cachedItems.Get(key)
-	if !found {
-		item = h.loadItem(key)
-		if item == nil {
-			item = new(HealthCheckItem)
-		}
-		h.cachedItems.Set(key, item, h.updateInterval)
-	} else {
-		item = val.(*HealthCheckItem)
-	}
-	return item.Status
-}
-
-func (h *Healthcheck) loadItem(key string) *HealthCheckItem {
-	splits := strings.SplitAfterN(key, ":", 2)
-	// logger.Default.Error(splits)
-	if len(splits) != 2 {
-		logger.Default.Errorf("invalid key: %s", key)
-		return nil
-	}
-	item := new(HealthCheckItem)
-	item.Host = strings.TrimSuffix(splits[0], ":")
-	item.Ip = splits[1]
-	itemStr, err := h.redisStat.Redis.Get("z42:healthcheck:" + key)
-	if err != nil {
-		logger.Default.Errorf("cannot load item %s : %s", key, err)
-		return nil
-	}
-	jsoniter.Unmarshal([]byte(itemStr), item)
-	if item.DownCount > 0 {
-		item.DownCount = -item.DownCount
-	}
-	return item
-}
-
-func (h *Healthcheck) storeItem(item *HealthCheckItem) {
-	key := item.Host + ":" + item.Ip
-	itemStr, err := jsoniter.Marshal(item)
-	if err != nil {
-		logger.Default.Errorf("cannot marshal item to json : %s", err)
-		return
-	}
-	// logger.Default.Debugf("setting %v in redis : %s", *item, string(itemStr))
-	h.redisStat.Redis.Set("z42:healthcheck:"+key, string(itemStr))
-}
-
 func (h *Healthcheck) getDomainId(zone string) string {
 	cfg, err := h.redisData.GetZoneConfig(zone)
 	if err != nil {
@@ -275,9 +203,9 @@ func (h *Healthcheck) Start() {
 
 	ticker := time.NewTicker(h.checkInterval)
 	for {
-		itemKeys, err := h.redisStat.Redis.GetKeys("z42:healthcheck:*")
+		itemKeys, err := h.redisStat.GetActiveHealthcheckItems()
 		if err != nil {
-			logger.Default.Errorf("cannot load keys : z42:healthcheck:* : %s", err)
+			logger.Default.Errorf("cannot load healthcheck active items : %s", err)
 		}
 		select {
 		case <-h.quit:
@@ -285,10 +213,9 @@ func (h *Healthcheck) Start() {
 			h.quitWG.Done()
 			return
 		case <-ticker.C:
-			for i := range itemKeys {
-				itemKey := strings.TrimPrefix(itemKeys[i], "z42:healthcheck:")
-				item := h.loadItem(itemKey)
-				if item != nil {
+			for _, itemKey := range itemKeys {
+				item, err := h.redisStat.GetHealthcheckItem(itemKey)
+				if err == nil {
 					if time.Since(item.LastCheck) > h.checkInterval {
 						h.dispatcher.Queue(item)
 					}
@@ -299,7 +226,7 @@ func (h *Healthcheck) Start() {
 
 }
 
-func (h *Healthcheck) logHealthcheck(item *HealthCheckItem) {
+func (h *Healthcheck) logHealthcheck(item *types.HealthCheckItem) {
 	data := map[string]interface{}{
 		"ip":          item.Ip,
 		"port":        item.Port,
@@ -318,7 +245,7 @@ func (h *Healthcheck) logHealthcheck(item *HealthCheckItem) {
 	h.logger.Log(data, "dns healthcheck")
 }
 
-func statusDown(item *HealthCheckItem) {
+func statusDown(item *types.HealthCheckItem) {
 	if item.Status <= 0 {
 		item.Status--
 		if item.Status < item.DownCount {
@@ -329,7 +256,7 @@ func statusDown(item *HealthCheckItem) {
 	}
 }
 
-func statusUp(item *HealthCheckItem) {
+func statusUp(item *types.HealthCheckItem) {
 	if item.Status >= 0 {
 		item.Status++
 		if item.Status > item.UpCount {
@@ -347,7 +274,7 @@ func (h *Healthcheck) FilterHealthcheck(qname string, rrset *types.IP_RRSet, mas
 	min := rrset.HealthCheckConfig.DownCount
 	for i, x := range mask {
 		if x == types.IpMaskWhite {
-			status := h.getStatus(qname, rrset.Data[i].Ip)
+			status := h.redisStat.GetHealthStatus(qname, rrset.Data[i].Ip.String())
 			if status > min {
 				min = status
 			}
@@ -361,7 +288,7 @@ func (h *Healthcheck) FilterHealthcheck(qname string, rrset *types.IP_RRSet, mas
 	for i, x := range mask {
 		if x == types.IpMaskWhite {
 			// logger.Default.Debug("qname: ", rrset.Data[i].Ip.String(), " status: ", h.getStatus(qname, rrset.Data[i].Ip))
-			if h.getStatus(qname, rrset.Data[i].Ip) < min {
+			if h.redisStat.GetHealthStatus(qname, rrset.Data[i].Ip.String()) < min {
 				mask[i] = types.IpMaskBlack
 			}
 		} else {
@@ -372,7 +299,7 @@ func (h *Healthcheck) FilterHealthcheck(qname string, rrset *types.IP_RRSet, mas
 }
 
 func (h *Healthcheck) Transfer() {
-	itemsEqual := func(item1 *HealthCheckItem, item2 *HealthCheckItem) bool {
+	itemsEqual := func(item1 *types.HealthCheckItem, item2 *types.HealthCheckItem) bool {
 		if item1 == nil || item2 == nil {
 			return false
 		}
@@ -407,7 +334,7 @@ func (h *Healthcheck) Transfer() {
 						}
 						for i := range rrset.Data {
 							key := record.Fqdn + ":" + rrset.Data[i].Ip.String()
-							newItem := &HealthCheckItem{
+							newItem := &types.HealthCheckItem{
 								Ip:        rrset.Data[i].Ip.String(),
 								Port:      rrset.HealthCheckConfig.Port,
 								Host:      record.Fqdn,
@@ -419,11 +346,11 @@ func (h *Healthcheck) Transfer() {
 								Protocol:  rrset.HealthCheckConfig.Protocol,
 								DomainId:  domainId,
 							}
-							oldItem := h.loadItem(key)
-							if !itemsEqual(oldItem, newItem) {
-								h.storeItem(newItem)
+							oldItem, err := h.redisStat.GetHealthcheckItem(key)
+							if err != nil || !itemsEqual(oldItem, newItem) {
+								h.redisStat.SetHealthcheckItem(newItem)
 							}
-							h.redisStat.Redis.Expire("z42:healthcheck:"+key, h.updateInterval)
+							h.redisStat.SetHealthcheckItemExpiration(key, h.updateInterval)
 						}
 					}
 				}
