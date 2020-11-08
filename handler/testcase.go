@@ -29,7 +29,7 @@ func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 
 	r := redis.NewDataHandler(&testCase.RedisDataConfig)
 	h := NewHandler(&testCase.HandlerConfig, r)
-	if err := h.RedisData.Redis.Del("*"); err != nil {
+	if err := h.RedisData.Clear(); err != nil {
 		return nil, err
 	}
 	for i, zone := range testCase.Zones {

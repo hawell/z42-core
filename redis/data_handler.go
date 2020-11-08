@@ -25,7 +25,7 @@ type DataHandlerConfig struct {
 }
 
 type DataHandler struct {
-	Redis              *Redis
+	redis              *Redis
 	Zones              *iradix.Tree
 	LastZoneUpdate     time.Time
 	RecordCache        *ristretto.Cache
@@ -44,7 +44,7 @@ const (
 
 func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	dh := &DataHandler{
-		Redis:              NewRedis(&config.Redis),
+		redis:              NewRedis(&config.Redis),
 		Zones:              iradix.New(),
 		RecordInflight:     new(singleflight.Group),
 		ZoneInflight:       new(singleflight.Group),
@@ -72,7 +72,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		dh.quitWG.Add(1)
 		quit := make(chan *sync.WaitGroup, 1)
 		modified := false
-		go dh.Redis.SubscribeEvent("z42:zones", func() {
+		go dh.redis.SubscribeEvent("z42:zones", func() {
 			modified = true
 		}, func(channel string, data string) {
 			modified = true
@@ -112,7 +112,7 @@ func (dh *DataHandler) ShutDown() {
 
 func (dh *DataHandler) LoadZones() {
 	dh.LastZoneUpdate = time.Now()
-	zones, err := dh.Redis.SMembers("z42:zones")
+	zones, err := dh.redis.SMembers("z42:zones")
 	if err != nil {
 		logger.Default.Error("cannot load zones : ", err)
 		return
@@ -143,13 +143,13 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 	}
 
 	answer, _, _ := dh.ZoneInflight.Do(zone, func() (interface{}, error) {
-		locations, err := dh.Redis.GetHKeys("z42:zones:" + zone)
+		locations, err := dh.redis.GetHKeys("z42:zones:" + zone)
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s locations : %s", zone, err)
 			return nil, err
 		}
 
-		configStr, err := dh.Redis.Get("z42:zones:" + zone + ":config")
+		configStr, err := dh.redis.Get("z42:zones:" + zone + ":config")
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
 		}
@@ -207,7 +207,7 @@ func (dh *DataHandler) GetZoneConfig(zone string) (*types.ZoneConfig, error) {
 }
 
 func (dh *DataHandler) GetZones() []string {
-	domains, err := dh.Redis.SMembers("z42:zones")
+	domains, err := dh.redis.SMembers("z42:zones")
 	if err != nil {
 		logger.Default.Errorf("cannot get members of z42:zones : %s", err)
 		return nil
@@ -224,11 +224,11 @@ func (dh *DataHandler) GetZoneLocations(zone string) []string {
 }
 
 func (dh *DataHandler) EnableZone(zone string) error {
-	return dh.Redis.SAdd("z42:zones", zone)
+	return dh.redis.SAdd("z42:zones", zone)
 }
 
 func (dh *DataHandler) DisableZone(zone string) error {
-	return dh.Redis.SRem("z42:zones", zone)
+	return dh.redis.SRem("z42:zones", zone)
 }
 
 func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) error {
@@ -240,23 +240,23 @@ func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) erro
 }
 
 func (dh *DataHandler) SetZoneConfigFromJson(zone string, config string) error {
-	return dh.Redis.Set("z42:zones:"+zone+":config", config)
+	return dh.redis.Set("z42:zones:"+zone+":config", config)
 }
 
 func (dh *DataHandler) SetZoneKey(zone string, keyType string, pub string, priv string) error {
-	if err := dh.Redis.Set("z42:zones:"+zone+":"+keyType+":pub", pub); err != nil {
+	if err := dh.redis.Set("z42:zones:"+zone+":"+keyType+":pub", pub); err != nil {
 		return err
 	}
-	return dh.Redis.Set("z42:zones:"+zone+":"+keyType+":priv", priv)
+	return dh.redis.Set("z42:zones:"+zone+":"+keyType+":priv", priv)
 }
 
 func (dh *DataHandler) loadKey(pub string, priv string) *types.ZoneKey {
-	pubStr, _ := dh.Redis.Get(pub)
+	pubStr, _ := dh.redis.Get(pub)
 	if pubStr == "" {
 		logger.Default.Errorf("key is not set : %s", pub)
 		return nil
 	}
-	privStr, _ := dh.Redis.Get(priv)
+	privStr, _ := dh.redis.Get(priv)
 	if privStr == "" {
 		logger.Default.Errorf("key is not set : %s", priv)
 		return nil
@@ -337,7 +337,7 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 		r.Label = label
 		r.CacheTimeout = time.Now().Unix() + dh.recordCacheTimeout
 
-		val, err := dh.Redis.HGet("z42:zones:"+zone, label)
+		val, err := dh.redis.HGet("z42:zones:"+zone, label)
 		if err != nil {
 			if label == "@" {
 				r.Fqdn = zone
@@ -378,8 +378,12 @@ func (dh *DataHandler) SetLocation(zone string, label string, val *types.Record)
 }
 
 func (dh *DataHandler) SetLocationFromJson(zone string, label string, val string) error {
-	if err := dh.Redis.HSet("z42:zones:"+zone, label, val); err != nil {
+	if err := dh.redis.HSet("z42:zones:"+zone, label, val); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (dh DataHandler) Clear() error {
+	return dh.redis.Del("*")
 }

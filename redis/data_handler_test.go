@@ -38,9 +38,9 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 
 func TestGetLocation(t *testing.T) {
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	_ = dh.Redis.Del("*")
-	_ = dh.Redis.SAdd("z42:zones", "zone1.com.")
-	_ = dh.Redis.HSet("z42:zones:zone1.com.", "@", `{"a":{"ttl":300, "records":[{"ip":"5.5.5.5"}]}}`)
+	_ = dh.Clear()
+	_ = dh.EnableZone("zone1.com.")
+	_ = dh.SetLocationFromJson("zone1.com.", "@", `{"a":{"ttl":300, "records":[{"ip":"5.5.5.5"}]}}`)
 	location := types.Record{
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
@@ -82,8 +82,8 @@ func TestGetLocation(t *testing.T) {
 
 func TestSetLocation(t *testing.T) {
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	_ = dh.Redis.Del("*")
-	_ = dh.Redis.SAdd("z42:zones", "zone1.com.")
+	_ = dh.Clear()
+	_ = dh.EnableZone("zone1.com.")
 	location := types.Record{
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
@@ -166,13 +166,11 @@ zone1.com. IN DNSKEY 257 3 5 AwEAAeVrjiD9xhyA+UJnnei/tnoQQpLrEwFzb/blH6c80yR7APm
 func TestGetZone(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	_ = dh.Redis.Del("*")
-	_ = dh.Redis.SAdd("z42:zones", "zone1.com")
-	_ = dh.Redis.Set("z42:zones:zone1.com.:config", `{"domain_id":"123456", "soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.zone1.com.","ns":"ns1.zone1.com.","refresh":44,"retry":55,"expire":66, "serial":32343}, "dnssec": true}`)
-	_ = dh.Redis.Set("z42:zones:"+zoneName+":zsk:pub", zone1ZskPub)
-	_ = dh.Redis.Set("z42:zones:"+zoneName+":zsk:priv", zone1ZskPriv)
-	_ = dh.Redis.Set("z42:zones:"+zoneName+":ksk:pub", zone1KskPub)
-	_ = dh.Redis.Set("z42:zones:"+zoneName+":ksk:priv", zone1KskPriv)
+	_ = dh.Clear()
+	_ = dh.EnableZone("zone1.com")
+	_ = dh.SetZoneConfigFromJson("zone1.com.", `{"domain_id":"123456", "soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.zone1.com.","ns":"ns1.zone1.com.","refresh":44,"retry":55,"expire":66, "serial":32343}, "dnssec": true}`)
+	_ = dh.SetZoneKey(zoneName, "zsk", zone1ZskPub, zone1ZskPriv)
+	_ = dh.SetZoneKey(zoneName, "ksk", zone1KskPub, zone1KskPriv)
 
 	zone := dh.GetZone(zoneName)
 	if zone == nil {
@@ -225,7 +223,7 @@ func TestGetZone(t *testing.T) {
 func TestEnableZone(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Redis.Del("*")
+	dh.Clear()
 	dh.EnableZone(zoneName)
 	zone := dh.GetZone(zoneName)
 	if zone == nil {
@@ -236,7 +234,7 @@ func TestEnableZone(t *testing.T) {
 func TestDisableZone(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Redis.Del("*")
+	dh.Clear()
 	dh.EnableZone(zoneName)
 	dh.DisableZone(zoneName)
 	time.Sleep(time.Second * 2)
@@ -249,7 +247,7 @@ func TestDisableZone(t *testing.T) {
 func TestSetZoneConfig(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Redis.Del("*")
+	dh.Clear()
 	dh.EnableZone(zoneName)
 	zone := dh.GetZone(zoneName)
 	if zone == nil {
@@ -267,7 +265,7 @@ func TestSetZoneConfig(t *testing.T) {
 func TestSetZoneKey(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Redis.Del("*")
+	dh.Clear()
 	dh.EnableZone(zoneName)
 	zoneConfig := types.ZoneConfig{
 		DomainId: "123456",

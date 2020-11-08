@@ -100,7 +100,7 @@ func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testC
 
 		r := redis.NewDataHandler(&DefaultRedisDataTestConfig)
 		h := NewHandler(&testCase.HandlerConfig, r)
-		if err := h.RedisData.Redis.Del("*"); err != nil {
+		if err := h.RedisData.Clear(); err != nil {
 			return nil, err
 		}
 		for i, zone := range testCase.Zones {

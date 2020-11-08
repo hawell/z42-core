@@ -35,7 +35,7 @@ func TestMain(m *testing.M) {
 
 	r := redis.NewDataHandler(&DefaultRedisDataTestConfig)
 	benchTestHandler = NewHandler(&DefaultHandlerTestConfig, r)
-	err := benchTestHandler.RedisData.Redis.Del("*")
+	err := benchTestHandler.RedisData.Clear()
 	log.Println(err)
 	err = benchTestHandler.RedisData.EnableZone(benchZone)
 	log.Println(err)

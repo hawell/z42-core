@@ -19,7 +19,7 @@ type StatHandlerConfig struct {
 }
 
 type StatHandler struct {
-	Redis  *Redis
+	redis  *Redis
 	cache  *ristretto.Cache
 	quit   chan struct{}
 	quitWG sync.WaitGroup
@@ -27,7 +27,7 @@ type StatHandler struct {
 
 func NewStatHandler(config *StatHandlerConfig) *StatHandler {
 	sh := &StatHandler{
-		Redis: NewRedis(&config.Redis),
+		redis: NewRedis(&config.Redis),
 		quit:  make(chan struct{}),
 	}
 	sh.cache, _ = ristretto.NewCache(&ristretto.Config{
@@ -40,7 +40,7 @@ func NewStatHandler(config *StatHandlerConfig) *StatHandler {
 	go func() {
 		sh.quitWG.Add(1)
 		quit := make(chan *sync.WaitGroup, 1)
-		go sh.Redis.SubscribeEvent("z42:healthcheck:*",
+		go sh.redis.SubscribeEvent("z42:healthcheck:*",
 			func() {
 			},
 			func(channel string, data string) {
@@ -60,7 +60,7 @@ func NewStatHandler(config *StatHandlerConfig) *StatHandler {
 }
 
 func (sh *StatHandler) GetActiveHealthcheckItems() ([]string, error) {
-	itemKeys, err := sh.Redis.GetKeys("z42:healthcheck:*")
+	itemKeys, err := sh.redis.GetKeys("z42:healthcheck:*")
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (sh *StatHandler) GetActiveHealthcheckItems() ([]string, error) {
 
 func (sh *StatHandler) GetHealthcheckItem(key string) (*types.HealthCheckItem, error) {
 	item := new(types.HealthCheckItem)
-	itemStr, err := sh.Redis.Get("z42:healthcheck:" + key)
+	itemStr, err := sh.redis.Get("z42:healthcheck:" + key)
 	if err != nil {
 		logger.Default.Errorf("cannot load item %s : %s", key, err)
 		return nil, err
@@ -93,12 +93,12 @@ func (sh *StatHandler) SetHealthcheckItem(item *types.HealthCheckItem) error {
 		return err
 	}
 	// logger.Default.Debugf("setting %v in redis : %s", *item, string(itemStr))
-	sh.Redis.Set("z42:healthcheck:"+key, string(itemStr))
+	sh.redis.Set("z42:healthcheck:"+key, string(itemStr))
 	return nil
 }
 
 func (sh *StatHandler) SetHealthcheckItemExpiration(key string, lifespan time.Duration) error {
-	return sh.Redis.Expire("z42:healthcheck:"+key, lifespan)
+	return sh.redis.Expire("z42:healthcheck:"+key, lifespan)
 }
 
 func (sh *StatHandler) GetHealthStatus(domain string, ip string) int {
@@ -126,4 +126,8 @@ func (sh *StatHandler) GetHealthStatus(domain string, ip string) int {
 func (sh *StatHandler) ShutDown() {
 	close(sh.quit)
 	sh.quitWG.Wait()
+}
+
+func (sh StatHandler) Clear() error {
+	return sh.redis.Del("*")
 }

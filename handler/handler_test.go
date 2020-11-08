@@ -2365,6 +2365,8 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize: func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
 			testCase.RedisDataConfig.Redis.Connection.WaitForConnection = false
+			testCase.RedisDataConfig.Redis.Connection.MaxActiveConnections = 0
+			testCase.RedisDataConfig.Redis.Connection.MaxIdleConnections = 0
 			testCase.RedisDataConfig.RecordCacheTimeout = 1
 			return DefaultInitialize(testCase)
 		},
@@ -2382,9 +2384,6 @@ var handlerTestCases = []*TestCase{
 				t.Fail()
 			}
 
-			for i := 0; i < testCase.RedisDataConfig.Redis.Connection.MaxActiveConnections; i++ {
-				handler.RedisData.Redis.Pool.Get()
-			}
 			time.Sleep(time.Duration(1200) * time.Millisecond)
 
 			r = tc.Msg()
@@ -2427,8 +2426,7 @@ var handlerTestCases = []*TestCase{
 			testCase.RedisDataConfig.ZoneReload = 1
 			r := redis.NewDataHandler(&testCase.RedisDataConfig)
 			h := NewHandler(&testCase.HandlerConfig, r)
-			_ = h.RedisData.Redis.SetConfig("notify-keyspace-events", "AKE")
-			if err := h.RedisData.Redis.Del("*"); err != nil {
+			if err := h.RedisData.Clear(); err != nil {
 				return nil, err
 			}
 			for i, zone := range testCase.Zones {

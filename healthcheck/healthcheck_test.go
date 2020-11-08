@@ -112,8 +112,8 @@ func TestGet(t *testing.T) {
 	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
-	h.redisStat.Redis.Del("*")
-	h.redisData.Redis.Del("*")
+	h.redisStat.Clear()
+	h.redisData.Clear()
 	for _, entry := range healthcheckGetEntries {
 		h.redisStat.SetHealthcheckItem(entry)
 	}
@@ -126,7 +126,7 @@ func TestGet(t *testing.T) {
 		}
 	}
 	// h.Stop()
-	h.redisStat.Redis.Del("*")
+	h.redisStat.Clear()
 }
 
 func TestFilter(t *testing.T) {
@@ -136,8 +136,8 @@ func TestFilter(t *testing.T) {
 	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
-	h.redisStat.Redis.Del("*")
-	h.redisData.Redis.Del("*")
+	h.redisStat.Clear()
+	h.redisData.Clear()
 	for _, entry := range healthcheckGetEntries {
 		h.redisStat.SetHealthcheckItem(entry)
 	}
@@ -269,7 +269,7 @@ func TestFilter(t *testing.T) {
 			t.Fail()
 		}
 	}
-	h.redisStat.Redis.Del("*")
+	h.redisStat.Clear()
 	// h.Stop()
 }
 
@@ -280,8 +280,8 @@ func TestSet(t *testing.T) {
 	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
-	h.redisStat.Redis.Del("*")
-	h.redisData.Redis.Del("*")
+	h.redisStat.Clear()
+	h.redisData.Clear()
 	for _, str := range healthCheckSetEntries {
 		a := fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", str[1], str[2])
 		h.redisData.SetLocationFromJson("healthcheck.com.", str[0], a)
@@ -330,8 +330,8 @@ func TestTransfer(t *testing.T) {
 	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
-	h.redisData.Redis.Del("*")
-	h.redisStat.Redis.Del("*")
+	h.redisData.Clear()
+	h.redisStat.Clear()
 	h.redisData.EnableZone("healthcheck.com.")
 	for _, str := range healthcheckTransferItems {
 		if str[2] != "" {
@@ -430,8 +430,8 @@ func TestHealthCheck(t *testing.T) {
 	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := redis.NewStatHandler(&healthcheckStatConfig)
 	hc := NewHealthcheck(&healthcheckConfig, dh, sh)
-	hc.redisStat.Redis.Del("*")
-	hc.redisData.Redis.Del("*")
+	hc.redisStat.Clear()
+	hc.redisData.Clear()
 	hc.redisData.EnableZone("google.com.")
 	for _, entry := range hcEntries {
 		hc.redisData.SetLocationFromJson("google.com.", entry[0], entry[1])
@@ -493,8 +493,8 @@ func TestExpire(t *testing.T) {
 	sh := redis.NewStatHandler(&statConfig)
 	hc := NewHealthcheck(&config, dh, sh)
 
-	hc.redisData.Redis.Del("*")
-	hc.redisStat.Redis.Del("*")
+	hc.redisData.Clear()
+	hc.redisStat.Clear()
 
 	expireItem := []string{
 		"w0", "1.2.3.4",

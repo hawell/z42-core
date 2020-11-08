@@ -76,7 +76,7 @@ func main() {
 		},
 	})
 
-	dh.Redis.Del("*")
+	dh.Clear()
 
 	fq, err := os.Create("../query.txt")
 	if err != nil {

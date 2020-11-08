@@ -86,7 +86,7 @@ func TestJsonLog(t *testing.T) {
 	logHandlerTestConfig.Log.Format = "json"
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
-	h.RedisData.Redis.Del("*")
+	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
 		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
@@ -137,7 +137,7 @@ func TestCapnpLog(t *testing.T) {
 	logHandlerTestConfig.Log.Format = "capnp_request"
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
-	h.RedisData.Redis.Del("*")
+	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
 		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
@@ -194,7 +194,7 @@ func TestCapnpLogNotAuth(t *testing.T) {
 	logHandlerTestConfig.Log.Format = "capnp_request"
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
-	h.RedisData.Redis.Del("*")
+	h.RedisData.Clear()
 	h.RedisData.LoadZones()
 	tc := test.Case{
 		Qname: "www2.zone.log",
@@ -239,7 +239,7 @@ func TestKafkaCapnpLog(t *testing.T) {
 	logHandlerTestConfig.Log.Kafka.Format = "capnp_request"
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
-	h.RedisData.Redis.Del("*")
+	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
 		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
@@ -325,7 +325,7 @@ func TestUdpCapnpLog(t *testing.T) {
 	logHandlerTestConfig.Log.Path = "localhost:9090"
 	rd := redis.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
-	h.RedisData.Redis.Del("*")
+	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)
 	for _, cmd := range logZoneEntries {
 		err := h.RedisData.SetLocationFromJson(logZone, cmd[0], cmd[1])
