@@ -6,6 +6,7 @@ import (
 	"github.com/hawell/z42/types"
 	jsoniter "github.com/json-iterator/go"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,21 +19,44 @@ type StatHandlerConfig struct {
 }
 
 type StatHandler struct {
-	Redis *Redis
-	cache *ristretto.Cache
+	Redis  *Redis
+	cache  *ristretto.Cache
+	quit   chan struct{}
+	quitWG sync.WaitGroup
 }
 
 func NewStatHandler(config *StatHandlerConfig) *StatHandler {
-	result := &StatHandler{
+	sh := &StatHandler{
 		Redis: NewRedis(&config.Redis),
+		quit:  make(chan struct{}),
 	}
-	result.cache, _ = ristretto.NewCache(&ristretto.Config{
+	sh.cache, _ = ristretto.NewCache(&ristretto.Config{
 		NumCounters: int64(cacheSize) * 10,
 		MaxCost:     int64(cacheSize),
 		BufferItems: 64,
 		Metrics:     false,
 	})
-	return result
+
+	go func() {
+		sh.quitWG.Add(1)
+		quit := make(chan *sync.WaitGroup, 1)
+		go sh.Redis.SubscribeEvent("z42:healthcheck:*",
+			func() {
+			},
+			func(channel string, data string) {
+				key := strings.TrimLeft(channel, "z42:healthcheck:")
+				sh.cache.Del(key)
+			},
+			func(err error) {
+				logger.Default.Error(err)
+			},
+			quit)
+
+		<-sh.quit
+		quit <- &sh.quitWG
+	}()
+
+	return sh
 }
 
 func (sh *StatHandler) GetActiveHealthcheckItems() ([]string, error) {
@@ -100,5 +124,6 @@ func (sh *StatHandler) GetHealthStatus(domain string, ip string) int {
 }
 
 func (sh *StatHandler) ShutDown() {
-
+	close(sh.quit)
+	sh.quitWG.Wait()
 }

@@ -523,9 +523,9 @@ func TestExpire(t *testing.T) {
 	hc.redisData.SetLocationFromJson("healthcheck.exp.", expireItem[0], a)
 
 	time.Sleep(time.Second * 5)
-	newItem, err := hc.redisStat.GetHealthcheckItem("w0.healthcheck.exp.:1.2.3.4")
-	if err == nil {
-		fmt.Println("2", newItem)
+	status = hc.redisStat.GetHealthStatus("w0.healthcheck.exp.", "1.2.3.4")
+	if status != 0 {
+		fmt.Println("2", status)
 		t.Fail()
 	}
 }
