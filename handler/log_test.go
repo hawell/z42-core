@@ -73,10 +73,10 @@ var logZoneConfig = `{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.zone.lo
 
 var logZoneEntries = [][]string{
 	{"www",
-		`{"a":{"ttl":300, "records":[{"ip":"127.0.0.1", "country":""}],"filter":{"count":"multi","order":"none","geo_filter":"none"}}}`,
+		`{"a":{"ttl":300, "records":[{"ip":"127.0.0.1", "country":[""]}],"filter":{"count":"multi","order":"none","geo_filter":"none"}}}`,
 	},
 	{"www2",
-		`{"a":{"ttl":300, "records":[{"ip":"127.0.0.1", "country":""}],"filter":{"count":"multi","order":"none","geo_filter":"none"}}}`,
+		`{"a":{"ttl":300, "records":[{"ip":"127.0.0.1", "country":[""]}],"filter":{"count":"multi","order":"none","geo_filter":"none"}}}`,
 	},
 }
 

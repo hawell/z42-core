@@ -2,9 +2,7 @@ package types
 
 import (
 	"crypto"
-	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
-	"github.com/pkg/errors"
 	"net"
 )
 
@@ -55,58 +53,6 @@ type IP_RR struct {
 	Ip      net.IP   `json:"ip"`
 	Country []string `json:"country,omitempty"`
 	ASN     []uint   `json:"asn,omitempty"`
-}
-
-type _IP_RR struct {
-	Country interface{} `json:"country,omitempty"`
-	ASN     interface{} `json:"asn,omitempty"`
-	Weight  int         `json:"weight,omitempty"`
-	Ip      net.IP      `json:"ip"`
-}
-
-func (iprr *IP_RR) UnmarshalJSON(data []byte) error {
-	var _ip_rr _IP_RR
-	if err := jsoniter.Unmarshal(data, &_ip_rr); err != nil {
-		return err
-	}
-
-	iprr.Ip = _ip_rr.Ip
-	iprr.Weight = _ip_rr.Weight
-
-	switch v := _ip_rr.Country.(type) {
-	case nil:
-	case string:
-		iprr.Country = []string{v}
-	case []interface{}:
-		for _, x := range v {
-			switch x.(type) {
-			case string:
-				iprr.Country = append(iprr.Country, x.(string))
-			default:
-				return errors.Errorf("string expected got %T:%v", x, x)
-			}
-		}
-	default:
-		return errors.Errorf("cannot parse country value: %v type: %T", v, v)
-	}
-	switch v := _ip_rr.ASN.(type) {
-	case nil:
-	case float64:
-		iprr.ASN = []uint{uint(v)}
-	case []interface{}:
-		for _, x := range v {
-			switch x.(type) {
-			case float64:
-				iprr.ASN = append(iprr.ASN, uint(x.(float64)))
-			default:
-				return errors.Errorf("invalid type:%T:%v", x, x)
-			}
-
-		}
-	default:
-		return errors.Errorf("cannot parse asn value: %v type: %T", v, v)
-	}
-	return nil
 }
 
 type IpHealthCheckConfig struct {

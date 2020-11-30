@@ -246,7 +246,7 @@ var dnssecTestCases = []*TestCase{
 				},
 				{"x",
 					`{
-			            "a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":"ES"},{"ip":"5.6.7.8", "country":""}]},
+			            "a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]},
             			"aaaa":{"ttl":300, "records":[{"ip":"::1"}]},
             			"txt":{"ttl":300, "records":[{"text":"foo"},{"text":"bar"}]},
             			"mx":{"ttl":300, "records":[{"host":"mx1.dnssec_test.com.", "preference":10},{"host":"mx2.dnssec_test.com.", "preference":10}]},

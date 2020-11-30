@@ -503,14 +503,14 @@ redis-cli>HGETALL example.com.
         "records":[
           {
             "ip" : "1.2.3.4",
-            "country" : "US",
-            "asn": 444,
+            "country" : ["US"],
+            "asn": [444],
             "weight" : 10
           },
           {
             "ip" : "2.2.3.4",
-            "country" : "US",
-            "asn": 444,
+            "country" : ["US"],
+            "asn": [444],
             "weight" : 10
           }
         ],
@@ -541,14 +541,14 @@ redis-cli>HGETALL example.com.
         "records":[
           {
             "ip" : "1.2.3.4",
-            "country" : "US",
-            "asn": 444,
+            "country" : ["US"],
+            "asn": [444],
             "weight" : 10
           },
           {
             "ip" : "1.2.3.4",
-            "country" : "US",
-            "asn": 444,
+            "country" : ["US"],
+            "asn": [444],
             "weight" : 10
           }
         ],

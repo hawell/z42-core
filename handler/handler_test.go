@@ -32,7 +32,7 @@ var handlerTestCases = []*TestCase{
 				},
 				{"x",
 					`{
-            			"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":"ES"},{"ip":"5.6.7.8", "country":""}]},
+            			"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]},
             			"aaaa":{"ttl":300, "records":[{"ip":"::1"}]},
             			"txt":{"ttl":300, "records":[{"text":"foo"},{"text":"bar"}]},
             			"mx":{"ttl":300, "records":[{"host":"mx1.example.com.", "preference":10},{"host":"mx2.example.com.", "preference":10}]},
@@ -1245,12 +1245,12 @@ var handlerTestCases = []*TestCase{
 				{"ww1",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":""},
-            				{"ip":"127.0.0.2", "country":""},
-            				{"ip":"127.0.0.3", "country":""},
-            				{"ip":"127.0.0.4", "country":""},
-            				{"ip":"127.0.0.5", "country":""},
-            				{"ip":"127.0.0.6", "country":""}
+            				{"ip":"127.0.0.1", "country":[""]},
+            				{"ip":"127.0.0.2", "country":[""]},
+            				{"ip":"127.0.0.3", "country":[""]},
+            				{"ip":"127.0.0.4", "country":[""]},
+            				{"ip":"127.0.0.5", "country":[""]},
+            				{"ip":"127.0.0.6", "country":[""]}
 						],
             			"filter":{"count":"multi","order":"none","geo_filter":"none"}}
 					}`,
@@ -1258,12 +1258,12 @@ var handlerTestCases = []*TestCase{
 				{"ww2",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":"US"},
-            				{"ip":"127.0.0.2", "country":"GB"},
-            				{"ip":"127.0.0.3", "country":"ES"},
-							{"ip":"127.0.0.4", "country":""},
-            				{"ip":"127.0.0.5", "country":""},
-            				{"ip":"127.0.0.6", "country":""}
+            				{"ip":"127.0.0.1", "country":["US"]},
+            				{"ip":"127.0.0.2", "country":["GB"]},
+            				{"ip":"127.0.0.3", "country":["ES"]},
+							{"ip":"127.0.0.4", "country":[""]},
+            				{"ip":"127.0.0.5", "country":[""]},
+            				{"ip":"127.0.0.6", "country":[""]}
 						],
             			"filter":{"count":"multi","order":"none","geo_filter":"country"}}
 					}`,
@@ -1282,12 +1282,12 @@ var handlerTestCases = []*TestCase{
 				{"ww4",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "asn":47447},
-            				{"ip":"127.0.0.2", "asn":20776},
-            				{"ip":"127.0.0.3", "asn":35470},
-            				{"ip":"127.0.0.4", "asn":0},
-            				{"ip":"127.0.0.5", "asn":0},
-            				{"ip":"127.0.0.6", "asn":0}
+            				{"ip":"127.0.0.1", "asn":[47447]},
+            				{"ip":"127.0.0.2", "asn":[20776]},
+            				{"ip":"127.0.0.3", "asn":[35470]},
+            				{"ip":"127.0.0.4", "asn":[0]},
+            				{"ip":"127.0.0.5", "asn":[0]},
+            				{"ip":"127.0.0.6", "asn":[0]}
 						],
         				"filter":{"count":"multi", "order":"none","geo_filter":"asn"}}
 					}`,
@@ -1295,12 +1295,12 @@ var handlerTestCases = []*TestCase{
 				{"ww5",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":"DE", "asn":47447},
-            				{"ip":"127.0.0.2", "country":"DE", "asn":20776},
-            				{"ip":"127.0.0.3", "country":"DE", "asn":35470},
-            				{"ip":"127.0.0.4", "country":"GB", "asn":0},
-            				{"ip":"127.0.0.5", "country":"", "asn":0},
-            				{"ip":"127.0.0.6", "country":"", "asn":0}
+            				{"ip":"127.0.0.1", "country":["DE"], "asn":[47447]},
+            				{"ip":"127.0.0.2", "country":["DE"], "asn":[20776]},
+            				{"ip":"127.0.0.3", "country":["DE"], "asn":[35470]},
+            				{"ip":"127.0.0.4", "country":["GB"], "asn":[0]},
+            				{"ip":"127.0.0.5", "country":[""], "asn":[0]},
+            				{"ip":"127.0.0.6", "country":[""], "asn":[0]}
 						],
         				"filter":{"count":"multi", "order":"none","geo_filter":"asn+country"}}
 					}`,
@@ -1310,8 +1310,8 @@ var handlerTestCases = []*TestCase{
 						"a":{"ttl":300, "records":[
             				{"ip":"127.0.0.1", "asn":[47447,20776]},
             				{"ip":"127.0.0.2", "asn":[0,35470]},
-            				{"ip":"127.0.0.3", "asn":35470},
-            				{"ip":"127.0.0.4", "asn":0},
+            				{"ip":"127.0.0.3", "asn":[35470]},
+            				{"ip":"127.0.0.4", "asn":[0]},
             				{"ip":"127.0.0.5", "asn":[]},
             				{"ip":"127.0.0.6"}
 						],
@@ -1323,9 +1323,9 @@ var handlerTestCases = []*TestCase{
 						"a":{"ttl":300, "records":[
             				{"ip":"127.0.0.1", "country":["DE", "GB"]},
             				{"ip":"127.0.0.2", "country":["", "DE"]},
-            				{"ip":"127.0.0.3", "country":"DE"},
-            				{"ip":"127.0.0.4", "country":"CA"},
-            				{"ip":"127.0.0.5", "country": ""},
+            				{"ip":"127.0.0.3", "country":["DE"]},
+            				{"ip":"127.0.0.4", "country":["CA"]},
+            				{"ip":"127.0.0.5", "country": [""]},
             				{"ip":"127.0.0.6", "country": []},
             				{"ip":"127.0.0.7"}
 						],
@@ -1554,12 +1554,12 @@ var handlerTestCases = []*TestCase{
 				{"ww1",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":""},
-            				{"ip":"127.0.0.2", "country":""},
-            				{"ip":"127.0.0.3", "country":""},
-            				{"ip":"127.0.0.4", "country":""},
-            				{"ip":"127.0.0.5", "country":""},
-            				{"ip":"127.0.0.6", "country":""}
+            				{"ip":"127.0.0.1", "country":[""]},
+            				{"ip":"127.0.0.2", "country":[""]},
+            				{"ip":"127.0.0.3", "country":[""]},
+            				{"ip":"127.0.0.4", "country":[""]},
+            				{"ip":"127.0.0.5", "country":[""]},
+            				{"ip":"127.0.0.6", "country":[""]}
 						],
             			"filter":{"count":"multi","order":"none","geo_filter":"none"}}
 					}`,
@@ -1567,11 +1567,11 @@ var handlerTestCases = []*TestCase{
 				{"ww2",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":"", "weight":1},
-            				{"ip":"127.0.0.2", "country":"", "weight":4},
-            				{"ip":"127.0.0.3", "country":"", "weight":10},
-            				{"ip":"127.0.0.4", "country":"", "weight":2},
-            				{"ip":"127.0.0.5", "country":"", "weight":20}
+            				{"ip":"127.0.0.1", "country":[""], "weight":1},
+            				{"ip":"127.0.0.2", "country":[""], "weight":4},
+            				{"ip":"127.0.0.3", "country":[""], "weight":10},
+            				{"ip":"127.0.0.4", "country":[""], "weight":2},
+            				{"ip":"127.0.0.5", "country":[""], "weight":20}
 						],
             			"filter":{"count":"multi","order":"weighted","geo_filter":"none"}}
 					}`,
@@ -1579,11 +1579,11 @@ var handlerTestCases = []*TestCase{
 				{"ww3",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":""},
-            				{"ip":"127.0.0.2", "country":""},
-            				{"ip":"127.0.0.3", "country":""},
-            				{"ip":"127.0.0.4", "country":""},
-            				{"ip":"127.0.0.5", "country":""}
+            				{"ip":"127.0.0.1", "country":[""]},
+            				{"ip":"127.0.0.2", "country":[""]},
+            				{"ip":"127.0.0.3", "country":[""]},
+            				{"ip":"127.0.0.4", "country":[""]},
+            				{"ip":"127.0.0.5", "country":[""]}
 						],
             			"filter":{"count":"multi","order":"rr","geo_filter":"none"}}
 					}`,
@@ -1714,12 +1714,12 @@ var handlerTestCases = []*TestCase{
 				{"ww1",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":""},
-            				{"ip":"127.0.0.2", "country":""},
-            				{"ip":"127.0.0.3", "country":""},
-            				{"ip":"127.0.0.4", "country":""},
-            				{"ip":"127.0.0.5", "country":""},
-            				{"ip":"127.0.0.6", "country":""}
+            				{"ip":"127.0.0.1", "country":[""]},
+            				{"ip":"127.0.0.2", "country":[""]},
+            				{"ip":"127.0.0.3", "country":[""]},
+            				{"ip":"127.0.0.4", "country":[""]},
+            				{"ip":"127.0.0.5", "country":[""]},
+            				{"ip":"127.0.0.6", "country":[""]}
 						],
             			"filter":{"count":"single","order":"none","geo_filter":"none"}}
 					}`,
@@ -1727,11 +1727,11 @@ var handlerTestCases = []*TestCase{
 				{"ww2",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":"", "weight":1},
-            				{"ip":"127.0.0.2", "country":"", "weight":4},
-            				{"ip":"127.0.0.3", "country":"", "weight":10},
-            				{"ip":"127.0.0.4", "country":"", "weight":2},
-            				{"ip":"127.0.0.5", "country":"", "weight":20}
+            				{"ip":"127.0.0.1", "country":[""], "weight":1},
+            				{"ip":"127.0.0.2", "country":[""], "weight":4},
+            				{"ip":"127.0.0.3", "country":[""], "weight":10},
+            				{"ip":"127.0.0.4", "country":[""], "weight":2},
+            				{"ip":"127.0.0.5", "country":[""], "weight":20}
 						],
             			"filter":{"count":"single","order":"weighted","geo_filter":"none"}}
 					}`,
@@ -1739,11 +1739,11 @@ var handlerTestCases = []*TestCase{
 				{"ww3",
 					`{
 						"a":{"ttl":300, "records":[
-            				{"ip":"127.0.0.1", "country":""},
-            				{"ip":"127.0.0.2", "country":""},
-            				{"ip":"127.0.0.3", "country":""},
-            				{"ip":"127.0.0.4", "country":""},
-            				{"ip":"127.0.0.5", "country":""}
+            				{"ip":"127.0.0.1", "country":[""]},
+            				{"ip":"127.0.0.2", "country":[""]},
+            				{"ip":"127.0.0.3", "country":[""]},
+            				{"ip":"127.0.0.4", "country":[""]},
+            				{"ip":"127.0.0.5", "country":[""]}
 						],
             			"filter":{"count":"single","order":"rr","geo_filter":"none"}}
 					}`,
