@@ -1,4 +1,4 @@
-package handler
+package geoip
 
 import (
 	"github.com/hawell/z42/types"
@@ -53,7 +53,7 @@ func TestGeoIpAutomatic(t *testing.T) {
 		{"37.148.176.54", "BE"},
 	}
 
-	cfg := GeoIpConfig{
+	cfg := Config{
 		Enable:    true,
 		CountryDB: "../geoCity.mmdb",
 	}
@@ -98,7 +98,7 @@ func TestGetSameCountry(t *testing.T) {
 		{"127.0.0.1", "", "3.4.5.6"},
 	}
 
-	cfg := GeoIpConfig{
+	cfg := Config{
 		Enable:    true,
 		CountryDB: "../geoCity.mmdb",
 	}
@@ -156,7 +156,7 @@ func TestGetSameASN(t *testing.T) {
 		{"852", "3.4.5.6"},
 		{"0", "4.5.6.7"},
 	}
-	cfg := GeoIpConfig{
+	cfg := Config{
 		Enable: true,
 		ASNDB:  "../geoIsp.mmdb",
 	}
@@ -258,7 +258,7 @@ func printCountryASN() {
 		"185.70.144.117",
 		"62.220.128.73",
 	}
-	cfg := GeoIpConfig{
+	cfg := Config{
 		Enable:    true,
 		ASNDB:     "../geoIsp.mmdb",
 		CountryDB: "../geoCity.mmdb",

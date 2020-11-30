@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hawell/z42/dnssec"
+	"github.com/hawell/z42/geoip"
 	"github.com/hawell/z42/handler/logformat"
 	"github.com/hawell/z42/redis"
 	"github.com/hawell/z42/types"
@@ -21,7 +22,7 @@ type DnsRequestHandler struct {
 	Config    *DnsRequestHandlerConfig
 	RedisData *redis.DataHandler
 	Logger    *logger.EventLogger
-	geoip     *GeoIp
+	geoip     *geoip.GeoIp
 	upstream  *upstream.Upstream
 	quit      chan struct{}
 	quitWG    sync.WaitGroup
@@ -30,7 +31,7 @@ type DnsRequestHandler struct {
 
 type DnsRequestHandlerConfig struct {
 	Upstream          []upstream.UpstreamConfig `json:"upstream"`
-	GeoIp             GeoIpConfig               `json:"geoip"`
+	GeoIp             geoip.Config             `json:"geoip"`
 	MaxTtl            int                       `json:"max_ttl"`
 	LogSourceLocation bool                      `json:"log_source_location"`
 	Log               logger.LogConfig          `json:"log"`
@@ -57,7 +58,7 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *
 
 	h.logQueue = make(chan map[string]interface{}, 1000)
 	h.Logger = logger.NewLogger(&config.Log, getFormatter)
-	h.geoip = NewGeoIp(&config.GeoIp)
+	h.geoip = geoip.NewGeoIp(&config.GeoIp)
 	h.upstream = upstream.NewUpstream(config.Upstream)
 	h.quit = make(chan struct{})
 
@@ -85,8 +86,8 @@ func (h *DnsRequestHandler) ShutDown() {
 	// logger.Default.Debug("handler : stopped")
 }
 
-func (h *DnsRequestHandler) Response(context *RequestContext) {
-	h.LogRequest(context)
+func (h *DnsRequestHandler) response(context *RequestContext) {
+	h.logRequest(context)
 	context.Response()
 }
 
@@ -103,7 +104,7 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 	zoneName := h.RedisData.FindZone(context.RawName())
 	if zoneName == "" {
 		context.Res = dns.RcodeNotAuth
-		h.Response(context)
+		h.response(context)
 		return
 	}
 	// logger.Default.Debugf("[%d] zone name : %s", context.Req.Id, zoneName)
@@ -111,7 +112,7 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 	context.zone = h.RedisData.GetZone(zoneName)
 	if context.zone == nil {
 		context.Res = dns.RcodeServerFailure
-		h.Response(context)
+		h.response(context)
 		return
 	}
 	context.LogData["domain_uuid"] = context.zone.Config.DomainId
@@ -135,7 +136,7 @@ loop:
 			// logger.Default.Debugf("[%d] out of zone - qname : %s, zone : %s", context.Req.Id, currentQName, zoneName)
 			context.Res = dns.RcodeSuccess
 			if len(context.Answer) == 0 {
-				NSec(context, context.RawName(), context.QType())
+				addNSec(context, context.RawName(), context.QType())
 			}
 			break loop
 		}
@@ -146,14 +147,14 @@ loop:
 			// logger.Default.Debugf("[%d] no location matched for %s in %s", context.Req.Id, currentQName, zoneName)
 			context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 			context.Res = dns.RcodeNameError
-			NSec(context, currentQName, dns.TypeNone)
+			addNSec(context, currentQName, dns.TypeNone)
 			break loop
 
 		case types.EmptyNonterminalMatch:
 			// logger.Default.Debugf("[%d] empty nonterminal match: %s", context.Req.Id)
 			context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 			context.Res = dns.RcodeSuccess
-			NSec(context, currentQName, dns.TypeNone)
+			addNSec(context, currentQName, dns.TypeNone)
 			break loop
 
 		case types.CEMatch:
@@ -165,10 +166,10 @@ loop:
 			}
 			if len(currentRecord.NS.Data) > 0 && currentRecord.Fqdn != context.zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
-				context.Authority = append(context.Authority, h.NS(currentRecord.Fqdn, currentRecord)...)
-				ds := h.DS(currentRecord.Fqdn, currentRecord)
+				context.Authority = append(context.Authority, h.ns(currentRecord.Fqdn, currentRecord)...)
+				ds := h.ds(currentRecord.Fqdn, currentRecord)
 				if len(ds) == 0 {
-					NSec(context, currentRecord.Fqdn, dns.TypeDS)
+					addNSec(context, currentRecord.Fqdn, dns.TypeDS)
 				}
 				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
@@ -177,10 +178,10 @@ loop:
 						glueRecord, err := h.RedisData.GetLocation(context.zone.Name, glueLocation)
 						// XXX : should we return with RcodeServerFailure?
 						if err == nil {
-							ips := h.Filter(context.SourceIp, &glueRecord.A)
-							context.Additional = append(context.Additional, h.A(ns.Host, glueRecord, ips)...)
-							ips = h.Filter(context.SourceIp, &glueRecord.AAAA)
-							context.Additional = append(context.Additional, h.AAAA(ns.Host, glueRecord, ips)...)
+							ips := h.filter(context.SourceIp, &glueRecord.A)
+							context.Additional = append(context.Additional, h.a(ns.Host, glueRecord, ips)...)
+							ips = h.filter(context.SourceIp, &glueRecord.AAAA)
+							context.Additional = append(context.Additional, h.aaaa(ns.Host, glueRecord, ips)...)
 						}
 					}
 				}
@@ -189,7 +190,7 @@ loop:
 			} else {
 				context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 				context.Res = dns.RcodeNameError
-				NSec(context, currentQName, context.QType())
+				addNSec(context, currentQName, context.QType())
 				break loop
 			}
 
@@ -207,9 +208,9 @@ loop:
 			if currentRecord.CNAME != nil && context.QType() != dns.TypeCNAME {
 				// logger.Default.Debugf("[%d] cname chain %s -> %s", context.Req.Id, currentQName, currentRecord.CNAME.Host)
 				if !cnameFlattening {
-					context.Answer = append(context.Answer, h.CNAME(currentQName, currentRecord)...)
+					context.Answer = append(context.Answer, h.cname(currentQName, currentRecord)...)
 				} else if h.RedisData.FindZone(currentRecord.CNAME.Host) != zoneName {
-					context.Answer = append(context.Answer, h.CNAME(context.RawName(), currentRecord)...)
+					context.Answer = append(context.Answer, h.cname(context.RawName(), currentRecord)...)
 					context.Res = dns.RcodeSuccess
 					break loop
 				}
@@ -218,16 +219,16 @@ loop:
 			}
 			if len(currentRecord.NS.Data) > 0 && currentQName != context.zone.Name {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
-				ds := h.DS(currentQName, currentRecord)
+				ds := h.ds(currentQName, currentRecord)
 				if len(ds) == 0 {
-					NSec(context, currentRecord.Fqdn, dns.TypeDS)
+					addNSec(context, currentRecord.Fqdn, dns.TypeDS)
 				}
 				if context.QType() == dns.TypeDS {
 					context.Answer = append(context.Answer, ds...)
 					context.Res = dns.RcodeSuccess
 					break loop
 				}
-				context.Authority = append(context.Authority, h.NS(currentQName, currentRecord)...)
+				context.Authority = append(context.Authority, h.ns(currentQName, currentRecord)...)
 				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
 					glueLocation, match := context.zone.FindLocation(ns.Host)
@@ -235,10 +236,10 @@ loop:
 						glueRecord, err := h.RedisData.GetLocation(context.zone.Name, glueLocation)
 						// XXX : should we return with RcodeServerFailure?
 						if err == nil {
-							ips := h.Filter(context.SourceIp, &glueRecord.A)
-							context.Additional = append(context.Additional, h.A(ns.Host, glueRecord, ips)...)
-							ips = h.Filter(context.SourceIp, &glueRecord.AAAA)
-							context.Additional = append(context.Additional, h.AAAA(ns.Host, glueRecord, ips)...)
+							ips := h.filter(context.SourceIp, &glueRecord.A)
+							context.Additional = append(context.Additional, h.a(ns.Host, glueRecord, ips)...)
+							ips = h.filter(context.SourceIp, &glueRecord.AAAA)
+							context.Additional = append(context.Additional, h.aaaa(ns.Host, glueRecord, ips)...)
 						}
 					}
 				}
@@ -256,42 +257,42 @@ loop:
 				var ips []net.IP
 				var ttl uint32
 				if len(currentRecord.A.Data) == 0 && currentRecord.ANAME != nil {
-					ips, context.Res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeA)
+					ips, context.Res, ttl = h.findANAME(context, currentRecord.ANAME.Location, dns.TypeA)
 					currentRecord.A.Ttl = ttl
 				} else {
-					ips = h.Filter(context.SourceIp, &currentRecord.A)
+					ips = h.filter(context.SourceIp, &currentRecord.A)
 				}
-				answer = h.A(currentQName, currentRecord, ips)
+				answer = h.a(currentQName, currentRecord, ips)
 			case dns.TypeAAAA:
 				var ips []net.IP
 				var ttl uint32
 				if len(currentRecord.AAAA.Data) == 0 && currentRecord.ANAME != nil {
-					ips, context.Res, ttl = h.FindANAME(context, currentRecord.ANAME.Location, dns.TypeAAAA)
+					ips, context.Res, ttl = h.findANAME(context, currentRecord.ANAME.Location, dns.TypeAAAA)
 					currentRecord.AAAA.Ttl = ttl
 				} else {
-					ips = h.Filter(context.SourceIp, &currentRecord.AAAA)
+					ips = h.filter(context.SourceIp, &currentRecord.AAAA)
 				}
-				answer = h.AAAA(currentQName, currentRecord, ips)
+				answer = h.aaaa(currentQName, currentRecord, ips)
 			case dns.TypeCNAME:
-				answer = h.CNAME(currentQName, currentRecord)
+				answer = h.cname(currentQName, currentRecord)
 			case dns.TypeTXT:
-				answer = h.TXT(currentQName, currentRecord)
+				answer = h.txt(currentQName, currentRecord)
 			case dns.TypeNS:
-				answer = h.NS(currentQName, currentRecord)
+				answer = h.ns(currentQName, currentRecord)
 			case dns.TypeMX:
-				answer = h.MX(currentQName, currentRecord)
+				answer = h.mx(currentQName, currentRecord)
 			case dns.TypeSRV:
-				answer = h.SRV(currentQName, currentRecord)
+				answer = h.srv(currentQName, currentRecord)
 			case dns.TypeCAA:
-				// TODO: handle FindCAA error response
-				caaRecord := h.FindCAA(context, currentRecord)
+				// TODO: handle findCAA error response
+				caaRecord := h.findCAA(context, currentRecord)
 				if caaRecord != nil {
-					answer = h.CAA(currentQName, caaRecord)
+					answer = h.caa(currentQName, caaRecord)
 				}
 			case dns.TypePTR:
-				answer = h.PTR(currentQName, currentRecord)
+				answer = h.ptr(currentQName, currentRecord)
 			case dns.TypeTLSA:
-				answer = h.TLSA(currentQName, currentRecord)
+				answer = h.tlsa(currentQName, currentRecord)
 			case dns.TypeSOA:
 				answer = []dns.RR{context.zone.Config.SOA.Data}
 			case dns.TypeDNSKEY:
@@ -308,7 +309,7 @@ loop:
 			}
 			context.Answer = append(context.Answer, answer...)
 			if len(answer) == 0 {
-				NSec(context, currentQName, context.QType())
+				addNSec(context, currentQName, context.QType())
 				if context.Res == dns.RcodeSuccess {
 					context.Authority = append(context.Authority, context.zone.Config.SOA.Data)
 				}
@@ -317,13 +318,13 @@ loop:
 		}
 	}
 
-	ApplyDnssec(context)
+	applyDnssec(context)
 
-	h.Response(context)
+	h.response(context)
 	// logger.Default.Debugf("[%d] end handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
 }
 
-func (h *DnsRequestHandler) Filter(sourceIp net.IP, rrset *types.IP_RRSet) []net.IP {
+func (h *DnsRequestHandler) filter(sourceIp net.IP, rrset *types.IP_RRSet) []net.IP {
 	mask := make([]int, len(rrset.Data))
 	// TODO: filterHealthCheck in redisStat
 	//mask = h.healthcheck.FilterHealthcheck(name, rrset, mask)
@@ -340,10 +341,10 @@ func (h *DnsRequestHandler) Filter(sourceIp net.IP, rrset *types.IP_RRSet) []net
 	default:
 	}
 
-	return OrderIps(rrset, mask)
+	return orderIps(rrset, mask)
 }
 
-func (h *DnsRequestHandler) LogRequest(state *RequestContext) {
+func (h *DnsRequestHandler) logRequest(state *RequestContext) {
 	state.LogData["process_time"] = time.Since(state.StartTime).Nanoseconds() / 1000000
 	state.LogData["response_code"] = state.Res
 	state.LogData["log_type"] = "request"
@@ -354,7 +355,7 @@ func (h *DnsRequestHandler) LogRequest(state *RequestContext) {
 	}
 }
 
-func (h *DnsRequestHandler) A(name string, record *types.Record, ips []net.IP) (answers []dns.RR) {
+func (h *DnsRequestHandler) a(name string, record *types.Record, ips []net.IP) (answers []dns.RR) {
 	for _, ip := range ips {
 		if ip == nil {
 			continue
@@ -368,7 +369,7 @@ func (h *DnsRequestHandler) A(name string, record *types.Record, ips []net.IP) (
 	return
 }
 
-func (h *DnsRequestHandler) AAAA(name string, record *types.Record, ips []net.IP) (answers []dns.RR) {
+func (h *DnsRequestHandler) aaaa(name string, record *types.Record, ips []net.IP) (answers []dns.RR) {
 	for _, ip := range ips {
 		if ip == nil {
 			continue
@@ -382,7 +383,7 @@ func (h *DnsRequestHandler) AAAA(name string, record *types.Record, ips []net.IP
 	return
 }
 
-func (h *DnsRequestHandler) CNAME(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) cname(name string, record *types.Record) (answers []dns.RR) {
 	if record.CNAME == nil {
 		return
 	}
@@ -394,7 +395,7 @@ func (h *DnsRequestHandler) CNAME(name string, record *types.Record) (answers []
 	return
 }
 
-func (h *DnsRequestHandler) TXT(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) txt(name string, record *types.Record) (answers []dns.RR) {
 	for _, txt := range record.TXT.Data {
 		if len(txt.Text) == 0 {
 			continue
@@ -408,7 +409,7 @@ func (h *DnsRequestHandler) TXT(name string, record *types.Record) (answers []dn
 	return
 }
 
-func (h *DnsRequestHandler) NS(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) ns(name string, record *types.Record) (answers []dns.RR) {
 	for _, ns := range record.NS.Data {
 		if len(ns.Host) == 0 {
 			continue
@@ -422,7 +423,7 @@ func (h *DnsRequestHandler) NS(name string, record *types.Record) (answers []dns
 	return
 }
 
-func (h *DnsRequestHandler) MX(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) mx(name string, record *types.Record) (answers []dns.RR) {
 	for _, mx := range record.MX.Data {
 		if len(mx.Host) == 0 {
 			continue
@@ -437,7 +438,7 @@ func (h *DnsRequestHandler) MX(name string, record *types.Record) (answers []dns
 	return
 }
 
-func (h *DnsRequestHandler) SRV(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) srv(name string, record *types.Record) (answers []dns.RR) {
 	for _, srv := range record.SRV.Data {
 		if len(srv.Target) == 0 {
 			continue
@@ -454,7 +455,7 @@ func (h *DnsRequestHandler) SRV(name string, record *types.Record) (answers []dn
 	return
 }
 
-func (h *DnsRequestHandler) CAA(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) caa(name string, record *types.Record) (answers []dns.RR) {
 	for _, caa := range record.CAA.Data {
 		r := new(dns.CAA)
 		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeCAA,
@@ -467,7 +468,7 @@ func (h *DnsRequestHandler) CAA(name string, record *types.Record) (answers []dn
 	return
 }
 
-func (h *DnsRequestHandler) PTR(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) ptr(name string, record *types.Record) (answers []dns.RR) {
 	if record.PTR == nil {
 		return
 	}
@@ -479,7 +480,7 @@ func (h *DnsRequestHandler) PTR(name string, record *types.Record) (answers []dn
 	return
 }
 
-func (h *DnsRequestHandler) TLSA(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) tlsa(name string, record *types.Record) (answers []dns.RR) {
 	for _, tlsa := range record.TLSA.Data {
 		r := new(dns.TLSA)
 		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeTLSA,
@@ -493,7 +494,7 @@ func (h *DnsRequestHandler) TLSA(name string, record *types.Record) (answers []d
 	return
 }
 
-func (h *DnsRequestHandler) DS(name string, record *types.Record) (answers []dns.RR) {
+func (h *DnsRequestHandler) ds(name string, record *types.Record) (answers []dns.RR) {
 	for _, ds := range record.DS.Data {
 		r := new(dns.DS)
 		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeDS,
@@ -541,7 +542,7 @@ func split255(s string) []string {
 	return sx
 }
 
-func OrderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
+func orderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 	sum := 0
 	count := 0
 	for i, x := range mask {
@@ -610,7 +611,7 @@ func OrderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 	}
 }
 
-func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Record) *types.Record {
+func (h *DnsRequestHandler) findCAA(context *RequestContext, record *types.Record) *types.Record {
 	zone := context.zone
 	currentRecord := record
 	currentLocation := strings.TrimSuffix(currentRecord.Fqdn, "."+zone.Name)
@@ -648,7 +649,7 @@ func (h *DnsRequestHandler) FindCAA(context *RequestContext, record *types.Recor
 	return nil
 }
 
-func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qtype uint16) ([]net.IP, int, uint32) {
+func (h *DnsRequestHandler) findANAME(context *RequestContext, aname string, qtype uint16) ([]net.IP, int, uint32) {
 	// logger.Default.Debug("finding aname")
 	currentQName := aname
 	loopCount := 0
@@ -705,10 +706,10 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 
 		if qtype == dns.TypeA && len(currentRecord.A.Data) > 0 {
 			// logger.Default.Debug("found a")
-			return h.Filter(context.SourceIp, &currentRecord.A), dns.RcodeSuccess, currentRecord.A.Ttl
+			return h.filter(context.SourceIp, &currentRecord.A), dns.RcodeSuccess, currentRecord.A.Ttl
 		} else if qtype == dns.TypeAAAA && len(currentRecord.AAAA.Data) > 0 {
 			// logger.Default.Debug("found aaaa")
-			return h.Filter(context.SourceIp, &currentRecord.AAAA), dns.RcodeSuccess, currentRecord.AAAA.Ttl
+			return h.filter(context.SourceIp, &currentRecord.AAAA), dns.RcodeSuccess, currentRecord.AAAA.Ttl
 		}
 
 		if currentRecord.ANAME != nil {
@@ -721,7 +722,7 @@ func (h *DnsRequestHandler) FindANAME(context *RequestContext, aname string, qty
 	}
 }
 
-func NSec(context *RequestContext, name string, qtype uint16) {
+func addNSec(context *RequestContext, name string, qtype uint16) {
 	if !context.dnssec {
 		return
 	}
@@ -750,7 +751,7 @@ func NSec(context *RequestContext, name string, qtype uint16) {
 	context.Authority = append(context.Authority, nsec)
 }
 
-func ApplyDnssec(context *RequestContext) {
+func applyDnssec(context *RequestContext) {
 	if !context.dnssec {
 		return
 	}

@@ -32,7 +32,7 @@ func TestWeight(t *testing.T) {
 	mask := make([]int, len(rrset.Data))
 	n := make([]int, 4)
 	for i := 0; i < 100000; i++ {
-		x := OrderIps(&rrset, mask)
+		x := orderIps(&rrset, mask)
 		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++
@@ -55,7 +55,7 @@ func TestWeight(t *testing.T) {
 	}
 	n[0], n[1], n[2], n[3] = 0, 0, 0, 0
 	for i := 0; i < 100000; i++ {
-		x := OrderIps(&rrset, mask)
+		x := orderIps(&rrset, mask)
 		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++
@@ -78,7 +78,7 @@ func TestWeight(t *testing.T) {
 	n[0], n[1], n[2], n[3] = 0, 0, 0, 0
 	rrset.Data[0].Weight, rrset.Data[1].Weight, rrset.Data[2].Weight, rrset.Data[3].Weight = 0, 5, 7, 0
 	for i := 0; i < 100000; i++ {
-		x := OrderIps(&rrset, mask)
+		x := orderIps(&rrset, mask)
 		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++
@@ -101,7 +101,7 @@ func TestWeight(t *testing.T) {
 	rrset.Data[0].Weight, rrset.Data[1].Weight, rrset.Data[2].Weight, rrset.Data[3].Weight = 0, 5, 7, 0
 	rrset.FilterConfig.Order = "rr"
 	for i := 0; i < 100000; i++ {
-		x := OrderIps(&rrset, mask)
+		x := orderIps(&rrset, mask)
 		switch x[0].String() {
 		case "1.2.3.4":
 			n[0]++

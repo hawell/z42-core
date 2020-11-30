@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/hawell/logger"
+	"github.com/hawell/z42/geoip"
 	"github.com/hawell/z42/handler/logformat"
 	"github.com/hawell/z42/redis"
 	"github.com/hawell/z42/test"
@@ -59,7 +60,7 @@ var logHandlerTestConfig = DnsRequestHandlerConfig{
 			Timeout:  1000,
 		},
 	},
-	GeoIp: GeoIpConfig{
+	GeoIp: geoip.Config{
 		Enable:    true,
 		CountryDB: "../geoCity.mmdb",
 		ASNDB:     "../geoIsp.mmdb",

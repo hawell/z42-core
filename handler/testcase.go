@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/logger"
+	"github.com/hawell/z42/geoip"
 	"github.com/hawell/z42/redis"
 	"github.com/hawell/z42/test"
 	"github.com/hawell/z42/upstream"
@@ -109,7 +110,7 @@ var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
 			Timeout:  1000,
 		},
 	},
-	GeoIp: GeoIpConfig{
+	GeoIp: geoip.Config{
 		Enable:    true,
 		CountryDB: "../geoCity.mmdb",
 		ASNDB:     "../geoIsp.mmdb",

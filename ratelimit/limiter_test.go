@@ -7,7 +7,7 @@ import (
 )
 
 func TestLimiter(t *testing.T) {
-	cfg := RateLimiterConfig{
+	cfg := Config{
 		Enable:    true,
 		Rate:      60000,
 		Burst:     10,

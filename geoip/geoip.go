@@ -1,4 +1,4 @@
-package handler
+package geoip
 
 import (
 	"github.com/hawell/z42/types"
@@ -15,13 +15,13 @@ type GeoIp struct {
 	ASNDB     *maxminddb.Reader
 }
 
-type GeoIpConfig struct {
+type Config struct {
 	Enable    bool   `json:"enable"`
 	CountryDB string `json:"country_db"`
 	ASNDB     string `json:"asn_db"`
 }
 
-func NewGeoIp(config *GeoIpConfig) *GeoIp {
+func NewGeoIp(config *Config) *GeoIp {
 	g := &GeoIp{
 		Enable: config.Enable,
 	}
@@ -147,7 +147,7 @@ func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []types.IP_RR, mask []in
 	}
 	minDistance := 1000.0
 	dists := make([]float64, 0, len(mask))
-	slat, slong, err := g.GetCoordinates(sourceIp)
+	slat, slong, err := g.getCoordinates(sourceIp)
 	if err != nil {
 		logger.Default.Error("getMinimumDistance failed")
 		return mask
@@ -155,7 +155,7 @@ func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []types.IP_RR, mask []in
 	for i, x := range mask {
 		if x == types.IpMaskWhite {
 			destinationIp := ips[i].Ip
-			dlat, dlong, _ := g.GetCoordinates(destinationIp)
+			dlat, dlong, _ := g.getCoordinates(destinationIp)
 			d, err := g.getDistance(slat, slong, dlat, dlong)
 			if err != nil {
 				d = 1000.0
@@ -206,7 +206,7 @@ func (g *GeoIp) getDistance(slat, slong, dlat, dlong float64) (float64, error) {
 	return c, nil
 }
 
-func (g *GeoIp) GetCoordinates(ip net.IP) (latitude float64, longitude float64, err error) {
+func (g *GeoIp) getCoordinates(ip net.IP) (latitude float64, longitude float64, err error) {
 	if !g.Enable || g.CountryDB == nil {
 		return
 	}

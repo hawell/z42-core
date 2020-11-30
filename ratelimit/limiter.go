@@ -11,12 +11,12 @@ type RateLimiter struct {
 	Limiters  *cache.Cache
 	MaxTime   time.Duration
 	TimeStep  time.Duration
-	Config    *RateLimiterConfig
+	Config    *Config
 	WhiteList map[string]interface{}
 	BlackList map[string]interface{}
 }
 
-type RateLimiterConfig struct {
+type Config struct {
 	Enable    bool     `json:"enable"`
 	Burst     int      `json:"burst"`
 	Rate      int      `json:"rate"`
@@ -24,7 +24,7 @@ type RateLimiterConfig struct {
 	BlackList []string `json:"blacklist"`
 }
 
-func NewRateLimiter(config *RateLimiterConfig) *RateLimiter {
+func NewRateLimiter(config *Config) *RateLimiter {
 	rl := &RateLimiter{
 		Config: config,
 	}

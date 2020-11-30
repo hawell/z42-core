@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/raven-go"
+	"github.com/hawell/z42/geoip"
 	"github.com/hawell/z42/handler"
 	"github.com/hawell/z42/healthcheck"
 	"github.com/hawell/z42/ratelimit"
@@ -54,17 +55,17 @@ func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	}
 }
 
-type RedinsConfig struct {
+type Config struct {
 	Server      []server.ServerConfig           `json:"server"`
 	ErrorLog    logger.LogConfig                `json:"error_log"`
 	RedisData   redis.DataHandlerConfig         `json:"redis_data"`
 	RedisStat   redis.StatHandlerConfig         `json:"redis_stat"`
 	Handler     handler.DnsRequestHandlerConfig `json:"handler"`
 	Healthcheck healthcheck.HealthcheckConfig   `json:"healthcheck"`
-	RateLimit   ratelimit.RateLimiterConfig     `json:"ratelimit"`
+	RateLimit   ratelimit.Config                `json:"ratelimit"`
 }
 
-var z42DefaultConfig = &RedinsConfig{
+var z42DefaultConfig = &Config{
 	Server: []server.ServerConfig{
 		{
 			Ip:       "127.0.0.1",
@@ -131,7 +132,7 @@ var z42DefaultConfig = &RedinsConfig{
 				Timeout:  400,
 			},
 		},
-		GeoIp: handler.GeoIpConfig{
+		GeoIp: geoip.Config{
 			Enable:    false,
 			CountryDB: "geoCity.mmdb",
 			ASNDB:     "geoIsp.mmdb",
@@ -224,7 +225,7 @@ var z42DefaultConfig = &RedinsConfig{
 			BufferSize:  1000,
 		},
 	},
-	RateLimit: ratelimit.RateLimiterConfig{
+	RateLimit: ratelimit.Config{
 		Enable:    false,
 		Rate:      60,
 		Burst:     10,
@@ -233,7 +234,7 @@ var z42DefaultConfig = &RedinsConfig{
 	},
 }
 
-func LoadConfig(path string) (*RedinsConfig, error) {
+func LoadConfig(path string) (*Config, error) {
 	config := z42DefaultConfig
 	configFile, err := os.Open(path)
 	if err != nil {
