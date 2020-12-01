@@ -40,6 +40,8 @@ type DataHandler struct {
 
 const (
 	ZoneForcedReload = time.Minute * 60
+	KeyPrefix = "z42:zones:"
+	ZonesKey = "z42:zones"
 )
 
 func NewDataHandler(config *DataHandlerConfig) *DataHandler {
@@ -72,7 +74,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		dh.quitWG.Add(1)
 		quit := make(chan *sync.WaitGroup, 1)
 		modified := false
-		go dh.redis.SubscribeEvent("z42:zones", func() {
+		go dh.redis.SubscribeEvent(ZonesKey, func() {
 			modified = true
 		}, func(channel string, data string) {
 			modified = true
@@ -110,9 +112,29 @@ func (dh *DataHandler) ShutDown() {
 	dh.quitWG.Wait()
 }
 
+func zonesKey() string {
+	return ZonesKey
+}
+
+func zoneConfigKey(zone string) string {
+	return KeyPrefix + zone + ":config"
+}
+
+func zoneLocationKey(zone string, label string) string {
+	return KeyPrefix + zone + ":labels:" + label
+}
+
+func zonePubKey(zone string, keyType string) string {
+	return KeyPrefix + zone + ":" + keyType + ":pub"
+}
+
+func zonePrivKey(zone string, keyType string) string {
+	return KeyPrefix + zone + ":" + keyType + ":priv"
+}
+
 func (dh *DataHandler) LoadZones() {
 	dh.LastZoneUpdate = time.Now()
-	zones, err := dh.redis.SMembers("z42:zones")
+	zones, err := dh.redis.SMembers(zonesKey())
 	if err != nil {
 		logger.Default.Error("cannot load zones : ", err)
 		return
@@ -143,13 +165,17 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 	}
 
 	answer, _, _ := dh.ZoneInflight.Do(zone, func() (interface{}, error) {
-		locations, err := dh.redis.GetHKeys("z42:zones:" + zone)
+		locations, err := dh.redis.GetKeys(zoneLocationKey(zone, "*"))
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s locations : %s", zone, err)
 			return nil, err
 		}
+		trm := zoneLocationKey(zone, "")
+		for i, s := range locations {
+			locations[i] = strings.TrimPrefix(s, trm)
+		}
 
-		configStr, err := dh.redis.Get("z42:zones:" + zone + ":config")
+		configStr, err := dh.redis.Get(zoneConfigKey(zone))
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
 		}
@@ -207,9 +233,9 @@ func (dh *DataHandler) GetZoneConfig(zone string) (*types.ZoneConfig, error) {
 }
 
 func (dh *DataHandler) GetZones() []string {
-	domains, err := dh.redis.SMembers("z42:zones")
+	domains, err := dh.redis.SMembers(zonesKey())
 	if err != nil {
-		logger.Default.Errorf("cannot get members of z42:zones : %s", err)
+		logger.Default.Errorf("cannot get members of %s : %s",zonesKey(), err)
 		return nil
 	}
 	return domains
@@ -224,11 +250,11 @@ func (dh *DataHandler) GetZoneLocations(zone string) []string {
 }
 
 func (dh *DataHandler) EnableZone(zone string) error {
-	return dh.redis.SAdd("z42:zones", zone)
+	return dh.redis.SAdd(zonesKey(), zone)
 }
 
 func (dh *DataHandler) DisableZone(zone string) error {
-	return dh.redis.SRem("z42:zones", zone)
+	return dh.redis.SRem(zonesKey(), zone)
 }
 
 func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) error {
@@ -240,25 +266,25 @@ func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) erro
 }
 
 func (dh *DataHandler) SetZoneConfigFromJson(zone string, config string) error {
-	return dh.redis.Set("z42:zones:"+zone+":config", config)
+	return dh.redis.Set(zoneConfigKey(zone), config)
 }
 
 func (dh *DataHandler) SetZoneKey(zone string, keyType string, pub string, priv string) error {
-	if err := dh.redis.Set("z42:zones:"+zone+":"+keyType+":pub", pub); err != nil {
+	if err := dh.redis.Set(zonePubKey(zone, keyType), pub); err != nil {
 		return err
 	}
-	return dh.redis.Set("z42:zones:"+zone+":"+keyType+":priv", priv)
+	return dh.redis.Set(zonePrivKey(zone,keyType), priv)
 }
 
-func (dh *DataHandler) loadKey(pub string, priv string) *types.ZoneKey {
-	pubStr, _ := dh.redis.Get(pub)
+func (dh *DataHandler) loadKey(zone string, keyType string) *types.ZoneKey {
+	pubStr, _ := dh.redis.Get(zonePubKey(zone, keyType))
 	if pubStr == "" {
-		logger.Default.Errorf("key is not set : %s", pub)
+		logger.Default.Errorf("key is not set : %s", zonePubKey(zone, keyType))
 		return nil
 	}
-	privStr, _ := dh.redis.Get(priv)
+	privStr, _ := dh.redis.Get(zonePrivKey(zone, keyType))
 	if privStr == "" {
-		logger.Default.Errorf("key is not set : %s", priv)
+		logger.Default.Errorf("key is not set : %s", zonePrivKey(zone, keyType))
 		return nil
 	}
 	privStr = strings.Replace(privStr, "\\n", "\n", -1)
@@ -283,12 +309,12 @@ func (dh *DataHandler) loadKey(pub string, priv string) *types.ZoneKey {
 
 func (dh *DataHandler) loadZoneKeys(z *types.Zone) {
 	if z.Config.DnsSec {
-		z.ZSK = dh.loadKey("z42:zones:"+z.Name+":zsk:pub", "z42:zones:"+z.Name+":zsk:priv")
+		z.ZSK = dh.loadKey(z.Name, "zsk")
 		if z.ZSK == nil {
 			z.Config.DnsSec = false
 			return
 		}
-		z.KSK = dh.loadKey("z42:zones:"+z.Name+":ksk:pub", "z42:zones:"+z.Name+":ksk:priv")
+		z.KSK = dh.loadKey(z.Name, "ksk")
 		if z.KSK == nil {
 			z.Config.DnsSec = false
 			return
@@ -337,7 +363,7 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 		r.Label = label
 		r.CacheTimeout = time.Now().Unix() + dh.recordCacheTimeout
 
-		val, err := dh.redis.HGet("z42:zones:"+zone, label)
+		val, err := dh.redis.Get(zoneLocationKey(zone, label))
 		if err != nil {
 			if label == "@" {
 				r.Fqdn = zone
@@ -378,12 +404,12 @@ func (dh *DataHandler) SetLocation(zone string, label string, val *types.Record)
 }
 
 func (dh *DataHandler) SetLocationFromJson(zone string, label string, val string) error {
-	if err := dh.redis.HSet("z42:zones:"+zone, label, val); err != nil {
+	if err := dh.redis.Set(zoneLocationKey(zone, label), val); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (dh DataHandler) Clear() error {
+func (dh *DataHandler) Clear() error {
 	return dh.redis.Del("*")
 }
