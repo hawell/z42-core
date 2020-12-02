@@ -26,41 +26,41 @@ type DataHandlerConfig struct {
 
 type DataHandler struct {
 	redis              *Redis
-	Zones              *iradix.Tree
-	LastZoneUpdate     time.Time
-	RecordCache        *ristretto.Cache
-	RecordInflight     *singleflight.Group
+	zones              *iradix.Tree
+	lastZoneUpdate     time.Time
+	recordCache        *ristretto.Cache
+	recordInflight     *singleflight.Group
 	recordCacheTimeout int64
-	ZoneCache          *ristretto.Cache
-	ZoneInflight       *singleflight.Group
+	zoneCache          *ristretto.Cache
+	zoneInflight       *singleflight.Group
 	zoneCacheTimeout   int64
 	quit               chan struct{}
 	quitWG             sync.WaitGroup
 }
 
 const (
-	ZoneForcedReload = time.Minute * 60
-	KeyPrefix = "z42:zones:"
-	ZonesKey = "z42:zones"
+	zoneForcedReload = time.Minute * 60
+	keyPrefix        = "z42:zones:"
+	zonesKey         = "z42:zones"
 )
 
 func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	dh := &DataHandler{
 		redis:              NewRedis(&config.Redis),
-		Zones:              iradix.New(),
-		RecordInflight:     new(singleflight.Group),
-		ZoneInflight:       new(singleflight.Group),
+		zones:              iradix.New(),
+		recordInflight:     new(singleflight.Group),
+		zoneInflight:       new(singleflight.Group),
 		quit:               make(chan struct{}),
 		recordCacheTimeout: int64(config.RecordCacheTimeout),
 		zoneCacheTimeout:   int64(config.ZoneCacheTimeout),
 	}
-	dh.ZoneCache, _ = ristretto.NewCache(&ristretto.Config{
+	dh.zoneCache, _ = ristretto.NewCache(&ristretto.Config{
 		NumCounters: int64(config.ZoneCacheSize) * 10,
 		MaxCost:     int64(config.ZoneCacheSize),
 		BufferItems: 64,
 		Metrics:     false,
 	})
-	dh.RecordCache, _ = ristretto.NewCache(&ristretto.Config{
+	dh.recordCache, _ = ristretto.NewCache(&ristretto.Config{
 		NumCounters: int64(config.RecordCacheSize) * 10,
 		MaxCost:     int64(config.RecordCacheSize),
 		BufferItems: 64,
@@ -74,7 +74,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		dh.quitWG.Add(1)
 		quit := make(chan *sync.WaitGroup, 1)
 		modified := false
-		go dh.redis.SubscribeEvent(ZonesKey, func() {
+		go dh.redis.SubscribeEvent(zonesKey, func() {
 			modified = true
 		}, func(channel string, data string) {
 			modified = true
@@ -83,7 +83,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		}, quit)
 
 		reloadTicker := time.NewTicker(time.Duration(config.ZoneReload) * time.Second)
-		forceReloadTicker := time.NewTicker(ZoneForcedReload)
+		forceReloadTicker := time.NewTicker(zoneForcedReload)
 		for {
 			select {
 			case <-dh.quit:
@@ -112,29 +112,26 @@ func (dh *DataHandler) ShutDown() {
 	dh.quitWG.Wait()
 }
 
-func zonesKey() string {
-	return ZonesKey
-}
-
 func zoneConfigKey(zone string) string {
-	return KeyPrefix + zone + ":config"
+	return keyPrefix + zone + ":config"
 }
 
 func zoneLocationKey(zone string, label string) string {
-	return KeyPrefix + zone + ":labels:" + label
+	return keyPrefix + zone + ":labels:" + label
 }
 
 func zonePubKey(zone string, keyType string) string {
-	return KeyPrefix + zone + ":" + keyType + ":pub"
+	return keyPrefix + zone + ":" + keyType + ":pub"
 }
 
 func zonePrivKey(zone string, keyType string) string {
-	return KeyPrefix + zone + ":" + keyType + ":priv"
+	return keyPrefix + zone + ":" + keyType + ":priv"
 }
 
+// TODO: make this function internal
 func (dh *DataHandler) LoadZones() {
-	dh.LastZoneUpdate = time.Now()
-	zones, err := dh.redis.SMembers(zonesKey())
+	dh.lastZoneUpdate = time.Now()
+	zones, err := dh.redis.SMembers(zonesKey)
 	if err != nil {
 		logger.Default.Error("cannot load zones : ", err)
 		return
@@ -143,19 +140,19 @@ func (dh *DataHandler) LoadZones() {
 	for _, zone := range zones {
 		newZones, _, _ = newZones.Insert(types.ReverseName(zone), zone)
 	}
-	dh.Zones = newZones
+	dh.zones = newZones
 }
 
 func (dh *DataHandler) FindZone(qname string) string {
 	rname := types.ReverseName(qname)
-	if _, zname, ok := dh.Zones.Root().LongestPrefix(rname); ok {
+	if _, zname, ok := dh.zones.Root().LongestPrefix(rname); ok {
 		return zname.(string)
 	}
 	return ""
 }
 
 func (dh *DataHandler) GetZone(zone string) *types.Zone {
-	cachedZone, found := dh.ZoneCache.Get(zone)
+	cachedZone, found := dh.zoneCache.Get(zone)
 	var z *types.Zone = nil
 	if found && cachedZone != nil {
 		z = cachedZone.(*types.Zone)
@@ -164,7 +161,7 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 		}
 	}
 
-	answer, _, _ := dh.ZoneInflight.Do(zone, func() (interface{}, error) {
+	answer, _, _ := dh.zoneInflight.Do(zone, func() (interface{}, error) {
 		locations, err := dh.redis.GetKeys(zoneLocationKey(zone, "*"))
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s locations : %s", zone, err)
@@ -215,7 +212,7 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 		dh.loadZoneKeys(z)
 		z.CacheTimeout = time.Now().Unix() + dh.zoneCacheTimeout
 
-		dh.ZoneCache.Set(zone, z, 1)
+		dh.zoneCache.Set(zone, z, 1)
 		return z, nil
 	})
 	if answer != nil {
@@ -233,9 +230,9 @@ func (dh *DataHandler) GetZoneConfig(zone string) (*types.ZoneConfig, error) {
 }
 
 func (dh *DataHandler) GetZones() []string {
-	domains, err := dh.redis.SMembers(zonesKey())
+	domains, err := dh.redis.SMembers(zonesKey)
 	if err != nil {
-		logger.Default.Errorf("cannot get members of %s : %s",zonesKey(), err)
+		logger.Default.Errorf("cannot get members of %s : %s",zonesKey, err)
 		return nil
 	}
 	return domains
@@ -250,11 +247,11 @@ func (dh *DataHandler) GetZoneLocations(zone string) []string {
 }
 
 func (dh *DataHandler) EnableZone(zone string) error {
-	return dh.redis.SAdd(zonesKey(), zone)
+	return dh.redis.SAdd(zonesKey, zone)
 }
 
 func (dh *DataHandler) DisableZone(zone string) error {
-	return dh.redis.SRem(zonesKey(), zone)
+	return dh.redis.SRem(zonesKey, zone)
 }
 
 func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) error {
@@ -339,7 +336,7 @@ func (dh *DataHandler) loadZoneKeys(z *types.Zone) {
 func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, error) {
 	key := label + "." + zone
 	var r *types.Record = nil
-	cachedRecord, found := dh.RecordCache.Get(key)
+	cachedRecord, found := dh.recordCache.Get(key)
 	if found && cachedRecord != nil {
 		r = cachedRecord.(*types.Record)
 		if time.Now().Unix() <= r.CacheTimeout {
@@ -347,7 +344,7 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 		}
 	}
 
-	answer, err, _ := dh.RecordInflight.Do(key, func() (interface{}, error) {
+	answer, err, _ := dh.recordInflight.Do(key, func() (interface{}, error) {
 		r := new(types.Record)
 		r.A = types.IP_RRSet{
 			FilterConfig: types.IpFilterConfig{
@@ -367,7 +364,7 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 		if err != nil {
 			if label == "@" {
 				r.Fqdn = zone
-				dh.RecordCache.Set(key, r, 1)
+				dh.recordCache.Set(key, r, 1)
 				return r, nil
 			}
 			logger.Default.Error(err, " : ", label, " ", zone)
@@ -385,7 +382,7 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 		} else {
 			r.Fqdn = label + "." + zone
 		}
-		dh.RecordCache.Set(key, r, 1)
+		dh.recordCache.Set(key, r, 1)
 		return r, nil
 	})
 
