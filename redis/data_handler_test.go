@@ -38,9 +38,18 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 
 func TestGetLocation(t *testing.T) {
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	_ = dh.Clear()
-	_ = dh.EnableZone("zone1.com.")
-	_ = dh.SetLocationFromJson("zone1.com.", "@", `{"a":{"ttl":300, "records":[{"ip":"5.5.5.5"}]}}`)
+	err := dh.Clear()
+	if err != nil {
+		t.FailNow()
+	}
+	err = dh.EnableZone("zone1.com.")
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.SetLocationFromJson("zone1.com.", "@", `{"a":{"ttl":300, "records":[{"ip":"5.5.5.5"}]}}`)
+	if err != nil {
+		t.Fail()
+	}
 	location := types.Record{
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
@@ -60,7 +69,7 @@ func TestGetLocation(t *testing.T) {
 	}
 	l, err := dh.GetLocation("zone1.com.", "@")
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
 	if l == nil {
 		t.Fail()
@@ -82,8 +91,14 @@ func TestGetLocation(t *testing.T) {
 
 func TestSetLocation(t *testing.T) {
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	_ = dh.Clear()
-	_ = dh.EnableZone("zone1.com.")
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone("zone1.com.")
+	if err != nil {
+		t.Fail()
+	}
 	location := types.Record{
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
@@ -101,13 +116,13 @@ func TestSetLocation(t *testing.T) {
 		Label: "@",
 		Fqdn:  "zone1.com.",
 	}
-	err := dh.SetLocation("zone1.com.", "@", &location)
+	err = dh.SetLocation("zone1.com.", "@", &location)
 	if err != nil {
 		t.Fail()
 	}
 	l, err := dh.GetLocation("zone1.com.", "@")
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
 	if l.Fqdn != location.Fqdn {
 		fmt.Println("fqdn name mismatch", l.Fqdn, location.Fqdn)
@@ -166,17 +181,31 @@ zone1.com. IN DNSKEY 257 3 5 AwEAAeVrjiD9xhyA+UJnnei/tnoQQpLrEwFzb/blH6c80yR7APm
 func TestGetZone(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	_ = dh.Clear()
-	_ = dh.EnableZone("zone1.com")
-	_ = dh.SetZoneConfigFromJson("zone1.com.", `{"domain_id":"123456", "soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.zone1.com.","ns":"ns1.zone1.com.","refresh":44,"retry":55,"expire":66, "serial":32343}, "dnssec": true}`)
-	_ = dh.SetZoneKey(zoneName, "zsk", zone1ZskPub, zone1ZskPriv)
-	_ = dh.SetZoneKey(zoneName, "ksk", zone1KskPub, zone1KskPriv)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone("zone1.com")
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.SetZoneConfigFromJson("zone1.com.", `{"domain_id":"123456", "soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.zone1.com.","ns":"ns1.zone1.com.","refresh":44,"retry":55,"expire":66, "serial":32343}, "dnssec": true}`)
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.SetZoneKey(zoneName, "zsk", zone1ZskPub, zone1ZskPriv)
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.SetZoneKey(zoneName, "ksk", zone1KskPub, zone1KskPriv)
+	if err != nil {
+		t.Fail()
+	}
 
 	zone := dh.GetZone(zoneName)
 	if zone == nil {
 		fmt.Println("load zone failed")
-		t.Fail()
-		return
+		t.FailNow()
 	}
 	if zone.Name != zoneName {
 		fmt.Println("zone name mismatch")
@@ -223,8 +252,14 @@ func TestGetZone(t *testing.T) {
 func TestEnableZone(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Clear()
-	dh.EnableZone(zoneName)
+	err := dh.Clear()
+	if err != nil {
+		t.FailNow()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
 	zone := dh.GetZone(zoneName)
 	if zone == nil {
 		t.Fail()
@@ -234,9 +269,18 @@ func TestEnableZone(t *testing.T) {
 func TestDisableZone(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Clear()
-	dh.EnableZone(zoneName)
-	dh.DisableZone(zoneName)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.DisableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
 	time.Sleep(time.Second * 2)
 	zone := dh.FindZone(zoneName)
 	if zone != "" {
@@ -247,14 +291,23 @@ func TestDisableZone(t *testing.T) {
 func TestSetZoneConfig(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Clear()
-	dh.EnableZone(zoneName)
+	err := dh.Clear()
+	if err != nil {
+		t.FailNow()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.FailNow()
+	}
 	zone := dh.GetZone(zoneName)
 	if zone == nil {
-		t.Fail()
+		t.FailNow()
 	}
 	zone.Config.DomainId = "12345"
-	dh.SetZoneConfig(zoneName, zone.Config)
+	err = dh.SetZoneConfig(zoneName, zone.Config)
+	if err != nil {
+		t.FailNow()
+	}
 	time.Sleep(time.Second * 2)
 	zone = dh.GetZone(zoneName)
 	if zone.Config.DomainId != "12345" {
@@ -265,8 +318,14 @@ func TestSetZoneConfig(t *testing.T) {
 func TestSetZoneKey(t *testing.T) {
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	dh.Clear()
-	dh.EnableZone(zoneName)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
 	zoneConfig := types.ZoneConfig{
 		DomainId: "123456",
 		SOA: &types.SOA_RRSet{
@@ -298,14 +357,26 @@ func TestSetZoneKey(t *testing.T) {
 		DnsSec:          false,
 		CnameFlattening: false,
 	}
-	dh.SetZoneConfig(zoneName, &zoneConfig)
-	dh.SetZoneKey(zoneName, "zsk", zone1ZskPub, zone1ZskPriv)
-	dh.SetZoneKey(zoneName, "ksk", zone1KskPub, zone1KskPriv)
+	err = dh.SetZoneConfig(zoneName, &zoneConfig)
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.SetZoneKey(zoneName, "zsk", zone1ZskPub, zone1ZskPriv)
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.SetZoneKey(zoneName, "ksk", zone1KskPub, zone1KskPriv)
+	if err != nil {
+		t.Fail()
+	}
 	zoneConfig.DnsSec = true
-	dh.SetZoneConfig(zoneName, &zoneConfig)
+	err = dh.SetZoneConfig(zoneName, &zoneConfig)
+	if err != nil {
+		t.Fail()
+	}
 	zone := dh.GetZone(zoneName)
 	if zone == nil {
-		t.Fail()
+		t.FailNow()
 	}
 	if zone.Config.DnsSec == false {
 		t.Fail()
