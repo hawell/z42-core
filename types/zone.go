@@ -3,8 +3,11 @@ package types
 import (
 	"bytes"
 	iradix "github.com/hashicorp/go-immutable-radix"
+	"github.com/hawell/logger"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"strings"
+	"time"
 )
 
 type Zone struct {
@@ -25,6 +28,41 @@ type ZoneConfig struct {
 	CnameFlattening bool       `json:"cname_flattening,omitempty"`
 }
 
+func ZoneConfigFromJson(zone string, configStr string) *ZoneConfig {
+	config := &ZoneConfig{
+		DnsSec:          false,
+		CnameFlattening: false,
+		SOA: &SOA_RRSet{
+			Ns:      "ns1." + zone,
+			MinTtl:  300,
+			Refresh: 86400,
+			Retry:   7200,
+			Expire:  3600,
+			MBox:    "hostmaster." + zone,
+			Serial:  uint32(time.Now().Unix()),
+			Ttl:     300,
+		},
+	}
+	if len(configStr) > 0 {
+		err := jsoniter.Unmarshal([]byte(configStr), config)
+		if err != nil {
+			logger.Default.Errorf("cannot parse zone config : %s", err)
+		}
+	}
+	config.SOA.Ns = dns.Fqdn(config.SOA.Ns)
+	config.SOA.Data = &dns.SOA{
+		Hdr:     dns.RR_Header{Name: zone, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: config.SOA.Ttl, Rdlength: 0},
+		Ns:      config.SOA.Ns,
+		Mbox:    config.SOA.MBox,
+		Refresh: config.SOA.Refresh,
+		Retry:   config.SOA.Retry,
+		Expire:  config.SOA.Expire,
+		Minttl:  config.SOA.MinTtl,
+		Serial:  config.SOA.Serial,
+	}
+	return config
+}
+
 func ReverseName(zone string) []byte {
 	runes := []rune("." + zone)
 	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
@@ -33,9 +71,9 @@ func ReverseName(zone string) []byte {
 	return []byte(string(runes))
 }
 
-func NewZone(name string, locations []string, config *ZoneConfig) *Zone {
+func NewZone(zone string, locations []string, configStr string) *Zone {
 	z := new(Zone)
-	z.Name = name
+	z.Name = zone
 	LocationsTree := iradix.New()
 	rvalues := make([][]byte, 0, len(locations))
 	for _, val := range locations {
@@ -56,7 +94,7 @@ func NewZone(name string, locations []string, config *ZoneConfig) *Zone {
 	z.LocationsTree = LocationsTree
 	z.LocationsList = locations
 
-	z.Config = config
+	z.Config = ZoneConfigFromJson(zone, configStr)
 
 	return z
 }

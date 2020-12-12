@@ -31,7 +31,7 @@ type DnsRequestHandler struct {
 
 type DnsRequestHandlerConfig struct {
 	Upstream          []upstream.UpstreamConfig `json:"upstream"`
-	GeoIp             geoip.Config             `json:"geoip"`
+	GeoIp             geoip.Config              `json:"geoip"`
 	MaxTtl            int                       `json:"max_ttl"`
 	LogSourceLocation bool                      `json:"log_source_location"`
 	Log               logger.LogConfig          `json:"log"`

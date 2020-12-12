@@ -143,6 +143,14 @@ func (dh *DataHandler) LoadZones() {
 	dh.zones = newZones
 }
 
+func (dh *DataHandler) EnableZone(zone string) error {
+	return dh.redis.SAdd(zonesKey, zone)
+}
+
+func (dh *DataHandler) DisableZone(zone string) error {
+	return dh.redis.SRem(zonesKey, zone)
+}
+
 func (dh *DataHandler) FindZone(qname string) string {
 	rname := types.ReverseName(qname)
 	if _, zname, ok := dh.zones.Root().LongestPrefix(rname); ok {
@@ -176,39 +184,8 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 		if err != nil {
 			logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
 		}
-		config := &types.ZoneConfig{
-			DnsSec:          false,
-			CnameFlattening: false,
-			SOA: &types.SOA_RRSet{
-				Ns:      "ns1." + zone,
-				MinTtl:  300,
-				Refresh: 86400,
-				Retry:   7200,
-				Expire:  3600,
-				MBox:    "hostmaster." + zone,
-				Serial:  uint32(time.Now().Unix()),
-				Ttl:     300,
-			},
-		}
-		if len(configStr) > 0 {
-			err := jsoniter.Unmarshal([]byte(configStr), config)
-			if err != nil {
-				logger.Default.Errorf("cannot parse zone config : %s", err)
-			}
-		}
-		config.SOA.Ns = dns.Fqdn(config.SOA.Ns)
-		config.SOA.Data = &dns.SOA{
-			Hdr:     dns.RR_Header{Name: zone, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: config.SOA.Ttl, Rdlength: 0},
-			Ns:      config.SOA.Ns,
-			Mbox:    config.SOA.MBox,
-			Refresh: config.SOA.Refresh,
-			Retry:   config.SOA.Retry,
-			Expire:  config.SOA.Expire,
-			Minttl:  config.SOA.MinTtl,
-			Serial:  config.SOA.Serial,
-		}
 
-		z := types.NewZone(zone, locations, config)
+		z := types.NewZone(zone, locations, configStr)
 		dh.loadZoneKeys(z)
 		z.CacheTimeout = time.Now().Unix() + dh.zoneCacheTimeout
 
@@ -232,7 +209,7 @@ func (dh *DataHandler) GetZoneConfig(zone string) (*types.ZoneConfig, error) {
 func (dh *DataHandler) GetZones() []string {
 	domains, err := dh.redis.SMembers(zonesKey)
 	if err != nil {
-		logger.Default.Errorf("cannot get members of %s : %s",zonesKey, err)
+		logger.Default.Errorf("cannot get members of %s : %s", zonesKey, err)
 		return nil
 	}
 	return domains
@@ -244,14 +221,6 @@ func (dh *DataHandler) GetZoneLocations(zone string) []string {
 		return nil
 	}
 	return z.LocationsList
-}
-
-func (dh *DataHandler) EnableZone(zone string) error {
-	return dh.redis.SAdd(zonesKey, zone)
-}
-
-func (dh *DataHandler) DisableZone(zone string) error {
-	return dh.redis.SRem(zonesKey, zone)
 }
 
 func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) error {
@@ -266,11 +235,74 @@ func (dh *DataHandler) SetZoneConfigFromJson(zone string, config string) error {
 	return dh.redis.Set(zoneConfigKey(zone), config)
 }
 
+func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, error) {
+	key := label + "." + zone
+	var r *types.Record = nil
+	cachedRecord, found := dh.recordCache.Get(key)
+	if found && cachedRecord != nil {
+		r = cachedRecord.(*types.Record)
+		if time.Now().Unix() <= r.CacheTimeout {
+			return r, nil
+		}
+	}
+
+	answer, err, _ := dh.recordInflight.Do(key, func() (interface{}, error) {
+		r := new(types.Record)
+		r.Label = label
+		r.CacheTimeout = time.Now().Unix() + dh.recordCacheTimeout
+
+		val, err := dh.redis.Get(zoneLocationKey(zone, label))
+		if err != nil {
+			if label == "@" {
+				r.Fqdn = zone
+				dh.recordCache.Set(key, r, 1)
+				return r, nil
+			}
+			logger.Default.Error(err, " : ", label, " ", zone)
+			return nil, err
+		}
+		if val != "" {
+			err := jsoniter.Unmarshal([]byte(val), r)
+			if err != nil {
+				logger.Default.Errorf("cannot parse json : zone -> %s, label -> %s, \"%s\" -> %s", zone, label, val, err)
+				return nil, err
+			}
+		}
+		if label == "@" {
+			r.Fqdn = zone
+		} else {
+			r.Fqdn = label + "." + zone
+		}
+		dh.recordCache.Set(key, r, 1)
+		return r, nil
+	})
+
+	if answer == nil {
+		return nil, err
+	}
+	return answer.(*types.Record), nil
+}
+
+func (dh *DataHandler) SetLocation(zone string, label string, val *types.Record) error {
+	jsonValue, err := jsoniter.Marshal(val)
+	if err != nil {
+		return err
+	}
+	return dh.SetLocationFromJson(zone, label, string(jsonValue))
+}
+
+func (dh *DataHandler) SetLocationFromJson(zone string, label string, val string) error {
+	if err := dh.redis.Set(zoneLocationKey(zone, label), val); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (dh *DataHandler) SetZoneKey(zone string, keyType string, pub string, priv string) error {
 	if err := dh.redis.Set(zonePubKey(zone, keyType), pub); err != nil {
 		return err
 	}
-	return dh.redis.Set(zonePrivKey(zone,keyType), priv)
+	return dh.redis.Set(zonePrivKey(zone, keyType), priv)
 }
 
 func (dh *DataHandler) loadKey(zone string, keyType string) *types.ZoneKey {
@@ -331,80 +363,6 @@ func (dh *DataHandler) loadZoneKeys(z *types.Zone) {
 			return
 		}
 	}
-}
-
-func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, error) {
-	key := label + "." + zone
-	var r *types.Record = nil
-	cachedRecord, found := dh.recordCache.Get(key)
-	if found && cachedRecord != nil {
-		r = cachedRecord.(*types.Record)
-		if time.Now().Unix() <= r.CacheTimeout {
-			return r, nil
-		}
-	}
-
-	answer, err, _ := dh.recordInflight.Do(key, func() (interface{}, error) {
-		r := new(types.Record)
-		r.A = types.IP_RRSet{
-			FilterConfig: types.IpFilterConfig{
-				Count:     "multi",
-				Order:     "none",
-				GeoFilter: "none",
-			},
-			HealthCheckConfig: types.IpHealthCheckConfig{
-				Enable: false,
-			},
-		}
-		r.AAAA = r.A
-		r.Label = label
-		r.CacheTimeout = time.Now().Unix() + dh.recordCacheTimeout
-
-		val, err := dh.redis.Get(zoneLocationKey(zone, label))
-		if err != nil {
-			if label == "@" {
-				r.Fqdn = zone
-				dh.recordCache.Set(key, r, 1)
-				return r, nil
-			}
-			logger.Default.Error(err, " : ", label, " ", zone)
-			return nil, err
-		}
-		if val != "" {
-			err := jsoniter.Unmarshal([]byte(val), r)
-			if err != nil {
-				logger.Default.Errorf("cannot parse json : zone -> %s, label -> %s, \"%s\" -> %s", zone, label, val, err)
-				return nil, err
-			}
-		}
-		if label == "@" {
-			r.Fqdn = zone
-		} else {
-			r.Fqdn = label + "." + zone
-		}
-		dh.recordCache.Set(key, r, 1)
-		return r, nil
-	})
-
-	if answer == nil {
-		return nil, err
-	}
-	return answer.(*types.Record), nil
-}
-
-func (dh *DataHandler) SetLocation(zone string, label string, val *types.Record) error {
-	jsonValue, err := jsoniter.Marshal(val)
-	if err != nil {
-		return err
-	}
-	return dh.SetLocationFromJson(zone, label, string(jsonValue))
-}
-
-func (dh *DataHandler) SetLocationFromJson(zone string, label string, val string) error {
-	if err := dh.redis.Set(zoneLocationKey(zone, label), val); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (dh *DataHandler) Clear() error {

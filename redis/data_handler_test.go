@@ -3,8 +3,10 @@ package redis
 import (
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	jsoniter "github.com/json-iterator/go"
 	"net"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -36,6 +38,270 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 	},
 }
 
+func TestEnableZone(t *testing.T) {
+	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	zone := dh.GetZone(zoneName)
+	if zone == nil {
+		t.FailNow()
+	}
+	if zone.Name != zoneName {
+		t.Fail()
+	}
+}
+
+func TestDisableZone(t *testing.T) {
+	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	zone := dh.FindZone(zoneName)
+	if zone == "" {
+		t.FailNow()
+	}
+	if zone != zoneName {
+		t.Fail()
+	}
+	err = dh.DisableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	zone = dh.FindZone(zoneName)
+	if zone != "" {
+		fmt.Println(dh.GetZones())
+		t.Fail()
+	}
+}
+
+func TestFindZone(t *testing.T) {
+	zone1Name := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	z := dh.FindZone(zone1Name)
+	if z != "" {
+		t.Fail()
+	}
+	err = dh.EnableZone(zone1Name)
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	z = dh.FindZone(zone1Name)
+	if z != zone1Name {
+		t.Fail()
+	}
+	z = dh.FindZone("a.b.c.d." + zone1Name)
+	if z != zone1Name {
+		t.Fail()
+	}
+	subZoneName := "sub.zone1.com."
+	err = dh.EnableZone(subZoneName)
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	z = dh.FindZone("a.b.c." + subZoneName)
+	if z != subZoneName {
+		t.Fail()
+	}
+	err = dh.DisableZone(subZoneName)
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	z = dh.FindZone("a.b.c." + subZoneName)
+	if z != zone1Name {
+		t.Fail()
+	}
+	err = dh.DisableZone(zone1Name)
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	z = dh.FindZone("a.b.c." + subZoneName)
+	if z != "" {
+		t.Fail()
+	}
+}
+
+func TestGetZone(t *testing.T) {
+	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	zone := dh.GetZone(zoneName)
+	if zone == nil {
+		fmt.Println("load zone failed")
+		t.FailNow()
+	}
+	if zone.Name != zoneName {
+		fmt.Println("zone name mismatch")
+		t.Fail()
+	}
+	defaultConfig := types.ZoneConfigFromJson(zoneName, "")
+	if cmp.Equal(zone.Config, defaultConfig) == false {
+		fmt.Println(cmp.Diff(zone.Config, defaultConfig))
+		fmt.Println("config mismatch")
+		t.Fail()
+	}
+}
+
+func TestGetZoneConfig(t *testing.T) {
+	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	defaultConfig := types.ZoneConfigFromJson(zoneName, "")
+	zoneConfig, err := dh.GetZoneConfig(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	if cmp.Equal(defaultConfig, zoneConfig) == false {
+		t.Fail()
+	}
+}
+
+func TestGetZones(t *testing.T) {
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	zones := []string{"zone1.com.", "zone2.com.", "zone3.com.", "zone4.com.", "zone5.com."}
+	for _, z := range zones {
+		err = dh.EnableZone(z)
+		if err != nil {
+			t.Fail()
+		}
+	}
+	time.Sleep(time.Millisecond * 200)
+	recvdZones := dh.GetZones()
+	sort.Strings(recvdZones)
+	if !cmp.Equal(zones, recvdZones) {
+		t.Fail()
+	}
+}
+
+func TestGetZoneLocations(t *testing.T) {
+	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	locations := dh.GetZoneLocations(zoneName)
+	if len(locations) != 0 {
+		t.Fail()
+	}
+}
+
+func TestSetZoneConfig(t *testing.T) {
+	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.FailNow()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.FailNow()
+	}
+	oldZoneConfig, err := dh.GetZoneConfig(zoneName)
+	if err != nil {
+		t.FailNow()
+	}
+	oldZoneConfig.DomainId = "12345"
+	err = dh.SetZoneConfig(zoneName, oldZoneConfig)
+	if err != nil {
+		t.FailNow()
+	}
+	time.Sleep(time.Second * 2)
+	newZoneConfig, err := dh.GetZoneConfig(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	if cmp.Equal(oldZoneConfig, newZoneConfig) == false {
+		t.FailNow()
+	}
+}
+
+func TestSetZoneConfigFromJson(t *testing.T) {
+	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.FailNow()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.FailNow()
+	}
+	configStr := `{"soa":{"ttl":311, "minttl":111, "mbox":"hostmaster.example.root.","ns":"ns1.example.root.","refresh":44,"retry":55,"expire":66}, "cname_flattening":true, "domain_id":"12345"}`
+	err = dh.SetZoneConfigFromJson(zoneName, configStr)
+	if err != nil {
+		t.Fail()
+	}
+	config, err := dh.GetZoneConfig(zoneName)
+	if err != nil {
+		t.FailNow()
+	}
+	if config.SOA.Ttl != 311 {
+		t.Fail()
+	}
+	if config.SOA.MinTtl != 111 {
+		t.Fail()
+	}
+	if config.SOA.MBox != "hostmaster.example.root." {
+		t.Fail()
+	}
+	if config.SOA.Ns != "ns1.example.root." {
+		t.Fail()
+	}
+	if config.SOA.Refresh != 44 || config.SOA.Retry != 55 || config.SOA.Expire != 66 {
+		t.Fail()
+	}
+	if config.CnameFlattening != true {
+		t.Fail()
+	}
+	if config.DomainId != "12345" {
+		t.Fail()
+	}
+}
+
 func TestGetLocation(t *testing.T) {
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
@@ -54,9 +320,9 @@ func TestGetLocation(t *testing.T) {
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
 				FilterConfig: types.IpFilterConfig{
-					Count:     "multi",
-					Order:     "none",
-					GeoFilter: "none",
+					Count:     "",
+					Order:     "",
+					GeoFilter: "",
 				},
 				Ttl: 300,
 				Data: []types.IP_RR{
@@ -95,7 +361,8 @@ func TestSetLocation(t *testing.T) {
 	if err != nil {
 		t.Fail()
 	}
-	err = dh.EnableZone("zone1.com.")
+	zoneName := "zone1.com."
+	err = dh.EnableZone(zoneName)
 	if err != nil {
 		t.Fail()
 	}
@@ -114,13 +381,13 @@ func TestSetLocation(t *testing.T) {
 			},
 		},
 		Label: "@",
-		Fqdn:  "zone1.com.",
+		Fqdn:  zoneName,
 	}
-	err = dh.SetLocation("zone1.com.", "@", &location)
+	err = dh.SetLocation(zoneName, "@", &location)
 	if err != nil {
 		t.Fail()
 	}
-	l, err := dh.GetLocation("zone1.com.", "@")
+	l, err := dh.GetLocation(zoneName, "@")
 	if err != nil {
 		t.FailNow()
 	}
@@ -134,6 +401,67 @@ func TestSetLocation(t *testing.T) {
 	}
 	if reflect.DeepEqual(l.A, location.A) == false {
 		fmt.Println("l.A not equal location.A", l.A, location.A)
+		t.Fail()
+	}
+}
+
+func TestSetLocationFromJson(t *testing.T) {
+	zoneName := "example.com."
+	locationStr :=
+		`{
+			"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]},
+			"aaaa":{"ttl":300, "records":[{"ip":"::1"}]},
+			"cname":{"ttl":300, "host":"x.example.com."},
+			"txt":{"ttl":300, "records":[{"text":"foo"},{"text":"bar"}]},
+			"ns":{"ttl":300, "records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]},
+			"mx":{"ttl":300, "records":[{"host":"mx1.example.com.", "preference":10},{"host":"mx2.example.com.", "preference":10}]},
+			"srv":{"ttl":300, "records":[{"target":"sip.example.com.","port":555,"priority":10,"weight":100}]},
+			"tlsa":{"ttl":300, "records":[{"usage":0, "selector":0, "matching_type":1, "certificate":"d2abde240d7cd3ee6b4b28c54df034b97983a1d16e8a410e4561cb106618e971"}]},
+			"ds":{"ttl":300, "records":[{"key_tag":57855, "algorithm":5, "digest_type":1, "digest":"B6DCD485719ADCA18E5F3D48A2331627FDD3636B"}]},
+			"aname":{"location":"aname.example.com."},
+			"caa":{"ttl":300, "records":[{"tag":"issue", "value":"godaddy2.com;", "flag":0}]}
+		}`
+	location := types.Record{
+		Label:        "@",
+		Fqdn:         "example.com.",
+		CacheTimeout: time.Now().Unix() + int64(dataHandlerDefaultTestConfig.RecordCacheTimeout),
+	}
+	err := jsoniter.Unmarshal([]byte(locationStr), &location)
+	if err != nil {
+		fmt.Println("1", err)
+		t.Fail()
+	}
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err = dh.Clear()
+	if err != nil {
+		fmt.Println("2")
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		fmt.Println("3")
+		t.Fail()
+	}
+	err = dh.SetLocationFromJson(zoneName, "@", locationStr)
+	if err != nil {
+		fmt.Println("4")
+		t.Fail()
+	}
+	l, err := dh.GetLocation(zoneName, "@")
+	if err != nil {
+		fmt.Println("5")
+		t.FailNow()
+	}
+	if l.Fqdn != zoneName {
+		fmt.Println("6")
+		t.Fail()
+	}
+	if l.Label != "@" {
+		fmt.Println("7")
+		t.Fail()
+	}
+	if cmp.Equal(&location, l) != true {
+		fmt.Println(cmp.Diff(&location, l))
 		t.Fail()
 	}
 }
@@ -177,143 +505,6 @@ Activate: 20190518113600
 var zone1KskPub = `
 zone1.com. IN DNSKEY 257 3 5 AwEAAeVrjiD9xhyA+UJnnei/tnoQQpLrEwFzb/blH6c80yR7APmwXrGU hbETczAFdnazO3wKXC+SIDaq4W+bcMbtf/nGY9i3dzwC25BDc5/3q05e AOLkHUlnZI/Cp2i4iUD2kw==
 `
-
-func TestGetZone(t *testing.T) {
-	zoneName := "zone1.com."
-	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
-	err = dh.EnableZone("zone1.com")
-	if err != nil {
-		t.Fail()
-	}
-	err = dh.SetZoneConfigFromJson("zone1.com.", `{"domain_id":"123456", "soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.zone1.com.","ns":"ns1.zone1.com.","refresh":44,"retry":55,"expire":66, "serial":32343}, "dnssec": true}`)
-	if err != nil {
-		t.Fail()
-	}
-	err = dh.SetZoneKey(zoneName, "zsk", zone1ZskPub, zone1ZskPriv)
-	if err != nil {
-		t.Fail()
-	}
-	err = dh.SetZoneKey(zoneName, "ksk", zone1KskPub, zone1KskPriv)
-	if err != nil {
-		t.Fail()
-	}
-
-	zone := dh.GetZone(zoneName)
-	if zone == nil {
-		fmt.Println("load zone failed")
-		t.FailNow()
-	}
-	if zone.Name != zoneName {
-		fmt.Println("zone name mismatch")
-		t.Fail()
-	}
-	zoneConfig := types.ZoneConfig{
-		DomainId: "123456",
-		SOA: &types.SOA_RRSet{
-			Data: &dns.SOA{
-				Hdr: dns.RR_Header{
-					Name:     "zone1.com.",
-					Rrtype:   6,
-					Class:    1,
-					Ttl:      300,
-					Rdlength: 0,
-				},
-				Ns:      "ns1.zone1.com.",
-				Mbox:    "hostmaster.zone1.com.",
-				Serial:  32343,
-				Refresh: 44,
-				Retry:   55,
-				Expire:  66,
-				Minttl:  100,
-			},
-			Ns:      "ns1.zone1.com.",
-			MBox:    "hostmaster.zone1.com.",
-			Ttl:     300,
-			Refresh: 44,
-			Retry:   55,
-			Expire:  66,
-			MinTtl:  100,
-			Serial:  32343,
-		},
-		DnsSec:          true,
-		CnameFlattening: false,
-	}
-	if cmp.Equal(zone.Config, &zoneConfig) == false {
-		fmt.Println(cmp.Diff(zone.Config, zoneConfig))
-		fmt.Println("config mismatch")
-		t.Fail()
-	}
-}
-
-func TestEnableZone(t *testing.T) {
-	zoneName := "zone1.com."
-	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	err := dh.Clear()
-	if err != nil {
-		t.FailNow()
-	}
-	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
-	zone := dh.GetZone(zoneName)
-	if zone == nil {
-		t.Fail()
-	}
-}
-
-func TestDisableZone(t *testing.T) {
-	zoneName := "zone1.com."
-	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
-	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
-	err = dh.DisableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
-	time.Sleep(time.Second * 2)
-	zone := dh.FindZone(zoneName)
-	if zone != "" {
-		t.Fail()
-	}
-}
-
-func TestSetZoneConfig(t *testing.T) {
-	zoneName := "zone1.com."
-	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	err := dh.Clear()
-	if err != nil {
-		t.FailNow()
-	}
-	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.FailNow()
-	}
-	zone := dh.GetZone(zoneName)
-	if zone == nil {
-		t.FailNow()
-	}
-	zone.Config.DomainId = "12345"
-	err = dh.SetZoneConfig(zoneName, zone.Config)
-	if err != nil {
-		t.FailNow()
-	}
-	time.Sleep(time.Second * 2)
-	zone = dh.GetZone(zoneName)
-	if zone.Config.DomainId != "12345" {
-		t.Fail()
-	}
-}
 
 func TestSetZoneKey(t *testing.T) {
 	zoneName := "zone1.com."
@@ -381,7 +572,4 @@ func TestSetZoneKey(t *testing.T) {
 	if zone.Config.DnsSec == false {
 		t.Fail()
 	}
-}
-
-func TestLoadZones(t *testing.T) {
 }
