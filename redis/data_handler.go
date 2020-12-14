@@ -72,7 +72,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	go func() {
 		// logger.Default.Debug("zone updater")
 		dh.quitWG.Add(1)
-		quit := make(chan *sync.WaitGroup, 1)
+		zoneListQuitChan := make(chan *sync.WaitGroup, 1)
 		modified := false
 		go dh.redis.SubscribeEvent(zonesKey, func() {
 			modified = true
@@ -80,7 +80,24 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 			modified = true
 		}, func(err error) {
 			logger.Default.Error(err)
-		}, quit)
+		}, zoneListQuitChan)
+
+		dh.quitWG.Add(1)
+		zonesQuitChan := make(chan *sync.WaitGroup, 1)
+		go dh.redis.SubscribeEvent(keyPrefix + "*", func() {
+		}, func(channel string, data string) {
+			keyStr := strings.TrimPrefix(channel, keyPrefix)
+			keyParts := splitDbKey(keyStr)
+			if zone, label, ok := isLocationEntry(keyParts); ok {
+				dh.recordCache.Del(label + "." + zone)
+			} else if zone, ok := isConfigEntry(keyParts); ok {
+				dh.zoneCache.Del(zone)
+			} else {
+				logger.Default.Error("unknown key : ", keyStr)
+			}
+		}, func(err error) {
+			logger.Default.Error(err)
+		}, zonesQuitChan)
 
 		reloadTicker := time.NewTicker(time.Duration(config.ZoneReload) * time.Second)
 		forceReloadTicker := time.NewTicker(zoneForcedReload)
@@ -90,7 +107,8 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 				reloadTicker.Stop()
 				forceReloadTicker.Stop()
 				// logger.Default.Debug("zone updater stopped")
-				quit <- &dh.quitWG
+				zoneListQuitChan <- &dh.quitWG
+				zonesQuitChan <- &dh.quitWG
 				return
 			case <-reloadTicker.C:
 				if modified {
@@ -105,6 +123,24 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	}()
 
 	return dh
+}
+
+func isConfigEntry(parts []string) (string, bool) {
+	if len(parts) == 2 && parts[1] == "config" {
+		return parts[0], true
+	}
+	return "", false
+}
+
+func isLocationEntry(parts []string) (string, string, bool) {
+	if len(parts) == 3 && parts[1] == "labels" {
+		return parts[0], parts[2], true
+	}
+	return "", "", false
+}
+
+func splitDbKey(key string) []string {
+	return strings.Split(key, ":")
 }
 
 func (dh *DataHandler) ShutDown() {

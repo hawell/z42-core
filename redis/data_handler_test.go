@@ -573,3 +573,74 @@ func TestSetZoneKey(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestLocationUpdate(t *testing.T) {
+	zoneName := "example.com."
+	locationStr := `{"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]}}`
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	_, err = dh.GetLocation(zoneName, "@")
+	if err != nil {
+		t.Fail()
+	}
+
+	err = dh.SetLocationFromJson(zoneName, "@", locationStr)
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	location, err := dh.GetLocation(zoneName, "@")
+	if err != nil {
+		t.FailNow()
+	}
+	if len(location.A.Data) != 2 {
+		t.FailNow()
+	}
+	if location.A.Data[0].Ip.String() != "1.2.3.4" {
+		t.Fail()
+	}
+	if location.A.Data[1].Ip.String() != "5.6.7.8" {
+		t.Fail()
+	}
+}
+
+func TestConfigUpdate(t *testing.T) {
+	zoneName := "example.com."
+	configStr := `{"cname_flattening":true, "domain_id":"12345"}`
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	_, err = dh.GetZoneConfig(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+
+	err = dh.SetZoneConfigFromJson(zoneName, configStr)
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	config, err := dh.GetZoneConfig(zoneName)
+	if err != nil {
+		t.FailNow()
+	}
+	if config.DomainId != "12345" {
+		t.Fail()
+	}
+	if config.CnameFlattening != true {
+		t.Fail()
+	}
+}
