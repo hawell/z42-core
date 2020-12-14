@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	redisCon "github.com/gomodule/redigo/redis"
 	"github.com/google/go-cmp/cmp"
 	jsoniter "github.com/json-iterator/go"
 	"net"
@@ -607,6 +608,40 @@ func TestLocationUpdate(t *testing.T) {
 		t.Fail()
 	}
 	if location.A.Data[1].Ip.String() != "5.6.7.8" {
+		t.Fail()
+	}
+}
+
+func TestRemoveLocation(t *testing.T) {
+	zoneName := "example.com."
+	locationStr := `{"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]}}`
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.EnableZone(zoneName)
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.SetLocationFromJson(zoneName, "www", locationStr)
+	if err != nil {
+		t.Fail()
+	}
+	_, err = dh.GetLocation(zoneName, "www")
+	if err != nil {
+		t.Fail()
+	}
+	err = dh.RemoveLocation(zoneName, "www")
+	if err != nil {
+		t.Fail()
+	}
+	time.Sleep(time.Millisecond * 1200)
+	location, err := dh.GetLocation(zoneName, "www")
+	if err != redisCon.ErrNil {
+		t.Fail()
+	}
+	if location != nil {
 		t.Fail()
 	}
 }

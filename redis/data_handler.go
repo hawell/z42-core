@@ -84,7 +84,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 
 		dh.quitWG.Add(1)
 		zonesQuitChan := make(chan *sync.WaitGroup, 1)
-		go dh.redis.SubscribeEvent(keyPrefix + "*", func() {
+		go dh.redis.SubscribeEvent(keyPrefix+"*", func() {
 		}, func(channel string, data string) {
 			keyStr := strings.TrimPrefix(channel, keyPrefix)
 			keyParts := splitDbKey(keyStr)
@@ -93,7 +93,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 			} else if zone, ok := isConfigEntry(keyParts); ok {
 				dh.zoneCache.Del(zone)
 			} else {
-				logger.Default.Error("unknown key : ", keyStr)
+				// logger.Default.Error("unknown key : ", keyStr)
 			}
 		}, func(err error) {
 			logger.Default.Error(err)
@@ -328,10 +328,11 @@ func (dh *DataHandler) SetLocation(zone string, label string, val *types.Record)
 }
 
 func (dh *DataHandler) SetLocationFromJson(zone string, label string, val string) error {
-	if err := dh.redis.Set(zoneLocationKey(zone, label), val); err != nil {
-		return err
-	}
-	return nil
+	return dh.redis.Set(zoneLocationKey(zone, label), val)
+}
+
+func (dh *DataHandler) RemoveLocation(zone string, label string) error {
+	return dh.redis.Del(zoneLocationKey(zone, label))
 }
 
 func (dh *DataHandler) SetZoneKey(zone string, keyType string, pub string, priv string) error {
