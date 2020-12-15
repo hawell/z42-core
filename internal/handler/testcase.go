@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/z42/internal/geoip"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/test"
 	"github.com/hawell/z42/internal/upstream"
+	geoip2 "github.com/hawell/z42/pkg/geoip"
 	"github.com/hawell/z42/pkg/hiredis"
 	"testing"
 )
@@ -111,7 +111,7 @@ var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
 			Timeout:  1000,
 		},
 	},
-	GeoIp: geoip.Config{
+	GeoIp: geoip2.Config{
 		Enable:    true,
 		CountryDB: "../../assets/geoCity.mmdb",
 		ASNDB:     "../../assets/geoIsp.mmdb",

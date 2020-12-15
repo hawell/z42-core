@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/raven-go"
-	"github.com/hawell/z42/internal/geoip"
 	"github.com/hawell/z42/internal/handler"
 	"github.com/hawell/z42/internal/healthcheck"
 	"github.com/hawell/z42/internal/server"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/upstream"
+	geoip2 "github.com/hawell/z42/pkg/geoip"
 	"github.com/hawell/z42/pkg/hiredis"
 	"github.com/hawell/z42/pkg/ratelimit"
 	"github.com/json-iterator/go"
@@ -133,7 +133,7 @@ var z42DefaultConfig = &Config{
 				Timeout:  400,
 			},
 		},
-		GeoIp: geoip.Config{
+		GeoIp: geoip2.Config{
 			Enable:    false,
 			CountryDB: "geoCity.mmdb",
 			ASNDB:     "geoIsp.mmdb",

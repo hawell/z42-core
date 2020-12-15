@@ -1,14 +1,15 @@
 package handler
 
 import (
+	"github.com/hawell/z42/internal/geotools"
 	"github.com/hawell/z42/internal/storage"
+	geoip2 "github.com/hawell/z42/pkg/geoip"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/hawell/z42/internal/dnssec"
-	"github.com/hawell/z42/internal/geoip"
 	"github.com/hawell/z42/internal/handler/logformat"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/internal/upstream"
@@ -22,7 +23,7 @@ type DnsRequestHandler struct {
 	Config    *DnsRequestHandlerConfig
 	RedisData *storage.DataHandler
 	Logger    *logger.EventLogger
-	geoip     *geoip.GeoIp
+	geoip     *geoip2.GeoIp
 	upstream  *upstream.Upstream
 	quit      chan struct{}
 	quitWG    sync.WaitGroup
@@ -31,7 +32,7 @@ type DnsRequestHandler struct {
 
 type DnsRequestHandlerConfig struct {
 	Upstream          []upstream.UpstreamConfig `json:"upstream"`
-	GeoIp             geoip.Config              `json:"geoip"`
+	GeoIp             geoip2.Config             `json:"geoip"`
 	MaxTtl            int                       `json:"max_ttl"`
 	LogSourceLocation bool                      `json:"log_source_location"`
 	Log               logger.LogConfig          `json:"log"`
@@ -58,7 +59,7 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *storage.DataHandler)
 
 	h.logQueue = make(chan map[string]interface{}, 1000)
 	h.Logger = logger.NewLogger(&config.Log, getFormatter)
-	h.geoip = geoip.NewGeoIp(&config.GeoIp)
+	h.geoip = geoip2.NewGeoIp(&config.GeoIp)
 	h.upstream = upstream.NewUpstream(config.Upstream)
 	h.quit = make(chan struct{})
 
@@ -330,14 +331,14 @@ func (h *DnsRequestHandler) filter(sourceIp net.IP, rrset *types.IP_RRSet) []net
 	//mask = h.healthcheck.FilterHealthcheck(name, rrset, mask)
 	switch rrset.FilterConfig.GeoFilter {
 	case "asn":
-		mask, _ = h.geoip.GetSameASN(sourceIp, rrset.Data, mask)
+		mask, _ = geotools.GetSameASN(h.geoip, sourceIp, rrset.Data, mask)
 	case "country":
-		mask, _ = h.geoip.GetSameCountry(sourceIp, rrset.Data, mask)
+		mask, _ = geotools.GetSameCountry(h.geoip, sourceIp, rrset.Data, mask)
 	case "asn+country":
-		mask, _ = h.geoip.GetSameASN(sourceIp, rrset.Data, mask)
-		mask, _ = h.geoip.GetSameCountry(sourceIp, rrset.Data, mask)
+		mask, _ = geotools.GetSameASN(h.geoip, sourceIp, rrset.Data, mask)
+		mask, _ = geotools.GetSameCountry(h.geoip, sourceIp, rrset.Data, mask)
 	case "location":
-		mask, _ = h.geoip.GetMinimumDistance(sourceIp, rrset.Data, mask)
+		mask, _ = geotools.GetMinimumDistance(h.geoip, sourceIp, rrset.Data, mask)
 	default:
 	}
 
