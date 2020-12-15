@@ -140,7 +140,7 @@ func pingCheck(ip string, timeout time.Duration) error {
 	}
 }
 
-type HealthcheckConfig struct {
+type Config struct {
 	Enable             bool             `json:"enable"`
 	MaxRequests        int              `json:"max_requests"`
 	MaxPendingRequests int              `json:"max_pending_requests"`
@@ -149,7 +149,7 @@ type HealthcheckConfig struct {
 	Log                logger.LogConfig `json:"log"`
 }
 
-func NewHealthcheck(config *HealthcheckConfig, redisData *storage.DataHandler, redisStat *storage.StatHandler) *Healthcheck {
+func NewHealthcheck(config *Config, redisData *storage.DataHandler, redisStat *storage.StatHandler) *Healthcheck {
 	h := &Healthcheck{
 		Enable:             config.Enable,
 		maxRequests:        config.MaxRequests,

@@ -59,13 +59,13 @@ func main() {
 		ZoneReload:         1,
 		RecordCacheSize:    1000000,
 		RecordCacheTimeout: 60,
-		Redis: hiredis.RedisConfig{
+		Redis: hiredis.Config{
 			Suffix:  "",
 			Prefix:  "",
 			Address: *redisAddrPtr,
 			Net:     "tcp",
 			DB:      0,
-			Connection: hiredis.RedisConnectionConfig{
+			Connection: hiredis.ConnectionConfig{
 				MaxIdleConnections:   10,
 				MaxActiveConnections: 10,
 				ConnectTimeout:       600,

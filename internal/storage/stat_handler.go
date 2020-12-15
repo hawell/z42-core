@@ -16,7 +16,7 @@ const (
 )
 
 type StatHandlerConfig struct {
-	Redis hiredis.RedisConfig `json:"redis"`
+	Redis hiredis.Config `json:"redis"`
 }
 
 type StatHandler struct {

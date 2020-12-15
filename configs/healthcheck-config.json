@@ -1,18 +1,4 @@
 {
-  "server": [
-    {
-      "ip": "127.0.0.1",
-      "port": 1053,
-      "protocol": "udp",
-      "count": 1,
-      "tls": {
-        "enable": false,
-        "cert_path": "",
-        "key_path": "",
-        "ca_path": ""
-      }
-    }
-  ],
   "error_log": {
     "enable": true,
     "target": "stdout",
@@ -84,51 +70,6 @@
       }
     }
   },
-  "handler": {
-    "upstream": [
-      {
-        "ip": "1.1.1.1",
-        "port": 53,
-        "protocol": "udp",
-        "timeout": 400
-      }
-    ],
-    "geoip": {
-      "enable": false,
-      "country_db": "geoCity.mmdb",
-      "asn_db": "geoIsp.mmdb"
-    },
-    "max_ttl": 3600,
-    "log_source_location": false,
-    "log": {
-      "enable": true,
-      "target": "file",
-      "level": "info",
-      "path": "/tmp/z42.log",
-      "format": "json",
-      "time_format": "2006-01-02T15:04:05Z07:00",
-      "sentry": {
-        "enable": false,
-        "dsn": ""
-      },
-      "syslog": {
-        "enable": false,
-        "protocol": "tcp",
-        "address": "localhost:514"
-      },
-      "kafka": {
-        "enable": false,
-        "topic": "z42",
-        "brokers": [
-          "127.0.0.1:9092"
-        ],
-        "format": "json",
-        "compression": "none",
-        "timeout": 3000,
-        "buffer_size": 1000
-      }
-    }
-  },
   "healthcheck": {
     "enable": false,
     "max_requests": 10,
@@ -163,12 +104,5 @@
         "buffer_size": 1000
       }
     }
-  },
-  "ratelimit": {
-    "enable": false,
-    "burst": 10,
-    "rate": 60,
-    "whitelist": [],
-    "blacklist": []
   }
 }

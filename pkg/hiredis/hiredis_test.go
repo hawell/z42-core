@@ -11,7 +11,7 @@ import (
 )
 
 func TestRedis(t *testing.T) {
-	cfg := RedisConfig{
+	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
 		Address: "redis:6379",
@@ -90,7 +90,7 @@ func TestRedis(t *testing.T) {
 
 func TestConfig(t *testing.T) {
 	var err error
-	cfg := RedisConfig{
+	cfg := Config{
 		Address: "redis:6379",
 		Net:     "tcp",
 		DB:      0,
@@ -118,7 +118,7 @@ func TestConfig(t *testing.T) {
 }
 
 func TestPubSub(t *testing.T) {
-	cfg := RedisConfig{
+	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
 		Address: "redis:6379",
@@ -218,7 +218,7 @@ func TestPubSub(t *testing.T) {
 }
 
 func TestExpirePersist(t *testing.T) {
-	cfg := RedisConfig{
+	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
 		Address: "redis:6379",
@@ -257,7 +257,7 @@ func TestExpirePersist(t *testing.T) {
 }
 
 func TestSets(t *testing.T) {
-	cfg := RedisConfig{
+	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
 		Address: "redis:6379",
@@ -288,7 +288,7 @@ func TestSets(t *testing.T) {
 }
 
 func TestUnixSocket(t *testing.T) {
-	cfg := RedisConfig{
+	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
 		Address: "/var/run/redis/redis-server.sock",

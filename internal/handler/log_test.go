@@ -8,7 +8,7 @@ import (
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/test"
 	"github.com/hawell/z42/internal/upstream"
-	geoip2 "github.com/hawell/z42/pkg/geoip"
+	"github.com/hawell/z42/pkg/geoip"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
@@ -27,7 +27,7 @@ var logRedisDataTestConfig = storage.DataHandlerConfig{
 	ZoneReload:         60,
 	RecordCacheSize:    1000000,
 	RecordCacheTimeout: 60,
-	Redis: hiredis.RedisConfig{
+	Redis: hiredis.Config{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
@@ -61,7 +61,7 @@ var logHandlerTestConfig = DnsRequestHandlerConfig{
 			Timeout:  1000,
 		},
 	},
-	GeoIp: geoip2.Config{
+	GeoIp: geoip.Config{
 		Enable:    true,
 		CountryDB: "../../assets/geoCity.mmdb",
 		ASNDB:     "../../assets/geoIsp.mmdb",

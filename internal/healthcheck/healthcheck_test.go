@@ -50,14 +50,14 @@ var healthCheckSetEntries = [][]string{
 }
 
 var healthcheckRedisStatConfig = storage.StatHandlerConfig{
-	Redis: hiredis.RedisConfig{
+	Redis: hiredis.Config{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
 		Prefix:   "healthcheck_",
 		Suffix:   "_healthcheck",
-		Connection: hiredis.RedisConnectionConfig{
+		Connection: hiredis.ConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       500,
@@ -75,14 +75,14 @@ var healthcheckRedisDataConfig = storage.DataHandlerConfig{
 	ZoneReload:         60,
 	RecordCacheSize:    10000000,
 	RecordCacheTimeout: 1,
-	Redis: hiredis.RedisConfig{
+	Redis: hiredis.Config{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
 		Prefix:   "hcconfig_",
 		Suffix:   "_hcconfig",
-		Connection: hiredis.RedisConnectionConfig{
+		Connection: hiredis.ConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       500,
@@ -94,7 +94,7 @@ var healthcheckRedisDataConfig = storage.DataHandlerConfig{
 	},
 }
 
-var healthcheckTestConfig = HealthcheckConfig{
+var healthcheckTestConfig = Config{
 	Enable:             true,
 	MaxRequests:        10,
 	MaxPendingRequests: 100,
@@ -383,7 +383,7 @@ func TestPing(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	var healthcheckStatConfig = storage.StatHandlerConfig{
-		Redis: hiredis.RedisConfig{
+		Redis: hiredis.Config{
 			Address:  "redis:6379",
 			Net:      "tcp",
 			DB:       0,
@@ -392,7 +392,7 @@ func TestHealthCheck(t *testing.T) {
 			Suffix:   "_hcstattest",
 		},
 	}
-	var healthcheckConfig = HealthcheckConfig{
+	var healthcheckConfig = Config{
 		Enable: true,
 		Log: logger.LogConfig{
 			Enable:     true,
@@ -466,7 +466,7 @@ func TestHealthCheck(t *testing.T) {
 
 func TestExpire(t *testing.T) {
 	var statConfig = storage.StatHandlerConfig{
-		Redis: hiredis.RedisConfig{
+		Redis: hiredis.Config{
 			Address:  "redis:6379",
 			Net:      "tcp",
 			DB:       0,
@@ -475,7 +475,7 @@ func TestExpire(t *testing.T) {
 			Suffix:   "_healthcheck1",
 		},
 	}
-	var config = HealthcheckConfig{
+	var config = Config{
 		Enable:             true,
 		MaxRequests:        10,
 		MaxPendingRequests: 100,

@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/hawell/z42/internal/geotools"
 	"github.com/hawell/z42/internal/storage"
-	geoip2 "github.com/hawell/z42/pkg/geoip"
+	"github.com/hawell/z42/pkg/geoip"
 	"net"
 	"strings"
 	"sync"
@@ -23,7 +23,7 @@ type DnsRequestHandler struct {
 	Config    *DnsRequestHandlerConfig
 	RedisData *storage.DataHandler
 	Logger    *logger.EventLogger
-	geoip     *geoip2.GeoIp
+	geoip     *geoip.GeoIp
 	upstream  *upstream.Upstream
 	quit      chan struct{}
 	quitWG    sync.WaitGroup
@@ -32,7 +32,7 @@ type DnsRequestHandler struct {
 
 type DnsRequestHandlerConfig struct {
 	Upstream          []upstream.UpstreamConfig `json:"upstream"`
-	GeoIp             geoip2.Config             `json:"geoip"`
+	GeoIp             geoip.Config             `json:"geoip"`
 	MaxTtl            int                       `json:"max_ttl"`
 	LogSourceLocation bool                      `json:"log_source_location"`
 	Log               logger.LogConfig          `json:"log"`
@@ -59,7 +59,7 @@ func NewHandler(config *DnsRequestHandlerConfig, redisData *storage.DataHandler)
 
 	h.logQueue = make(chan map[string]interface{}, 1000)
 	h.Logger = logger.NewLogger(&config.Log, getFormatter)
-	h.geoip = geoip2.NewGeoIp(&config.GeoIp)
+	h.geoip = geoip.NewGeoIp(&config.GeoIp)
 	h.upstream = upstream.NewUpstream(config.Upstream)
 	h.quit = make(chan struct{})
 

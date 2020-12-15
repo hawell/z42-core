@@ -3,30 +3,23 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/hawell/z42/internal/handler"
-	"github.com/hawell/z42/internal/server"
+	"github.com/hawell/logger"
+	"github.com/hawell/z42/internal/healthcheck"
 	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/pkg/ratelimit"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/hawell/logger"
-	"github.com/miekg/dns"
-	_ "net/http/pprof"
 )
 
 var (
-	servers           []*dns.Server
 	redisDataHandler  *storage.DataHandler
 	redisStatHandler  *storage.StatHandler
-	dnsRequestHandler *handler.DnsRequestHandler
-	rateLimiter       *ratelimit.RateLimiter
-	configFile        string
+	healthChecker     *healthcheck.Healthcheck
+	configFile string
 )
 
 func main() {
@@ -45,7 +38,7 @@ func main() {
 	}
 
 	if flagset["g"] {
-		data, err := jsoniter.MarshalIndent(resolverDefaultConfig, "", "  ")
+		data, err := jsoniter.MarshalIndent(healthcheckerDefaultConfig, "", "  ")
 		if err != nil {
 			fmt.Println("cannot unmarshal template config : ", err)
 			return
@@ -60,7 +53,7 @@ func main() {
 
 	// TODO: this should be part of a general api
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		log.Println(http.ListenAndServe("localhost:6061", nil))
 	}()
 
 	c := make(chan os.Signal, 1)
@@ -78,18 +71,6 @@ func main() {
 	}
 }
 
-func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
-	context := handler.NewRequestContext(w, r)
-	// logger.Default.Debugf("handle request: [%d] %s %s", r.Id, context.RawName(), context.Type())
-
-	if rateLimiter.CanHandle(context.IP()) {
-		dnsRequestHandler.HandleRequest(context)
-	} else {
-		context.Res = dns.RcodeRefused
-		context.Response()
-	}
-}
-
 func Start() {
 	log.Printf("[INFO] loading config : %s", configFile)
 	cfg, _ := LoadConfig(configFile)
@@ -98,36 +79,16 @@ func Start() {
 	logger.Default = logger.NewLogger(&cfg.ErrorLog, nil)
 	log.Printf("[INFO] logger loaded")
 
-	servers = server.NewServer(cfg.Server)
-
 	redisDataHandler = storage.NewDataHandler(&cfg.RedisData)
 	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
-	logger.Default.Info("starting handler...")
-	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler)
-	logger.Default.Info("handler started")
-
-	rateLimiter = ratelimit.NewRateLimiter(&cfg.RateLimit)
-
-	dns.HandleFunc(".", handleRequest)
-
-	logger.Default.Info("binding listeners...")
-	for i := range servers {
-		go func(i int) {
-			err := servers[i].ListenAndServe()
-			if err != nil {
-				logger.Default.Errorf("listener error : %s", err)
-			}
-		}(i)
-	}
-	logger.Default.Info("binding completed")
+	logger.Default.Info("starting health checker...")
+	healthChecker = healthcheck.NewHealthcheck(&cfg.Healthcheck, redisDataHandler, redisStatHandler)
+	logger.Default.Info("health checker started")
 }
 
 func Stop() {
-	for i := range servers {
-		_ = servers[i].Shutdown()
-	}
-	dnsRequestHandler.ShutDown()
+	healthChecker.ShutDown()
 	redisDataHandler.ShutDown()
 	redisStatHandler.ShutDown()
 }

@@ -17,12 +17,12 @@ import (
 )
 
 type DataHandlerConfig struct {
-	ZoneCacheSize      int                 `json:"zone_cache_size"`
-	ZoneCacheTimeout   int                 `json:"zone_cache_timeout"`
-	ZoneReload         int                 `json:"zone_reload"`
-	RecordCacheSize    int                 `json:"record_cache_size"`
-	RecordCacheTimeout int                 `json:"record_cache_timeout"`
-	Redis              hiredis.RedisConfig `json:"redis"`
+	ZoneCacheSize      int            `json:"zone_cache_size"`
+	ZoneCacheTimeout   int            `json:"zone_cache_timeout"`
+	ZoneReload         int            `json:"zone_reload"`
+	RecordCacheSize    int            `json:"record_cache_size"`
+	RecordCacheTimeout int            `json:"record_cache_timeout"`
+	Redis              hiredis.Config `json:"redis"`
 }
 
 type DataHandler struct {
