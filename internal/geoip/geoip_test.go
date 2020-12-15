@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	asnDB = "../../assets/geoIsp.mmdb"
+	asnDB     = "../../assets/geoIsp.mmdb"
 	countryDB = "../../assets/geoCity.mmdb"
 )
 
@@ -309,7 +309,7 @@ func TestDisabled(t *testing.T) {
 			Ip:      nil,
 			Country: nil,
 			ASN:     nil,
-	}}, []int{0})
+		}}, []int{0})
 	if err != ErrGeoIpDisabled {
 		t.Fail()
 	}

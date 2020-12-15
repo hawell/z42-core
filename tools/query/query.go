@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/hawell/workerpool"
+	"github.com/hawell/z42/pkg/workerpool"
 	"github.com/hawell/z42/tools/query/query"
 	"github.com/hawell/z42/tools/query/source"
 	"github.com/hawell/z42/tools/query/tool"
