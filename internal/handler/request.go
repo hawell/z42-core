@@ -2,7 +2,7 @@ package handler
 
 import (
 	"github.com/coredns/coredns/request"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/types"
 	"github.com/miekg/dns"
 	"net"
 	"strings"

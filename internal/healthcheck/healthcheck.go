@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/hawell/logger"
 	"github.com/hawell/workerpool"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/types"
 	"github.com/pkg/errors"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -24,8 +24,8 @@ type Healthcheck struct {
 	maxPendingRequests int
 	updateInterval     time.Duration
 	checkInterval      time.Duration
-	redisData          *redis.DataHandler
-	redisStat          *redis.StatHandler
+	redisData          *storage.DataHandler
+	redisStat          *storage.StatHandler
 	logger             *logger.EventLogger
 	lastUpdate         time.Time
 	dispatcher         *workerpool.Dispatcher
@@ -149,7 +149,7 @@ type HealthcheckConfig struct {
 	Log                logger.LogConfig `json:"log"`
 }
 
-func NewHealthcheck(config *HealthcheckConfig, redisData *redis.DataHandler, redisStat *redis.StatHandler) *Healthcheck {
+func NewHealthcheck(config *HealthcheckConfig, redisData *storage.DataHandler, redisStat *storage.StatHandler) *Healthcheck {
 	h := &Healthcheck{
 		Enable:             config.Enable,
 		maxRequests:        config.MaxRequests,

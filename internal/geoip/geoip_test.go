@@ -1,7 +1,7 @@
 package geoip
 
 import (
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/types"
 	"log"
 	"net"
 	"testing"
@@ -9,6 +9,11 @@ import (
 	"fmt"
 	"github.com/hawell/logger"
 	"strconv"
+)
+
+var (
+	asnDB = "../../assets/geoIsp.mmdb"
+	countryDB = "../../assets/geoCity.mmdb"
 )
 
 func TestGeoIpAutomatic(t *testing.T) {
@@ -55,7 +60,7 @@ func TestGeoIpAutomatic(t *testing.T) {
 
 	cfg := Config{
 		Enable:    true,
-		CountryDB: "../geoCity.mmdb",
+		CountryDB: countryDB,
 	}
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
@@ -75,7 +80,10 @@ func TestGeoIpAutomatic(t *testing.T) {
 		}
 		dest.Ttl = 100
 		mask := make([]int, len(dest.Data))
-		mask = g.GetMinimumDistance(net.ParseIP(sip[i][0]), dest.Data, mask)
+		mask, err := g.GetMinimumDistance(net.ParseIP(sip[i][0]), dest.Data, mask)
+		if err != nil {
+			t.FailNow()
+		}
 		index := 0
 		for j, x := range mask {
 			if x == types.IpMaskWhite {
@@ -100,7 +108,7 @@ func TestGetSameCountry(t *testing.T) {
 
 	cfg := Config{
 		Enable:    true,
-		CountryDB: "../geoCity.mmdb",
+		CountryDB: countryDB,
 	}
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
@@ -114,7 +122,10 @@ func TestGetSameCountry(t *testing.T) {
 			{Ip: net.ParseIP("3.4.5.6"), Country: []string{""}},
 		}
 		mask := make([]int, len(dest.Data))
-		mask = g.GetSameCountry(net.ParseIP(sip[i][0]), dest.Data, mask)
+		mask, err := g.GetSameCountry(net.ParseIP(sip[i][0]), dest.Data, mask)
+		if err != nil {
+			t.FailNow()
+		}
 		index := -1
 		for j, x := range mask {
 			if x == types.IpMaskWhite {
@@ -158,14 +169,17 @@ func TestGetSameASN(t *testing.T) {
 	}
 	cfg := Config{
 		Enable: true,
-		ASNDB:  "../geoIsp.mmdb",
+		ASNDB:  asnDB,
 	}
 
 	g := NewGeoIp(&cfg)
 
 	for i := range sip {
 		mask := make([]int, len(dip.Data))
-		mask = g.GetSameASN(net.ParseIP(sip[i]), dip.Data, mask)
+		mask, err := g.GetSameASN(net.ParseIP(sip[i]), dip.Data, mask)
+		if err != nil {
+			t.FailNow()
+		}
 		index := -1
 		for j, x := range mask {
 			if x == types.IpMaskWhite {
@@ -260,8 +274,8 @@ func printCountryASN() {
 	}
 	cfg := Config{
 		Enable:    true,
-		ASNDB:     "../geoIsp.mmdb",
-		CountryDB: "../geoCity.mmdb",
+		ASNDB:     asnDB,
+		CountryDB: countryDB,
 	}
 
 	g := NewGeoIp(&cfg)
@@ -270,5 +284,101 @@ func printCountryASN() {
 		asn, _ := g.GetASN(net.ParseIP(ip))
 		c, _ := g.GetCountry(net.ParseIP(ip))
 		fmt.Println(ip, asn, c)
+	}
+}
+
+func TestDisabled(t *testing.T) {
+	cfg := Config{
+		Enable:    false,
+		CountryDB: countryDB,
+		ASNDB:     asnDB,
+	}
+	g := NewGeoIp(&cfg)
+
+	_, err := g.GetASN(net.ParseIP("1.2.3.4"))
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetCountry(net.ParseIP("1.2.3.4"))
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetMinimumDistance(net.ParseIP("1.2.3.4"),
+		[]types.IP_RR{{
+			Weight:  0,
+			Ip:      nil,
+			Country: nil,
+			ASN:     nil,
+	}}, []int{0})
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetSameASN(net.ParseIP("1.2.3.4"),
+		[]types.IP_RR{{
+			Weight:  0,
+			Ip:      nil,
+			Country: nil,
+			ASN:     nil,
+		}}, []int{0})
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetSameCountry(net.ParseIP("1.2.3.4"),
+		[]types.IP_RR{{
+			Weight:  0,
+			Ip:      nil,
+			Country: nil,
+			ASN:     nil,
+		}}, []int{0})
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+}
+
+func TestBadDB(t *testing.T) {
+	cfg := Config{
+		Enable:    true,
+		CountryDB: "ddd",
+		ASNDB:     "ddds",
+	}
+	g := NewGeoIp(&cfg)
+
+	_, err := g.GetASN(net.ParseIP("1.2.3.4"))
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetCountry(net.ParseIP("1.2.3.4"))
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetMinimumDistance(net.ParseIP("1.2.3.4"),
+		[]types.IP_RR{{
+			Weight:  0,
+			Ip:      nil,
+			Country: nil,
+			ASN:     nil,
+		}}, []int{0})
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetSameASN(net.ParseIP("1.2.3.4"),
+		[]types.IP_RR{{
+			Weight:  0,
+			Ip:      nil,
+			Country: nil,
+			ASN:     nil,
+		}}, []int{0})
+	if err != ErrGeoIpDisabled {
+		t.Fail()
+	}
+	_, err = g.GetSameCountry(net.ParseIP("1.2.3.4"),
+		[]types.IP_RR{{
+			Weight:  0,
+			Ip:      nil,
+			Country: nil,
+			ASN:     nil,
+		}}, []int{0})
+	if err != ErrGeoIpDisabled {
+		t.Fail()
 	}
 }

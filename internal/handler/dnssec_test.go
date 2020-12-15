@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/test"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/test"
+	"github.com/hawell/z42/internal/types"
 	"github.com/miekg/dns"
 	"sort"
 	"strings"
@@ -98,7 +98,7 @@ func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testC
 
 		logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-		r := redis.NewDataHandler(&DefaultRedisDataTestConfig)
+		r := storage.NewDataHandler(&DefaultRedisDataTestConfig)
 		h := NewHandler(&testCase.HandlerConfig, r)
 		if err := h.RedisData.Clear(); err != nil {
 			return nil, err

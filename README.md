@@ -2,7 +2,7 @@
 [![Code Coverage](https://img.shields.io/codecov/c/github/hawell/z42.svg)](https://codecov.io/github/hawell/z42?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hawell/z42)](https://goreportcard.com/report/hawell/z42)
 
--> ![logo](logo.png) <-
+-> ![logo](assets/logo.png) <-
 
 The ultimate answer to all dns queries.
 

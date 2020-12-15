@@ -1,12 +1,13 @@
-package redis
+package storage
 
 import (
 	"errors"
 	"github.com/dgraph-io/ristretto"
 	"github.com/hashicorp/go-immutable-radix"
 	"github.com/hawell/logger"
-	"github.com/hawell/z42/dnssec"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/dnssec"
+	"github.com/hawell/z42/internal/types"
+	"github.com/hawell/z42/pkg/hiredis"
 	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"golang.org/x/sync/singleflight"
@@ -16,16 +17,16 @@ import (
 )
 
 type DataHandlerConfig struct {
-	ZoneCacheSize      int         `json:"zone_cache_size"`
-	ZoneCacheTimeout   int         `json:"zone_cache_timeout"`
-	ZoneReload         int         `json:"zone_reload"`
-	RecordCacheSize    int         `json:"record_cache_size"`
-	RecordCacheTimeout int         `json:"record_cache_timeout"`
-	Redis              RedisConfig `json:"redis"`
+	ZoneCacheSize      int                 `json:"zone_cache_size"`
+	ZoneCacheTimeout   int                 `json:"zone_cache_timeout"`
+	ZoneReload         int                 `json:"zone_reload"`
+	RecordCacheSize    int                 `json:"record_cache_size"`
+	RecordCacheTimeout int                 `json:"record_cache_timeout"`
+	Redis              hiredis.RedisConfig `json:"redis"`
 }
 
 type DataHandler struct {
-	redis              *Redis
+	redis              *hiredis.Redis
 	zones              *iradix.Tree
 	lastZoneUpdate     time.Time
 	recordCache        *ristretto.Cache
@@ -46,7 +47,7 @@ const (
 
 func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	dh := &DataHandler{
-		redis:              NewRedis(&config.Redis),
+		redis:              hiredis.NewRedis(&config.Redis),
 		zones:              iradix.New(),
 		recordInflight:     new(singleflight.Group),
 		zoneInflight:       new(singleflight.Group),

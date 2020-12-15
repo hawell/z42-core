@@ -1,7 +1,8 @@
 package geoip
 
 import (
-	"github.com/hawell/z42/types"
+	"errors"
+	"github.com/hawell/z42/internal/types"
 	"math"
 	"net"
 
@@ -20,6 +21,10 @@ type Config struct {
 	CountryDB string `json:"country_db"`
 	ASNDB     string `json:"asn_db"`
 }
+
+var (
+	ErrGeoIpDisabled = errors.New("geoip is disabled")
+)
 
 func NewGeoIp(config *Config) *GeoIp {
 	g := &GeoIp{
@@ -40,14 +45,14 @@ func NewGeoIp(config *Config) *GeoIp {
 	return g
 }
 
-func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []types.IP_RR, mask []int) []int {
+func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []types.IP_RR, mask []int) ([]int, error) {
 	if !g.Enable || g.CountryDB == nil {
-		return mask
+		return mask, ErrGeoIpDisabled
 	}
 	sourceCountry, err := g.GetCountry(sourceIp)
 	if err != nil {
 		logger.Default.Error("getSameCountry failed")
-		return mask
+		return mask, nil
 	}
 
 	passed := 0
@@ -68,7 +73,7 @@ func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []types.IP_RR, mask []int) [
 		}
 	}
 	if passed > 0 {
-		return mask
+		return mask, nil
 	}
 
 	for i, x := range mask {
@@ -87,17 +92,17 @@ func (g *GeoIp) GetSameCountry(sourceIp net.IP, ips []types.IP_RR, mask []int) [
 		}
 	}
 
-	return mask
+	return mask, nil
 }
 
-func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []types.IP_RR, mask []int) []int {
+func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []types.IP_RR, mask []int) ([]int, error) {
 	if !g.Enable || g.ASNDB == nil {
-		return mask
+		return mask, ErrGeoIpDisabled
 	}
 	sourceASN, err := g.GetASN(sourceIp)
 	if err != nil {
 		logger.Default.Error("getSameASN failed")
-		return mask
+		return mask, nil
 	}
 
 	passed := 0
@@ -118,7 +123,7 @@ func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []types.IP_RR, mask []int) []int
 		}
 	}
 	if passed > 0 {
-		return mask
+		return mask, nil
 	}
 
 	for i, x := range mask {
@@ -137,20 +142,20 @@ func (g *GeoIp) GetSameASN(sourceIp net.IP, ips []types.IP_RR, mask []int) []int
 		}
 	}
 
-	return mask
+	return mask, nil
 }
 
 // TODO: add a margin for minimum distance
-func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []types.IP_RR, mask []int) []int {
+func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []types.IP_RR, mask []int) ([]int, error) {
 	if !g.Enable || g.CountryDB == nil {
-		return mask
+		return mask, ErrGeoIpDisabled
 	}
 	minDistance := 1000.0
 	dists := make([]float64, 0, len(mask))
 	slat, slong, err := g.getCoordinates(sourceIp)
 	if err != nil {
 		logger.Default.Error("getMinimumDistance failed")
-		return mask
+		return mask, nil
 	}
 	for i, x := range mask {
 		if x == types.IpMaskWhite {
@@ -180,14 +185,14 @@ func (g *GeoIp) GetMinimumDistance(sourceIp net.IP, ips []types.IP_RR, mask []in
 		}
 	}
 	if passed > 0 {
-		return mask
+		return mask, nil
 	} else {
 		for i := range mask {
 			if mask[i] == types.IpMaskGrey {
 				mask[i] = types.IpMaskWhite
 			}
 		}
-		return mask
+		return mask, nil
 	}
 }
 
@@ -226,9 +231,9 @@ func (g *GeoIp) getCoordinates(ip net.IP) (latitude float64, longitude float64, 
 	return record.Location.Latitude, longitude, nil
 }
 
-func (g *GeoIp) GetCountry(ip net.IP) (country string, err error) {
+func (g *GeoIp) GetCountry(ip net.IP) (string, error) {
 	if !g.Enable || g.CountryDB == nil {
-		return
+		return "", ErrGeoIpDisabled
 	}
 	var record struct {
 		Country struct {
@@ -245,6 +250,9 @@ func (g *GeoIp) GetCountry(ip net.IP) (country string, err error) {
 }
 
 func (g *GeoIp) GetASN(ip net.IP) (uint, error) {
+	if !g.Enable || g.ASNDB == nil {
+		return 0, ErrGeoIpDisabled
+	}
 	var record struct {
 		AutonomousSystemNumber uint `maxminddb:"autonomous_system_number"`
 	}

@@ -4,7 +4,8 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/pkg/hiredis"
 	"github.com/miekg/dns"
 	"math/rand"
 	"os"
@@ -52,19 +53,19 @@ func main() {
 
 	// opts := []redis.DialOption{}
 	// opts = append(opts, redis.DialPassword(*redisAuthPtr))
-	dh := redis.NewDataHandler(&redis.DataHandlerConfig{
+	dh := storage.NewDataHandler(&storage.DataHandlerConfig{
 		ZoneCacheSize:      10000,
 		ZoneCacheTimeout:   60,
 		ZoneReload:         1,
 		RecordCacheSize:    1000000,
 		RecordCacheTimeout: 60,
-		Redis: redis.RedisConfig{
+		Redis: hiredis.RedisConfig{
 			Suffix:  "",
 			Prefix:  "",
 			Address: *redisAddrPtr,
 			Net:     "tcp",
 			DB:      0,
-			Connection: redis.RedisConnectionConfig{
+			Connection: hiredis.RedisConnectionConfig{
 				MaxIdleConnections:   10,
 				MaxActiveConnections: 10,
 				ConnectTimeout:       600,

@@ -2,8 +2,9 @@ package healthcheck
 
 import (
 	"fmt"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/types"
+	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	"log"
 	"net"
@@ -48,15 +49,15 @@ var healthCheckSetEntries = [][]string{
 	},
 }
 
-var healthcheckRedisStatConfig = redis.StatHandlerConfig{
-	Redis: redis.RedisConfig{
+var healthcheckRedisStatConfig = storage.StatHandlerConfig{
+	Redis: hiredis.RedisConfig{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
 		Prefix:   "healthcheck_",
 		Suffix:   "_healthcheck",
-		Connection: redis.RedisConnectionConfig{
+		Connection: hiredis.RedisConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       500,
@@ -68,20 +69,20 @@ var healthcheckRedisStatConfig = redis.StatHandlerConfig{
 	},
 }
 
-var healthcheckRedisDataConfig = redis.DataHandlerConfig{
+var healthcheckRedisDataConfig = storage.DataHandlerConfig{
 	ZoneCacheSize:      10000,
 	ZoneCacheTimeout:   60,
 	ZoneReload:         60,
 	RecordCacheSize:    10000000,
 	RecordCacheTimeout: 1,
-	Redis: redis.RedisConfig{
+	Redis: hiredis.RedisConfig{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
 		Prefix:   "hcconfig_",
 		Suffix:   "_hcconfig",
-		Connection: redis.RedisConnectionConfig{
+		Connection: hiredis.RedisConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       500,
@@ -108,8 +109,8 @@ var healthcheckTestConfig = HealthcheckConfig{
 func TestGet(t *testing.T) {
 	log.Println("TestGet")
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
-	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
+	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
 	h.redisStat.Clear()
@@ -132,8 +133,8 @@ func TestGet(t *testing.T) {
 func TestFilter(t *testing.T) {
 	log.Println("TestFilter")
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
-	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
+	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
 	h.redisStat.Clear()
@@ -276,8 +277,8 @@ func TestFilter(t *testing.T) {
 func TestSet(t *testing.T) {
 	log.Println("TestSet")
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
-	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
+	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
 	h.redisStat.Clear()
@@ -326,8 +327,8 @@ func TestTransfer(t *testing.T) {
 	}
 
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
-	sh := redis.NewStatHandler(&healthcheckRedisStatConfig)
+	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
 
 	h.redisData.Clear()
@@ -381,8 +382,8 @@ func TestPing(t *testing.T) {
 */
 
 func TestHealthCheck(t *testing.T) {
-	var healthcheckStatConfig = redis.StatHandlerConfig{
-		Redis: redis.RedisConfig{
+	var healthcheckStatConfig = storage.StatHandlerConfig{
+		Redis: hiredis.RedisConfig{
 			Address:  "redis:6379",
 			Net:      "tcp",
 			DB:       0,
@@ -427,8 +428,8 @@ func TestHealthCheck(t *testing.T) {
 	log.Println("TestHealthCheck")
 	logger.Default = logger.NewLogger(&logger.LogConfig{Enable: true, Target: "stdout", Format: "text"}, nil)
 
-	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
-	sh := redis.NewStatHandler(&healthcheckStatConfig)
+	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	sh := storage.NewStatHandler(&healthcheckStatConfig)
 	hc := NewHealthcheck(&healthcheckConfig, dh, sh)
 	hc.redisStat.Clear()
 	hc.redisData.Clear()
@@ -464,8 +465,8 @@ func TestHealthCheck(t *testing.T) {
 }
 
 func TestExpire(t *testing.T) {
-	var statConfig = redis.StatHandlerConfig{
-		Redis: redis.RedisConfig{
+	var statConfig = storage.StatHandlerConfig{
+		Redis: hiredis.RedisConfig{
 			Address:  "redis:6379",
 			Net:      "tcp",
 			DB:       0,
@@ -489,8 +490,8 @@ func TestExpire(t *testing.T) {
 	log.Printf("TestExpire")
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-	dh := redis.NewDataHandler(&healthcheckRedisDataConfig)
-	sh := redis.NewStatHandler(&statConfig)
+	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	sh := storage.NewStatHandler(&statConfig)
 	hc := NewHealthcheck(&config, dh, sh)
 
 	hc.redisData.Clear()

@@ -2,8 +2,8 @@ package handler
 
 import (
 	"github.com/hawell/logger"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/test"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/test"
 	"github.com/miekg/dns"
 	"log"
 	"os"
@@ -33,7 +33,7 @@ var benchTestHandler *DnsRequestHandler
 func TestMain(m *testing.M) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-	r := redis.NewDataHandler(&DefaultRedisDataTestConfig)
+	r := storage.NewDataHandler(&DefaultRedisDataTestConfig)
 	benchTestHandler = NewHandler(&DefaultHandlerTestConfig, r)
 	err := benchTestHandler.RedisData.Clear()
 	log.Println(err)

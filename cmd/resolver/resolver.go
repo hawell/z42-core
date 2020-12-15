@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/getsentry/raven-go"
-	"github.com/hawell/z42/geoip"
-	"github.com/hawell/z42/handler"
-	"github.com/hawell/z42/healthcheck"
-	"github.com/hawell/z42/ratelimit"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/server"
-	"github.com/hawell/z42/upstream"
+	"github.com/hawell/z42/internal/geoip"
+	"github.com/hawell/z42/internal/handler"
+	"github.com/hawell/z42/internal/healthcheck"
+	"github.com/hawell/z42/internal/server"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/upstream"
+	"github.com/hawell/z42/pkg/ratelimit"
+	"github.com/hawell/z42/pkg/hiredis"
 	"github.com/json-iterator/go"
 	"github.com/logrusorgru/aurora"
 	"github.com/oschwald/maxminddb-golang"
@@ -35,8 +36,8 @@ import (
 
 var (
 	servers           []*dns.Server
-	redisDataHandler  *redis.DataHandler
-	redisStatHandler  *redis.StatHandler
+	redisDataHandler  *storage.DataHandler
+	redisStatHandler  *storage.StatHandler
 	dnsRequestHandler *handler.DnsRequestHandler
 	healthChecker     *healthcheck.Healthcheck
 	rateLimiter       *ratelimit.RateLimiter
@@ -58,8 +59,8 @@ func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 type Config struct {
 	Server      []server.ServerConfig           `json:"server"`
 	ErrorLog    logger.LogConfig                `json:"error_log"`
-	RedisData   redis.DataHandlerConfig         `json:"redis_data"`
-	RedisStat   redis.StatHandlerConfig         `json:"redis_stat"`
+	RedisData   storage.DataHandlerConfig       `json:"redis_data"`
+	RedisStat   storage.StatHandlerConfig       `json:"redis_stat"`
 	Handler     handler.DnsRequestHandlerConfig `json:"handler"`
 	Healthcheck healthcheck.HealthcheckConfig   `json:"healthcheck"`
 	RateLimit   ratelimit.Config                `json:"ratelimit"`
@@ -80,20 +81,20 @@ var z42DefaultConfig = &Config{
 			},
 		},
 	},
-	RedisData: redis.DataHandlerConfig{
+	RedisData: storage.DataHandlerConfig{
 		ZoneCacheSize:      10000,
 		ZoneCacheTimeout:   60,
 		ZoneReload:         60,
 		RecordCacheSize:    1000000,
 		RecordCacheTimeout: 60,
-		Redis: redis.RedisConfig{
+		Redis: hiredis.RedisConfig{
 			Address:  "127.0.0.1:6379",
 			Net:      "tcp",
 			DB:       0,
 			Password: "",
 			Prefix:   "z42_",
 			Suffix:   "_z42",
-			Connection: redis.RedisConnectionConfig{
+			Connection: hiredis.RedisConnectionConfig{
 				MaxIdleConnections:   10,
 				MaxActiveConnections: 10,
 				ConnectTimeout:       500,
@@ -104,15 +105,15 @@ var z42DefaultConfig = &Config{
 			},
 		},
 	},
-	RedisStat: redis.StatHandlerConfig{
-		Redis: redis.RedisConfig{
+	RedisStat: storage.StatHandlerConfig{
+		Redis: hiredis.RedisConfig{
 			Address:  "127.0.0.1:6379",
 			Net:      "tcp",
 			DB:       0,
 			Password: "",
 			Prefix:   "z42_",
 			Suffix:   "_z42",
-			Connection: redis.RedisConnectionConfig{
+			Connection: hiredis.RedisConnectionConfig{
 				MaxIdleConnections:   10,
 				MaxActiveConnections: 10,
 				ConnectTimeout:       500,
@@ -263,8 +264,8 @@ func Start() {
 
 	servers = server.NewServer(cfg.Server)
 
-	redisDataHandler = redis.NewDataHandler(&cfg.RedisData)
-	redisStatHandler = redis.NewStatHandler(&cfg.RedisStat)
+	redisDataHandler = storage.NewDataHandler(&cfg.RedisData)
+	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
 	logger.Default.Info("starting handler...")
 	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler)
@@ -339,9 +340,9 @@ func Verify(configFile string) {
 		printResult(msg, err)
 	}
 
-	checkRedis := func(config *redis.RedisConfig) {
+	checkRedis := func(config *hiredis.RedisConfig) {
 		fmt.Println("checking redis...")
-		rd := redis.NewRedis(config)
+		rd := hiredis.NewRedis(config)
 		msg := fmt.Sprintf("checking whether %s://%s is available", config.Net, config.Address)
 		err := rd.Ping()
 		printResult(msg, err)

@@ -1,7 +1,8 @@
 package source
 
 import (
-	"github.com/hawell/z42/redis"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/pkg/hiredis"
 	"github.com/hawell/z42/tools/query/query"
 )
 
@@ -12,19 +13,19 @@ type RedisDumpQueryGenerator struct {
 }
 
 func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
-	dh := redis.NewDataHandler(&redis.DataHandlerConfig{
+	dh := storage.NewDataHandler(&storage.DataHandlerConfig{
 		ZoneCacheSize:      10000,
 		ZoneCacheTimeout:   60,
 		ZoneReload:         1,
 		RecordCacheSize:    1000000,
 		RecordCacheTimeout: 60,
-		Redis: redis.RedisConfig{
+		Redis: hiredis.RedisConfig{
 			Suffix:  "_redis2",
 			Prefix:  "",
 			Address: redisAddress,
 			Net:     "tcp",
 			DB:      0,
-			Connection: redis.RedisConnectionConfig{
+			Connection: hiredis.RedisConnectionConfig{
 				MaxIdleConnections:   10,
 				MaxActiveConnections: 10,
 				ConnectTimeout:       500,

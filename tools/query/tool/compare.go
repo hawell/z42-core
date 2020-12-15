@@ -2,7 +2,7 @@ package tool
 
 import (
 	"fmt"
-	"github.com/hawell/z42/test"
+	"github.com/hawell/z42/internal/test"
 	"github.com/hawell/z42/tools/query/query"
 	"github.com/miekg/dns"
 	"sort"

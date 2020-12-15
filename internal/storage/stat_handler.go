@@ -1,9 +1,10 @@
-package redis
+package storage
 
 import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/hawell/logger"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/types"
+	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	"strings"
 	"sync"
@@ -15,11 +16,11 @@ const (
 )
 
 type StatHandlerConfig struct {
-	Redis RedisConfig `json:"redis"`
+	Redis hiredis.RedisConfig `json:"redis"`
 }
 
 type StatHandler struct {
-	redis  *Redis
+	redis  *hiredis.Redis
 	cache  *ristretto.Cache
 	quit   chan struct{}
 	quitWG sync.WaitGroup
@@ -27,7 +28,7 @@ type StatHandler struct {
 
 func NewStatHandler(config *StatHandlerConfig) *StatHandler {
 	sh := &StatHandler{
-		redis: NewRedis(&config.Redis),
+		redis: hiredis.NewRedis(&config.Redis),
 		quit:  make(chan struct{}),
 	}
 	sh.cache, _ = ristretto.NewCache(&ristretto.Config{

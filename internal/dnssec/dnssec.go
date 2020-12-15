@@ -3,7 +3,7 @@ package dnssec
 import (
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/types"
 
 	"github.com/hawell/logger"
 	"github.com/miekg/dns"

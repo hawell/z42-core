@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/z42/geoip"
-	"github.com/hawell/z42/handler/logformat"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/test"
-	"github.com/hawell/z42/upstream"
+	"github.com/hawell/z42/internal/geoip"
+	"github.com/hawell/z42/internal/handler/logformat"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/test"
+	"github.com/hawell/z42/internal/upstream"
+	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"io/ioutil"
@@ -20,13 +21,13 @@ import (
 	capnp "zombiezen.com/go/capnproto2"
 )
 
-var logRedisDataTestConfig = redis.DataHandlerConfig{
+var logRedisDataTestConfig = storage.DataHandlerConfig{
 	ZoneCacheSize:      10000,
 	ZoneCacheTimeout:   60,
 	ZoneReload:         60,
 	RecordCacheSize:    1000000,
 	RecordCacheTimeout: 60,
-	Redis: redis.RedisConfig{
+	Redis: hiredis.RedisConfig{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
@@ -62,8 +63,8 @@ var logHandlerTestConfig = DnsRequestHandlerConfig{
 	},
 	GeoIp: geoip.Config{
 		Enable:    true,
-		CountryDB: "../geoCity.mmdb",
-		ASNDB:     "../geoIsp.mmdb",
+		CountryDB: "../../assets/geoCity.mmdb",
+		ASNDB:     "../../assets/geoIsp.mmdb",
 	},
 }
 
@@ -85,7 +86,7 @@ func TestJsonLog(t *testing.T) {
 	os.Remove("/tmp/test.log")
 
 	logHandlerTestConfig.Log.Format = "json"
-	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	rd := storage.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)
@@ -136,7 +137,7 @@ func TestCapnpLog(t *testing.T) {
 	os.Remove("/tmp/test.log")
 
 	logHandlerTestConfig.Log.Format = "capnp_request"
-	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	rd := storage.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)
@@ -193,7 +194,7 @@ func TestCapnpLogNotAuth(t *testing.T) {
 	os.Remove("/tmp/test.log")
 
 	logHandlerTestConfig.Log.Format = "capnp_request"
-	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	rd := storage.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Clear()
 	h.RedisData.LoadZones()
@@ -238,7 +239,7 @@ func TestKafkaCapnpLog(t *testing.T) {
 	logHandlerTestConfig.Log.Format = "text"
 	logHandlerTestConfig.Log.Kafka.Enable = true
 	logHandlerTestConfig.Log.Kafka.Format = "capnp_request"
-	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	rd := storage.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)
@@ -324,7 +325,7 @@ func TestUdpCapnpLog(t *testing.T) {
 	logHandlerTestConfig.Log.Format = "capnp_request"
 	logHandlerTestConfig.Log.Target = "udp"
 	logHandlerTestConfig.Log.Path = "localhost:9090"
-	rd := redis.NewDataHandler(&logRedisDataTestConfig)
+	rd := storage.NewDataHandler(&logRedisDataTestConfig)
 	h := NewHandler(&logHandlerTestConfig, rd)
 	h.RedisData.Clear()
 	h.RedisData.EnableZone(logZone)

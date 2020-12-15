@@ -1,17 +1,17 @@
 package handler
 
 import (
+	"github.com/hawell/z42/internal/storage"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/hawell/z42/dnssec"
-	"github.com/hawell/z42/geoip"
-	"github.com/hawell/z42/handler/logformat"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/types"
-	"github.com/hawell/z42/upstream"
+	"github.com/hawell/z42/internal/dnssec"
+	"github.com/hawell/z42/internal/geoip"
+	"github.com/hawell/z42/internal/handler/logformat"
+	"github.com/hawell/z42/internal/types"
+	"github.com/hawell/z42/internal/upstream"
 	"github.com/sirupsen/logrus"
 
 	"github.com/hawell/logger"
@@ -20,7 +20,7 @@ import (
 
 type DnsRequestHandler struct {
 	Config    *DnsRequestHandlerConfig
-	RedisData *redis.DataHandler
+	RedisData *storage.DataHandler
 	Logger    *logger.EventLogger
 	geoip     *geoip.GeoIp
 	upstream  *upstream.Upstream
@@ -37,7 +37,7 @@ type DnsRequestHandlerConfig struct {
 	Log               logger.LogConfig          `json:"log"`
 }
 
-func NewHandler(config *DnsRequestHandlerConfig, redisData *redis.DataHandler) *DnsRequestHandler {
+func NewHandler(config *DnsRequestHandlerConfig, redisData *storage.DataHandler) *DnsRequestHandler {
 	h := &DnsRequestHandler{
 		Config:    config,
 		RedisData: redisData,
@@ -330,14 +330,14 @@ func (h *DnsRequestHandler) filter(sourceIp net.IP, rrset *types.IP_RRSet) []net
 	//mask = h.healthcheck.FilterHealthcheck(name, rrset, mask)
 	switch rrset.FilterConfig.GeoFilter {
 	case "asn":
-		mask = h.geoip.GetSameASN(sourceIp, rrset.Data, mask)
+		mask, _ = h.geoip.GetSameASN(sourceIp, rrset.Data, mask)
 	case "country":
-		mask = h.geoip.GetSameCountry(sourceIp, rrset.Data, mask)
+		mask, _ = h.geoip.GetSameCountry(sourceIp, rrset.Data, mask)
 	case "asn+country":
-		mask = h.geoip.GetSameASN(sourceIp, rrset.Data, mask)
-		mask = h.geoip.GetSameCountry(sourceIp, rrset.Data, mask)
+		mask, _ = h.geoip.GetSameASN(sourceIp, rrset.Data, mask)
+		mask, _ = h.geoip.GetSameCountry(sourceIp, rrset.Data, mask)
 	case "location":
-		mask = h.geoip.GetMinimumDistance(sourceIp, rrset.Data, mask)
+		mask, _ = h.geoip.GetMinimumDistance(sourceIp, rrset.Data, mask)
 	default:
 	}
 

@@ -2,7 +2,7 @@ package handler
 
 import (
 	"fmt"
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/types"
 	"log"
 	"net"
 	"testing"

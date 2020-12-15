@@ -1,9 +1,10 @@
-package redis
+package storage
 
 import (
 	"fmt"
 	redisCon "github.com/gomodule/redigo/redis"
 	"github.com/google/go-cmp/cmp"
+	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	"net"
 	"reflect"
@@ -11,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hawell/z42/types"
+	"github.com/hawell/z42/internal/types"
 	"github.com/miekg/dns"
 )
 
@@ -21,13 +22,13 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 	ZoneReload:         1,
 	RecordCacheSize:    1000000,
 	RecordCacheTimeout: 60,
-	Redis: RedisConfig{
+	Redis: hiredis.RedisConfig{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
 		Address: "redis:6379",
 		Net:     "tcp",
 		DB:      0,
-		Connection: RedisConnectionConfig{
+		Connection: hiredis.RedisConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       600,

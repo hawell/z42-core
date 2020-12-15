@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/logger"
-	"github.com/hawell/z42/geoip"
-	"github.com/hawell/z42/redis"
-	"github.com/hawell/z42/test"
-	"github.com/hawell/z42/upstream"
+	"github.com/hawell/z42/internal/geoip"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/test"
+	"github.com/hawell/z42/internal/upstream"
+	"github.com/hawell/z42/pkg/hiredis"
 	"testing"
 )
 
@@ -15,7 +16,7 @@ type TestCase struct {
 	Name            string
 	Description     string
 	Enabled         bool
-	RedisDataConfig redis.DataHandlerConfig
+	RedisDataConfig storage.DataHandlerConfig
 	HandlerConfig   DnsRequestHandlerConfig
 	Initialize      func(testCase *TestCase) (*DnsRequestHandler, error)
 	ApplyAndVerify  func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T)
@@ -28,7 +29,7 @@ type TestCase struct {
 func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
-	r := redis.NewDataHandler(&testCase.RedisDataConfig)
+	r := storage.NewDataHandler(&testCase.RedisDataConfig)
 	h := NewHandler(&testCase.HandlerConfig, r)
 	if err := h.RedisData.Clear(); err != nil {
 		return nil, err
@@ -72,20 +73,20 @@ func DefaultApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler
 	}
 }
 
-var DefaultRedisDataTestConfig = redis.DataHandlerConfig{
+var DefaultRedisDataTestConfig = storage.DataHandlerConfig{
 	ZoneCacheSize:      10000,
 	ZoneCacheTimeout:   60,
 	ZoneReload:         60,
 	RecordCacheSize:    1000000,
 	RecordCacheTimeout: 60,
-	Redis: redis.RedisConfig{
+	Redis: hiredis.RedisConfig{
 		Address:  "redis:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
 		Prefix:   "test_",
 		Suffix:   "_test",
-		Connection: redis.RedisConnectionConfig{
+		Connection: hiredis.RedisConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
 			ConnectTimeout:       500,
@@ -112,8 +113,8 @@ var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
 	},
 	GeoIp: geoip.Config{
 		Enable:    true,
-		CountryDB: "../geoCity.mmdb",
-		ASNDB:     "../geoIsp.mmdb",
+		CountryDB: "../../assets/geoCity.mmdb",
+		ASNDB:     "../../assets/geoIsp.mmdb",
 	},
 }
 
