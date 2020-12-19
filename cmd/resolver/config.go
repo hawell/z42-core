@@ -27,12 +27,12 @@ import (
 )
 
 type Config struct {
-	Server      []server.ServerConfig           `json:"server"`
-	ErrorLog    logger.LogConfig                `json:"error_log"`
-	RedisData   storage.DataHandlerConfig       `json:"redis_data"`
-	RedisStat   storage.StatHandlerConfig       `json:"redis_stat"`
-	Handler     handler.DnsRequestHandlerConfig `json:"handler"`
-	RateLimit   ratelimit.Config                `json:"ratelimit"`
+	Server    []server.ServerConfig           `json:"server"`
+	ErrorLog  logger.LogConfig                `json:"error_log"`
+	RedisData storage.DataHandlerConfig       `json:"redis_data"`
+	RedisStat storage.StatHandlerConfig       `json:"redis_stat"`
+	Handler   handler.DnsRequestHandlerConfig `json:"handler"`
+	RateLimit ratelimit.Config                `json:"ratelimit"`
 }
 
 var resolverDefaultConfig = &Config{

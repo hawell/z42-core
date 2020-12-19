@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	redisDataHandler  *storage.DataHandler
-	redisStatHandler  *storage.StatHandler
-	healthChecker     *healthcheck.Healthcheck
-	configFile string
+	redisDataHandler *storage.DataHandler
+	redisStatHandler *storage.StatHandler
+	healthChecker    *healthcheck.Healthcheck
+	configFile       string
 )
 
 func main() {

@@ -333,11 +333,12 @@ func (h *Healthcheck) Transfer() {
 							continue
 						}
 						for i := range rrset.Data {
-							key := record.Fqdn + ":" + rrset.Data[i].Ip.String()
+							fqdn := subdomain + "." + domain
+							key := fqdn + ":" + rrset.Data[i].Ip.String()
 							newItem := &types.HealthCheckItem{
 								Ip:        rrset.Data[i].Ip.String(),
 								Port:      rrset.HealthCheckConfig.Port,
-								Host:      record.Fqdn,
+								Host:      fqdn,
 								Enable:    rrset.HealthCheckConfig.Enable,
 								DownCount: rrset.HealthCheckConfig.DownCount,
 								UpCount:   rrset.HealthCheckConfig.UpCount,

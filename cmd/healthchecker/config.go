@@ -123,7 +123,6 @@ var healthcheckerDefaultConfig = &Config{
 	},
 }
 
-
 func LoadConfig(path string) (*Config, error) {
 	config := healthcheckerDefaultConfig
 	configFile, err := os.Open(path)

@@ -32,7 +32,7 @@ type DnsRequestHandler struct {
 
 type DnsRequestHandlerConfig struct {
 	Upstream          []upstream.UpstreamConfig `json:"upstream"`
-	GeoIp             geoip.Config             `json:"geoip"`
+	GeoIp             geoip.Config              `json:"geoip"`
 	MaxTtl            int                       `json:"max_ttl"`
 	LogSourceLocation bool                      `json:"log_source_location"`
 	Log               logger.LogConfig          `json:"log"`
@@ -165,12 +165,13 @@ loop:
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
-			if len(currentRecord.NS.Data) > 0 && currentRecord.Fqdn != context.zone.Name {
+			if len(currentRecord.NS.Data) > 0 {
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
-				context.Authority = append(context.Authority, h.ns(currentRecord.Fqdn, currentRecord)...)
-				ds := h.ds(currentRecord.Fqdn, currentRecord)
+				cutPoint := location + "." + zoneName
+				context.Authority = append(context.Authority, h.ns(cutPoint, currentRecord)...)
+				ds := h.ds(cutPoint, currentRecord)
 				if len(ds) == 0 {
-					addNSec(context, currentRecord.Fqdn, dns.TypeDS)
+					addNSec(context, cutPoint, dns.TypeDS)
 				}
 				context.Authority = append(context.Authority, ds...)
 				for _, ns := range currentRecord.NS.Data {
@@ -222,7 +223,7 @@ loop:
 				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
 				ds := h.ds(currentQName, currentRecord)
 				if len(ds) == 0 {
-					addNSec(context, currentRecord.Fqdn, dns.TypeDS)
+					addNSec(context, currentQName, dns.TypeDS)
 				}
 				if context.QType() == dns.TypeDS {
 					context.Answer = append(context.Answer, ds...)
@@ -286,7 +287,7 @@ loop:
 				answer = h.srv(currentQName, currentRecord)
 			case dns.TypeCAA:
 				// TODO: handle findCAA error response
-				caaRecord := h.findCAA(context, currentRecord)
+				caaRecord := h.findCAA(context, currentQName)
 				if caaRecord != nil {
 					answer = h.caa(currentQName, caaRecord)
 				}
@@ -612,11 +613,11 @@ func orderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 	}
 }
 
-func (h *DnsRequestHandler) findCAA(context *RequestContext, record *types.Record) *types.Record {
+func (h *DnsRequestHandler) findCAA(context *RequestContext, query string) *types.Record {
 	zone := context.zone
-	currentRecord := record
-	currentLocation := strings.TrimSuffix(currentRecord.Fqdn, "."+zone.Name)
-	if len(currentRecord.CAA.Data) != 0 {
+	currentLocation, _ := zone.FindLocation(query)
+	currentRecord, err := h.RedisData.GetLocation(zone.Name, currentLocation)
+	if err == nil && len(currentRecord.CAA.Data) != 0 {
 		return currentRecord
 	}
 	for {
@@ -640,7 +641,7 @@ func (h *DnsRequestHandler) findCAA(context *RequestContext, record *types.Recor
 			return currentRecord
 		}
 	}
-	currentRecord, err := h.RedisData.GetLocation(zone.Name, "@")
+	currentRecord, err = h.RedisData.GetLocation(zone.Name, "@")
 	if err != nil {
 		return nil
 	}

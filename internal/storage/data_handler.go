@@ -285,13 +285,11 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 
 	answer, err, _ := dh.recordInflight.Do(key, func() (interface{}, error) {
 		r := new(types.Record)
-		r.Label = label
 		r.CacheTimeout = time.Now().Unix() + dh.recordCacheTimeout
 
 		val, err := dh.redis.Get(zoneLocationKey(zone, label))
 		if err != nil {
 			if label == "@" {
-				r.Fqdn = zone
 				dh.recordCache.Set(key, r, 1)
 				return r, nil
 			}
@@ -304,11 +302,6 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 				logger.Default.Errorf("cannot parse json : zone -> %s, label -> %s, \"%s\" -> %s", zone, label, val, err)
 				return nil, err
 			}
-		}
-		if label == "@" {
-			r.Fqdn = zone
-		} else {
-			r.Fqdn = label + "." + zone
 		}
 		dh.recordCache.Set(key, r, 1)
 		return r, nil

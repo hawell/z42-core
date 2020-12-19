@@ -332,22 +332,12 @@ func TestGetLocation(t *testing.T) {
 				},
 			},
 		},
-		Label: "@",
-		Fqdn:  "zone1.com.",
 	}
 	l, err := dh.GetLocation("zone1.com.", "@")
 	if err != nil {
 		t.FailNow()
 	}
 	if l == nil {
-		t.Fail()
-	}
-	if l.Fqdn != location.Fqdn {
-		fmt.Println("fqdn name mismatch", l.Fqdn, location.Fqdn)
-		t.Fail()
-	}
-	if l.Label != location.Label {
-		fmt.Println("label name mismatch", l.Label, location.Label)
 		t.Fail()
 	}
 	if reflect.DeepEqual(l.A, location.A) == false {
@@ -382,8 +372,6 @@ func TestSetLocation(t *testing.T) {
 				},
 			},
 		},
-		Label: "@",
-		Fqdn:  zoneName,
 	}
 	err = dh.SetLocation(zoneName, "@", &location)
 	if err != nil {
@@ -392,14 +380,6 @@ func TestSetLocation(t *testing.T) {
 	l, err := dh.GetLocation(zoneName, "@")
 	if err != nil {
 		t.FailNow()
-	}
-	if l.Fqdn != location.Fqdn {
-		fmt.Println("fqdn name mismatch", l.Fqdn, location.Fqdn)
-		t.Fail()
-	}
-	if l.Label != location.Label {
-		fmt.Println("label name mismatch", l.Label, location.Label)
-		t.Fail()
 	}
 	if reflect.DeepEqual(l.A, location.A) == false {
 		fmt.Println("l.A not equal location.A", l.A, location.A)
@@ -424,8 +404,6 @@ func TestSetLocationFromJson(t *testing.T) {
 			"caa":{"ttl":300, "records":[{"tag":"issue", "value":"godaddy2.com;", "flag":0}]}
 		}`
 	location := types.Record{
-		Label:        "@",
-		Fqdn:         "example.com.",
 		CacheTimeout: time.Now().Unix() + int64(dataHandlerDefaultTestConfig.RecordCacheTimeout),
 	}
 	err := jsoniter.Unmarshal([]byte(locationStr), &location)
@@ -453,14 +431,6 @@ func TestSetLocationFromJson(t *testing.T) {
 	if err != nil {
 		fmt.Println("5")
 		t.FailNow()
-	}
-	if l.Fqdn != zoneName {
-		fmt.Println("6")
-		t.Fail()
-	}
-	if l.Label != "@" {
-		fmt.Println("7")
-		t.Fail()
 	}
 	if cmp.Equal(&location, l) != true {
 		fmt.Println(cmp.Diff(&location, l))

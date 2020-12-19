@@ -30,7 +30,6 @@ type RRSets struct {
 type Record struct {
 	RRSets
 	Label        string `json:"-"`
-	Fqdn         string `json:"-"`
 	CacheTimeout int64  `json:"-"`
 }
 
