@@ -1,16 +1,16 @@
 package geotools
 
 import (
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/geoip"
+	"go.uber.org/zap"
 	"net"
 )
 
 func GetSameCountry(g *geoip.GeoIp, sourceIp net.IP, ips []types.IP_RR, mask []int) ([]int, error) {
 	sourceCountry, err := g.GetCountry(sourceIp)
 	if err != nil {
-		logger.Default.Error("getSameCountry failed")
+		zap.L().Error("getSameCountry failed")
 		return mask, err
 	}
 
@@ -57,7 +57,7 @@ func GetSameCountry(g *geoip.GeoIp, sourceIp net.IP, ips []types.IP_RR, mask []i
 func GetSameASN(g *geoip.GeoIp, sourceIp net.IP, ips []types.IP_RR, mask []int) ([]int, error) {
 	sourceASN, err := g.GetASN(sourceIp)
 	if err != nil {
-		logger.Default.Error("getSameASN failed")
+		zap.L().Error("getSameASN failed")
 		return mask, err
 	}
 
@@ -107,7 +107,7 @@ func GetMinimumDistance(g *geoip.GeoIp, sourceIp net.IP, ips []types.IP_RR, mask
 	dists := make([]float64, 0, len(mask))
 	slat, slong, err := g.GetCoordinates(sourceIp)
 	if err != nil {
-		logger.Default.Error("getMinimumDistance failed")
+		zap.L().Error("getMinimumDistance failed")
 		return mask, err
 	}
 	for i, x := range mask {

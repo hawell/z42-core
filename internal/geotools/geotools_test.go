@@ -2,7 +2,6 @@ package geotools
 
 import (
 	"fmt"
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/geoip"
 	"log"
@@ -62,7 +61,6 @@ func TestGeoIpAutomatic(t *testing.T) {
 		Enable:    true,
 		CountryDB: countryDB,
 	}
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
 	g := geoip.NewGeoIp(&cfg)
 
@@ -111,7 +109,6 @@ func TestGetSameCountry(t *testing.T) {
 		Enable:    true,
 		CountryDB: countryDB,
 	}
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
 	g := geoip.NewGeoIp(&cfg)
 

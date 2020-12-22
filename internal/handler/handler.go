@@ -4,87 +4,55 @@ import (
 	"github.com/hawell/z42/internal/geotools"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/pkg/geoip"
+	"go.uber.org/zap"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/hawell/z42/internal/dnssec"
-	"github.com/hawell/z42/internal/handler/logformat"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/internal/upstream"
-	"github.com/sirupsen/logrus"
 
-	"github.com/hawell/logger"
 	"github.com/miekg/dns"
 )
 
 type DnsRequestHandler struct {
-	Config    *DnsRequestHandlerConfig
-	RedisData *storage.DataHandler
-	Logger    *logger.EventLogger
-	geoip     *geoip.GeoIp
-	upstream  *upstream.Upstream
-	quit      chan struct{}
-	quitWG    sync.WaitGroup
-	logQueue  chan map[string]interface{}
+	Config        *DnsRequestHandlerConfig
+	RedisData     *storage.DataHandler
+	requestLogger *zap.Logger
+	geoip         *geoip.GeoIp
+	upstream      *upstream.Upstream
+	quit          chan struct{}
+	quitWG        sync.WaitGroup
 }
 
 type DnsRequestHandlerConfig struct {
-	Upstream          []upstream.UpstreamConfig `json:"upstream"`
-	GeoIp             geoip.Config              `json:"geoip"`
-	MaxTtl            int                       `json:"max_ttl"`
-	LogSourceLocation bool                      `json:"log_source_location"`
-	Log               logger.LogConfig          `json:"log"`
+	Upstream          []upstream.Config `json:"upstream"`
+	GeoIp             geoip.Config      `json:"geoip"`
+	MaxTtl            int               `json:"max_ttl"`
+	LogSourceLocation bool              `json:"log_source_location"`
 }
 
-func NewHandler(config *DnsRequestHandlerConfig, redisData *storage.DataHandler) *DnsRequestHandler {
+func NewHandler(config *DnsRequestHandlerConfig, redisData *storage.DataHandler, requestLogger *zap.Logger) *DnsRequestHandler {
 	h := &DnsRequestHandler{
-		Config:    config,
-		RedisData: redisData,
+		Config:        config,
+		RedisData:     redisData,
+		requestLogger: requestLogger,
 	}
 
-	getFormatter := func(name string) logrus.Formatter {
-		switch name {
-		case "capnp_request":
-			return &logformat.CapnpRequestLogFormatter{}
-		case "json":
-			return &logrus.JSONFormatter{TimestampFormat: h.Config.Log.TimeFormat}
-		case "text":
-			return &logrus.TextFormatter{TimestampFormat: h.Config.Log.TimeFormat}
-		default:
-			return &logrus.TextFormatter{TimestampFormat: h.Config.Log.TimeFormat}
-		}
-	}
-
-	h.logQueue = make(chan map[string]interface{}, 1000)
-	h.Logger = logger.NewLogger(&config.Log, getFormatter)
 	h.geoip = geoip.NewGeoIp(&config.GeoIp)
 	h.upstream = upstream.NewUpstream(config.Upstream)
 	h.quit = make(chan struct{})
-
-	go func() {
-		h.quitWG.Add(1)
-		for {
-			select {
-			case <-h.quit:
-				close(h.logQueue)
-				h.quitWG.Done()
-				return
-			case data := <-h.logQueue:
-				h.Logger.Log(data, "dns request")
-			}
-		}
-	}()
 
 	return h
 }
 
 func (h *DnsRequestHandler) ShutDown() {
-	// logger.Default.Debug("handler : stopping")
+	zap.L().Debug("handler : stopping")
 	close(h.quit)
 	h.quitWG.Wait()
-	// logger.Default.Debug("handler : stopped")
+	zap.L().Debug("handler : stopped")
 }
 
 func (h *DnsRequestHandler) response(context *RequestContext) {
@@ -93,22 +61,33 @@ func (h *DnsRequestHandler) response(context *RequestContext) {
 }
 
 func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
-	// logger.Default.Debugf("[%d] start handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
+	zap.L().Debug(
+		"start handle request",
+		zap.Uint16("id", context.Req.Id),
+		zap.String("query", context.RawName()),
+		zap.String("type", context.Type()),
+	)
 	if h.Config.LogSourceLocation {
 		sourceIP := context.SourceIp
-		sourceCountry, _ := h.geoip.GetCountry(sourceIP)
-		context.LogData["source_country"] = sourceCountry
-		sourceASN, _ := h.geoip.GetASN(sourceIP)
-		context.LogData["source_asn"] = sourceASN
+		context.SourceCountry, _ = h.geoip.GetCountry(sourceIP)
+		context.SourceASN, _ = h.geoip.GetASN(sourceIP)
 	}
 
 	zoneName := h.RedisData.FindZone(context.RawName())
 	if zoneName == "" {
+		zap.L().Debug(
+			"zone not found",
+			zap.Uint16("id", context.Req.Id),
+		)
 		context.Res = dns.RcodeNotAuth
 		h.response(context)
 		return
 	}
-	// logger.Default.Debugf("[%d] zone name : %s", context.Req.Id, zoneName)
+	zap.L().Debug(
+		"zone matched",
+		zap.Uint16("id", context.Req.Id),
+		zap.String("zone", zoneName),
+	)
 
 	context.zone = h.RedisData.GetZone(zoneName)
 	if context.zone == nil {
@@ -116,7 +95,7 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 		h.response(context)
 		return
 	}
-	context.LogData["domain_uuid"] = context.zone.Config.DomainId
+	context.DomainUid = context.zone.Config.DomainId
 
 	context.dnssec = context.Do() && context.Auth && context.zone.Config.DnsSec
 	cnameFlattening := context.dnssec || context.zone.Config.CnameFlattening
@@ -126,7 +105,11 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 loop:
 	for {
 		if loopCount > 10 {
-			logger.Default.Errorf("CNAME loop in request %s->%s", context.RawName(), context.Type())
+			zap.L().Error(
+				"CNAME loop in request",
+				zap.String("query", context.RawName()),
+				zap.String("type", context.Type()),
+			)
 			context.Answer = []dns.RR{}
 			context.Res = dns.RcodeServerFailure
 			break loop
@@ -134,7 +117,11 @@ loop:
 		loopCount++
 
 		if h.RedisData.FindZone(currentQName) != zoneName {
-			// logger.Default.Debugf("[%d] out of zone - qname : %s, zone : %s", context.Req.Id, currentQName, zoneName)
+			zap.L().Debug(
+				"out of zone",
+				zap.Uint16("id", context.Req.Id),
+				zap.String("qname", currentQName),
+			)
 			context.Res = dns.RcodeSuccess
 			if len(context.Answer) == 0 {
 				addNSec(context, context.RawName(), context.QType())
@@ -145,28 +132,47 @@ loop:
 		location, match := context.zone.FindLocation(currentQName)
 		switch match {
 		case types.NoMatch:
-			// logger.Default.Debugf("[%d] no location matched for %s in %s", context.Req.Id, currentQName, zoneName)
+			zap.L().Debug(
+				"no location matched",
+				zap.Uint16("id", context.Req.Id),
+				zap.String("qname", currentQName),
+			)
 			context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 			context.Res = dns.RcodeNameError
 			addNSec(context, currentQName, dns.TypeNone)
 			break loop
 
 		case types.EmptyNonterminalMatch:
-			// logger.Default.Debugf("[%d] empty nonterminal match: %s", context.Req.Id)
+			zap.L().Debug(
+				"empty non-terminal matched",
+				zap.Uint16("id", context.Req.Id),
+				zap.String("qname", currentQName),
+				zap.String("location", location),
+			)
 			context.Authority = []dns.RR{context.zone.Config.SOA.Data}
 			context.Res = dns.RcodeSuccess
 			addNSec(context, currentQName, dns.TypeNone)
 			break loop
 
 		case types.CEMatch:
-			// logger.Default.Debugf("[%d] ce match: %s -> %s", context.Req.Id, currentQName, location)
+			zap.L().Debug(
+				"ce math",
+				zap.Uint16("id", context.Req.Id),
+				zap.String("qname", currentQName),
+				zap.String("location", location),
+			)
 			currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
 			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
 			if len(currentRecord.NS.Data) > 0 {
-				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
+				zap.L().Debug(
+					"sub delegation",
+					zap.Uint16("id", context.Req.Id),
+					zap.String("qname", currentQName),
+					zap.String("location", location),
+				)
 				cutPoint := location + "." + zoneName
 				context.Authority = append(context.Authority, h.ns(cutPoint, currentRecord)...)
 				ds := h.ds(cutPoint, currentRecord)
@@ -197,18 +203,27 @@ loop:
 			}
 
 		case types.WildCardMatch:
-			// logger.Default.Debugf("[%d] wildcard match: %s", context.Req.Id, currentRecord.Name)
 			fallthrough
 
 		case types.ExactMatch:
-			// logger.Default.Debugf("[%d] loading location %s", context.Req.Id, location)
+			zap.L().Debug(
+				"match",
+				zap.Uint16("id", context.Req.Id),
+				zap.String("qname", currentQName),
+				zap.String("location", location),
+			)
 			currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
 			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
 			if currentRecord.CNAME != nil && context.QType() != dns.TypeCNAME {
-				// logger.Default.Debugf("[%d] cname chain %s -> %s", context.Req.Id, currentQName, currentRecord.CNAME.Host)
+				zap.L().Debug(
+					"cname chain",
+					zap.Uint16("id", context.Req.Id),
+					zap.String("source", currentQName),
+					zap.String("destination", currentRecord.CNAME.Host),
+				)
 				if !cnameFlattening {
 					context.Answer = append(context.Answer, h.cname(currentQName, currentRecord)...)
 				} else if h.RedisData.FindZone(currentRecord.CNAME.Host) != zoneName {
@@ -220,7 +235,10 @@ loop:
 				continue
 			}
 			if len(currentRecord.NS.Data) > 0 && currentQName != context.zone.Name {
-				// logger.Default.Debugf("[%d] delegation", context.Req.Id)
+				zap.L().Debug(
+					"delegation",
+					zap.Uint16("id", context.Req.Id),
+				)
 				ds := h.ds(currentQName, currentRecord)
 				if len(ds) == 0 {
 					addNSec(context, currentQName, dns.TypeDS)
@@ -249,7 +267,11 @@ loop:
 				break loop
 			}
 
-			// logger.Default.Debugf("[%d] final location : %s", context.Req.Id, currentQName)
+			zap.L().Debug(
+				"final location",
+				zap.Uint16("id", context.Req.Id),
+				zap.String("qname", currentQName),
+			)
 			if cnameFlattening {
 				currentQName = context.RawName()
 			}
@@ -323,7 +345,12 @@ loop:
 	applyDnssec(context)
 
 	h.response(context)
-	// logger.Default.Debugf("[%d] end handle request - name : %s, type : %s", context.Req.Id, context.RawName(), context.Type())
+	zap.L().Debug(
+		"end handle request",
+		zap.Uint16("id", context.Req.Id),
+		zap.String("query", context.RawName()),
+		zap.String("type", context.Type()),
+	)
 }
 
 func (h *DnsRequestHandler) filter(sourceIp net.IP, rrset *types.IP_RRSet) []net.IP {
@@ -347,14 +374,16 @@ func (h *DnsRequestHandler) filter(sourceIp net.IP, rrset *types.IP_RRSet) []net
 }
 
 func (h *DnsRequestHandler) logRequest(state *RequestContext) {
-	state.LogData["process_time"] = time.Since(state.StartTime).Nanoseconds() / 1000000
-	state.LogData["response_code"] = state.Res
-	state.LogData["log_type"] = "request"
-	select {
-	case h.logQueue <- state.LogData:
-	default:
-		logger.Default.Warning("log queue is full")
-	}
+	h.requestLogger.Info("query",
+		zap.String("domain.id", state.DomainUid),
+		zap.String("zone", state.Zone),
+		zap.String("source.ip", state.SourceIp.String()),
+		zap.String("source.subnet", state.SourceSubnet),
+		zap.String("source.country", state.SourceCountry),
+		zap.Uint("source.asn", state.SourceASN),
+		zap.Duration("process_time", time.Since(state.StartTime)),
+		zap.Int("response_code", state.Res),
+	)
 }
 
 func (h *DnsRequestHandler) a(name string, record *types.Record, ips []net.IP) (answers []dns.RR) {
@@ -621,7 +650,7 @@ func (h *DnsRequestHandler) findCAA(context *RequestContext, query string) *type
 		return currentRecord
 	}
 	for {
-		// logger.Default.Debug("location : ", currentLocation)
+		zap.L().Debug("caa location", zap.String("location", currentLocation))
 		splits := strings.SplitAfterN(currentLocation, ".", 2)
 		if len(splits) != 2 {
 			break
@@ -652,20 +681,28 @@ func (h *DnsRequestHandler) findCAA(context *RequestContext, query string) *type
 }
 
 func (h *DnsRequestHandler) findANAME(context *RequestContext, aname string, qtype uint16) ([]net.IP, int, uint32) {
-	// logger.Default.Debug("finding aname")
+	zap.L().Debug("finding aname")
 	currentQName := aname
 	loopCount := 0
 	for {
 		if loopCount > 10 {
-			logger.Default.Errorf("ANAME loop in request %s->%s", context.RawName(), context.Type())
+			zap.L().Error(
+				"ANAME loop in request",
+				zap.String("query", context.RawName()),
+				zap.String("type", context.Type()),
+			)
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 		loopCount++
 
 		zoneName := h.RedisData.FindZone(currentQName)
-		// logger.Default.Debug("zone : ", zoneName, " qname : ", currentQName, " record : ", currentRecord.Name)
+		zap.L().Debug(
+			"find zone",
+			zap.String("zone", zoneName),
+			zap.String("qname", currentQName),
+		)
 		if zoneName == "" || zoneName != context.zone.Name {
-			// logger.Default.Debug("non-authoritative zone, using upstream")
+			zap.L().Debug("non-authoritative zone, using upstream")
 			upstreamAnswers, upstreamRes := h.upstream.Query(currentQName, qtype)
 			if upstreamRes == dns.RcodeSuccess {
 				var ips []net.IP
@@ -692,7 +729,10 @@ func (h *DnsRequestHandler) findANAME(context *RequestContext, aname string, qty
 
 		location, matchType := context.zone.FindLocation(currentQName)
 		if matchType == types.NoMatch {
-			// logger.Default.Debugf("location not found for %s", currentQName)
+			zap.L().Debug(
+				"location not found",
+				zap.String("qname", currentQName),
+			)
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 
@@ -701,21 +741,21 @@ func (h *DnsRequestHandler) findANAME(context *RequestContext, aname string, qty
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 		if currentRecord.CNAME != nil {
-			// logger.Default.Debug("cname")
+			zap.L().Debug("cname")
 			currentQName = currentRecord.CNAME.Host
 			continue
 		}
 
 		if qtype == dns.TypeA && len(currentRecord.A.Data) > 0 {
-			// logger.Default.Debug("found a")
+			zap.L().Debug("found a")
 			return h.filter(context.SourceIp, &currentRecord.A), dns.RcodeSuccess, currentRecord.A.Ttl
 		} else if qtype == dns.TypeAAAA && len(currentRecord.AAAA.Data) > 0 {
-			// logger.Default.Debug("found aaaa")
+			zap.L().Debug("found aaaa")
 			return h.filter(context.SourceIp, &currentRecord.AAAA), dns.RcodeSuccess, currentRecord.AAAA.Ttl
 		}
 
 		if currentRecord.ANAME != nil {
-			// logger.Default.Debug("aname")
+			zap.L().Debug("aname")
 			currentQName = currentRecord.ANAME.Location
 			continue
 		}

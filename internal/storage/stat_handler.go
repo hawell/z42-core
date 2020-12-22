@@ -2,10 +2,10 @@ package storage
 
 import (
 	"github.com/dgraph-io/ristretto"
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
+	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +49,7 @@ func NewStatHandler(config *StatHandlerConfig) *StatHandler {
 				sh.cache.Del(key)
 			},
 			func(err error) {
-				logger.Default.Error(err)
+				zap.L().Error("subscribe error", zap.Error(err))
 			},
 			quit)
 
@@ -76,7 +76,7 @@ func (sh *StatHandler) GetHealthcheckItem(key string) (*types.HealthCheckItem, e
 	item := new(types.HealthCheckItem)
 	itemStr, err := sh.redis.Get("z42:healthcheck:" + key)
 	if err != nil {
-		logger.Default.Errorf("cannot load item %s : %s", key, err)
+		zap.L().Error("cannot load item", zap.String("key", key), zap.Error(err))
 		return nil, err
 	}
 	jsoniter.Unmarshal([]byte(itemStr), item)
@@ -90,10 +90,9 @@ func (sh *StatHandler) SetHealthcheckItem(item *types.HealthCheckItem) error {
 	key := item.Host + ":" + item.Ip
 	itemStr, err := jsoniter.Marshal(item)
 	if err != nil {
-		logger.Default.Errorf("cannot marshal item to json : %s", err)
+		zap.L().Error("cannot marshal item to json", zap.Error(err))
 		return err
 	}
-	// logger.Default.Debugf("setting %v in redis : %s", *item, string(itemStr))
 	sh.redis.Set("z42:healthcheck:"+key, string(itemStr))
 	return nil
 }

@@ -12,7 +12,6 @@ import (
 type RequestContext struct {
 	request.Request
 	StartTime  time.Time
-	LogData    map[string]interface{}
 	Auth       bool
 	Res        int
 	dnssec     bool
@@ -20,8 +19,11 @@ type RequestContext struct {
 	Authority  []dns.RR
 	Additional []dns.RR
 
-	SourceIp     net.IP
-	SourceSubnet string
+	DomainUid     string
+	SourceIp      net.IP
+	SourceSubnet  string
+	SourceCountry string
+	SourceASN     uint
 
 	name string
 
@@ -43,13 +45,6 @@ func NewRequestContext(w dns.ResponseWriter, r *dns.Msg) *RequestContext {
 	}
 	context.SourceIp = context.sourceIp()
 	context.SourceSubnet = context.sourceSubnet()
-	context.LogData = map[string]interface{}{
-		"source_ip":     context.SourceIp,
-		"record":        context.RawName(),
-		"type":          context.Type(),
-		"client_subnet": context.SourceSubnet,
-		"domain_uuid":   "",
-	}
 	return context
 }
 
@@ -107,7 +102,7 @@ func (context *RequestContext) Response() {
 	context.SizeAndDo(m)
 	m = context.Scrub(m)
 	if err := context.W.WriteMsg(m); err != nil {
-		// logger.Default.Error("write error : ", err, " msg : ", m.String())
+		// zap.L().Error("write error", zap.Error(err), zap.String("msg", m.String()))
 		_ = context.W.Close()
 	}
 }

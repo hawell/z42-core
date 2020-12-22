@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/z42/internal/storage"
+	"go.uber.org/zap"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/test"
 	"github.com/miekg/dns"
 )
@@ -2422,10 +2422,10 @@ var handlerTestCases = []*TestCase{
 		RedisDataConfig: DefaultRedisDataTestConfig,
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize: func(testCase *TestCase) (handler *DnsRequestHandler, e error) {
-			logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 			testCase.RedisDataConfig.ZoneReload = 1
 			r := storage.NewDataHandler(&testCase.RedisDataConfig)
-			h := NewHandler(&testCase.HandlerConfig, r)
+			l, _ := zap.NewProduction()
+			h := NewHandler(&testCase.HandlerConfig, r, l)
 			if err := h.RedisData.Clear(); err != nil {
 				return nil, err
 			}

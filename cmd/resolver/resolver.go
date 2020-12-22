@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/hawell/z42/internal/handler"
 	"github.com/hawell/z42/internal/server"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/pkg/ratelimit"
 	"github.com/json-iterator/go"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,7 +16,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/hawell/logger"
 	"github.com/miekg/dns"
 	_ "net/http/pprof"
 )
@@ -27,6 +27,8 @@ var (
 	dnsRequestHandler *handler.DnsRequestHandler
 	rateLimiter       *ratelimit.RateLimiter
 	configFile        string
+	requestLogger     *zap.Logger
+	eventLogger       *zap.Logger
 )
 
 func main() {
@@ -47,11 +49,11 @@ func main() {
 	if flagset["g"] {
 		data, err := jsoniter.MarshalIndent(resolverDefaultConfig, "", "  ")
 		if err != nil {
-			fmt.Println("cannot unmarshal template config : ", err)
+			log.Println("cannot unmarshal template config : ", err)
 			return
 		}
 		if err = ioutil.WriteFile(*generateConfigPtr, data, 0644); err != nil {
-			fmt.Printf("cannot save template config to file %s : %s\n", *generateConfigPtr, err)
+			log.Printf("cannot save template config to file %s : %s\n", *generateConfigPtr, err)
 		}
 		return
 	}
@@ -80,7 +82,12 @@ func main() {
 
 func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 	context := handler.NewRequestContext(w, r)
-	// logger.Default.Debugf("handle request: [%d] %s %s", r.Id, context.RawName(), context.Type())
+	zap.L().Debug(
+		"handle request",
+		zap.Uint16("id", r.Id),
+		zap.String("query", context.RawName()),
+		zap.String("type", context.Type()),
+	)
 
 	if rateLimiter.CanHandle(context.IP()) {
 		dnsRequestHandler.HandleRequest(context)
@@ -92,10 +99,58 @@ func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
 
 func Start() {
 	log.Printf("[INFO] loading config : %s", configFile)
-	cfg, _ := LoadConfig(configFile)
+	cfg, err := LoadConfig(configFile)
+	if err != nil {
+		panic(err)
+	}
 
 	log.Printf("[INFO] loading logger...")
-	logger.Default = logger.NewLogger(&cfg.ErrorLog, nil)
+	requestLoggerConfig := zap.Config{
+		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
+		Development: false,
+		Encoding:    "json",
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "time",
+			NameKey:        "logger",
+			MessageKey:     "dns_query",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.LowercaseLevelEncoder,
+			EncodeTime:     zapcore.EpochTimeEncoder,
+			EncodeDuration: zapcore.SecondsDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+	requestLogger, err = requestLoggerConfig.Build()
+	if err != nil {
+		panic(err)
+	}
+	eventLoggerConfig := zap.Config{
+		Level:       zap.NewAtomicLevelAt(zap.ErrorLevel),
+		Development: false,
+		Encoding:    "json",
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "time",
+			LevelKey:       "level",
+			NameKey:        "logger",
+			CallerKey:      "caller",
+			MessageKey:     "message",
+			StacktraceKey:  "stacktrace",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.LowercaseLevelEncoder,
+			EncodeTime:     zapcore.EpochTimeEncoder,
+			EncodeDuration: zapcore.SecondsDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
+		OutputPaths:      []string{"stderr"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+	eventLogger, err = eventLoggerConfig.Build()
+	if err != nil {
+		panic(err)
+	}
+	zap.ReplaceGlobals(eventLogger)
 	log.Printf("[INFO] logger loaded")
 
 	servers = server.NewServer(cfg.Server)
@@ -103,24 +158,24 @@ func Start() {
 	redisDataHandler = storage.NewDataHandler(&cfg.RedisData)
 	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
-	logger.Default.Info("starting handler...")
-	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler)
-	logger.Default.Info("handler started")
+	eventLogger.Info("starting handler...")
+	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler, requestLogger)
+	eventLogger.Info("handler started")
 
 	rateLimiter = ratelimit.NewRateLimiter(&cfg.RateLimit)
 
 	dns.HandleFunc(".", handleRequest)
 
-	logger.Default.Info("binding listeners...")
+	eventLogger.Info("binding listeners...")
 	for i := range servers {
 		go func(i int) {
 			err := servers[i].ListenAndServe()
 			if err != nil {
-				logger.Default.Errorf("listener error : %s", err)
+				eventLogger.Error("listener error : %s", zap.Error(err))
 			}
 		}(i)
 	}
-	logger.Default.Info("binding completed")
+	eventLogger.Info("binding completed")
 }
 
 func Stop() {
@@ -130,4 +185,6 @@ func Stop() {
 	dnsRequestHandler.ShutDown()
 	redisDataHandler.ShutDown()
 	redisStatHandler.ShutDown()
+	requestLogger.Sync()
+	eventLogger.Sync()
 }

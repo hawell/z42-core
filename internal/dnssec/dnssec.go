@@ -4,8 +4,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"github.com/hawell/z42/internal/types"
+	"go.uber.org/zap"
 
-	"github.com/hawell/logger"
 	"github.com/miekg/dns"
 )
 
@@ -59,12 +59,12 @@ func SignRRSet(rrs []dns.RR, name string, key *types.ZoneKey, ttl uint32) *dns.R
 	switch rrsig.Algorithm {
 	case dns.RSAMD5, dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512:
 		if err := rrsig.Sign(key.PrivateKey.(*rsa.PrivateKey), rrs); err != nil {
-			logger.Default.Errorf("sign failed : %s", err)
+			zap.L().Error("sign failed", zap.Error(err))
 			return nil
 		}
 	case dns.ECDSAP256SHA256, dns.ECDSAP384SHA384:
 		if err := rrsig.Sign(key.PrivateKey.(*ecdsa.PrivateKey), rrs); err != nil {
-			logger.Default.Errorf("sign failed : %s", err)
+			zap.L().Error("sign failed", zap.Error(err))
 			return nil
 		}
 	case dns.DSA, dns.DSANSEC3SHA1:

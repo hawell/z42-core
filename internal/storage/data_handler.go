@@ -4,12 +4,12 @@ import (
 	"errors"
 	"github.com/dgraph-io/ristretto"
 	"github.com/hashicorp/go-immutable-radix"
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/dnssec"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
 	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
+	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 	"strings"
 	"sync"
@@ -71,7 +71,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	dh.LoadZones()
 
 	go func() {
-		// logger.Default.Debug("zone updater")
+		zap.L().Debug("zone updater")
 		dh.quitWG.Add(1)
 		zoneListQuitChan := make(chan *sync.WaitGroup, 1)
 		modified := false
@@ -80,7 +80,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		}, func(channel string, data string) {
 			modified = true
 		}, func(err error) {
-			logger.Default.Error(err)
+			zap.L().Error("error", zap.Error(err))
 		}, zoneListQuitChan)
 
 		dh.quitWG.Add(1)
@@ -93,11 +93,9 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 				dh.recordCache.Del(label + "." + zone)
 			} else if zone, ok := isConfigEntry(keyParts); ok {
 				dh.zoneCache.Del(zone)
-			} else {
-				// logger.Default.Error("unknown key : ", keyStr)
 			}
 		}, func(err error) {
-			logger.Default.Error(err)
+			zap.L().Error("error", zap.Error(err))
 		}, zonesQuitChan)
 
 		reloadTicker := time.NewTicker(time.Duration(config.ZoneReload) * time.Second)
@@ -107,13 +105,13 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 			case <-dh.quit:
 				reloadTicker.Stop()
 				forceReloadTicker.Stop()
-				// logger.Default.Debug("zone updater stopped")
+				zap.L().Debug("zone updater stopped")
 				zoneListQuitChan <- &dh.quitWG
 				zonesQuitChan <- &dh.quitWG
 				return
 			case <-reloadTicker.C:
 				if modified {
-					// logger.Default.Debug("loading zones")
+					zap.L().Debug("loading zones")
 					dh.LoadZones()
 					modified = false
 				}
@@ -170,7 +168,7 @@ func (dh *DataHandler) LoadZones() {
 	dh.lastZoneUpdate = time.Now()
 	zones, err := dh.redis.SMembers(zonesKey)
 	if err != nil {
-		logger.Default.Error("cannot load zones : ", err)
+		zap.L().Error("cannot load zones", zap.Error(err))
 		return
 	}
 	newZones := iradix.New()
@@ -209,7 +207,7 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 	answer, _, _ := dh.zoneInflight.Do(zone, func() (interface{}, error) {
 		locations, err := dh.redis.GetKeys(zoneLocationKey(zone, "*"))
 		if err != nil {
-			logger.Default.Errorf("cannot load zone %s locations : %s", zone, err)
+			zap.L().Error("cannot load zone locations", zap.String("zone", zone), zap.Error(err))
 			return nil, err
 		}
 		trm := zoneLocationKey(zone, "")
@@ -219,7 +217,7 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 
 		configStr, err := dh.redis.Get(zoneConfigKey(zone))
 		if err != nil {
-			logger.Default.Errorf("cannot load zone %s config : %s", zone, err)
+			zap.L().Error("cannot load zone config", zap.String("zone", zone), zap.Error(err))
 		}
 
 		z := types.NewZone(zone, locations, configStr)
@@ -246,7 +244,7 @@ func (dh *DataHandler) GetZoneConfig(zone string) (*types.ZoneConfig, error) {
 func (dh *DataHandler) GetZones() []string {
 	domains, err := dh.redis.SMembers(zonesKey)
 	if err != nil {
-		logger.Default.Errorf("cannot get members of %s : %s", zonesKey, err)
+		zap.L().Error("cannot get zone list", zap.String("key", zonesKey), zap.Error(err))
 		return nil
 	}
 	return domains
@@ -293,13 +291,19 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 				dh.recordCache.Set(key, r, 1)
 				return r, nil
 			}
-			logger.Default.Error(err, " : ", label, " ", zone)
+			zap.L().Error("cannot get location", zap.Error(err), zap.String("label", label), zap.String("zone", zone))
 			return nil, err
 		}
 		if val != "" {
 			err := jsoniter.Unmarshal([]byte(val), r)
 			if err != nil {
-				logger.Default.Errorf("cannot parse json : zone -> %s, label -> %s, \"%s\" -> %s", zone, label, val, err)
+				zap.L().Error(
+					"cannot parse json",
+					zap.String("zone", zone),
+					zap.String("label", label),
+					zap.String("json", val),
+					zap.Error(err),
+				)
 				return nil, err
 			}
 		}
@@ -339,12 +343,12 @@ func (dh *DataHandler) SetZoneKey(zone string, keyType string, pub string, priv 
 func (dh *DataHandler) loadKey(zone string, keyType string) *types.ZoneKey {
 	pubStr, _ := dh.redis.Get(zonePubKey(zone, keyType))
 	if pubStr == "" {
-		logger.Default.Errorf("key is not set : %s", zonePubKey(zone, keyType))
+		zap.L().Error("key is not set", zap.String("key", zonePubKey(zone, keyType)))
 		return nil
 	}
 	privStr, _ := dh.redis.Get(zonePrivKey(zone, keyType))
 	if privStr == "" {
-		logger.Default.Errorf("key is not set : %s", zonePrivKey(zone, keyType))
+		zap.L().Error("key is not set", zap.String("key", zonePrivKey(zone, keyType)))
 		return nil
 	}
 	privStr = strings.Replace(privStr, "\\n", "\n", -1)
@@ -352,13 +356,13 @@ func (dh *DataHandler) loadKey(zone string, keyType string) *types.ZoneKey {
 	if rr, err := dns.NewRR(pubStr); err == nil {
 		zoneKey.DnsKey = rr.(*dns.DNSKEY)
 	} else {
-		logger.Default.Errorf("cannot parse zone key : %s", err)
+		zap.L().Error("cannot parse zone key", zap.Error(err))
 		return nil
 	}
 	if pk, err := zoneKey.DnsKey.NewPrivateKey(privStr); err == nil {
 		zoneKey.PrivateKey = pk
 	} else {
-		logger.Default.Errorf("cannot create private key : %s", err)
+		zap.L().Error("cannot create private key", zap.Error(err))
 		return nil
 	}
 	now := time.Now()
@@ -389,7 +393,7 @@ func (dh *DataHandler) loadZoneKeys(z *types.Zone) {
 		if rrsig := dnssec.SignRRSet([]dns.RR{z.ZSK.DnsKey, z.KSK.DnsKey}, z.Name, z.KSK, z.KSK.DnsKey.Hdr.Ttl); rrsig != nil {
 			z.DnsKeySig = rrsig
 		} else {
-			logger.Default.Errorf("cannot create RRSIG for DNSKEY")
+			zap.L().Error("cannot create RRSIG for DNSKEY")
 			z.Config.DnsSec = false
 			return
 		}

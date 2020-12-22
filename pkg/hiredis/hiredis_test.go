@@ -6,8 +6,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/hawell/logger"
 )
 
 func TestRedis(t *testing.T) {
@@ -229,29 +227,24 @@ func TestExpirePersist(t *testing.T) {
 	r.Del("foo")
 	r.Set("foo", "bar")
 	if v, _ := r.Get("foo"); v != "bar" {
-		logger.Default.Error("1")
 		t.Fail()
 	}
 	if r.Expire("foo", time.Millisecond*10) != nil {
-		logger.Default.Error("2")
 		t.Fail()
 	}
 	time.Sleep(time.Millisecond * 11)
 	if v, _ := r.Get("foo"); v != "" {
-		logger.Default.Error("3")
 		t.Fail()
 	}
 	r.Set("foo", "bar")
 	r.Expire("foo", time.Millisecond*10)
 	time.Sleep(time.Millisecond)
 	if v, _ := r.Get("foo"); v != "bar" {
-		logger.Default.Error("4")
 		t.Fail()
 	}
 	r.Persist("foo")
 	time.Sleep(time.Millisecond * 11)
 	if v, _ := r.Get("foo"); v != "bar" {
-		logger.Default.Error("5")
 		t.Fail()
 	}
 }

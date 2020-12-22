@@ -4,11 +4,11 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/workerpool"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"net"
@@ -26,7 +26,7 @@ type Healthcheck struct {
 	checkInterval      time.Duration
 	redisData          *storage.DataHandler
 	redisStat          *storage.StatHandler
-	logger             *logger.EventLogger
+	logger             *zap.Logger
 	lastUpdate         time.Time
 	dispatcher         *workerpool.Dispatcher
 	quit               chan struct{}
@@ -36,7 +36,7 @@ type Healthcheck struct {
 func HandleHealthCheck(h *Healthcheck) workerpool.JobHandler {
 	return func(worker *workerpool.Worker, job workerpool.Job) {
 		item := job.(*types.HealthCheckItem)
-		// logger.Default.Debugf("item %v received", item)
+		// zap.L().Debug("item received", zap.String("ip", item.Ip), zap.String("host", item.Host))
 		var err error
 		switch item.Protocol {
 		case "http", "https":
@@ -45,10 +45,14 @@ func HandleHealthCheck(h *Healthcheck) workerpool.JobHandler {
 			err = httpCheck(url, item.Host, timeout)
 		case "ping", "icmp":
 			err = pingCheck(item.Ip, time.Duration(item.Timeout)*time.Millisecond)
-			logger.Default.Error("@@@@@@@@@@@@@@ ", item.Ip, " : result : ", err)
+			zap.L().Error("icmp ping", zap.String("ip", item.Ip), zap.Error(err))
 		default:
-			err = errors.New(fmt.Sprintf("invalid protocol : %s used for %s:%d", item.Protocol, item.Ip, item.Port))
-			logger.Default.Error(err)
+			zap.L().Error(
+				"invalid protocol",
+				zap.String("protocol", item.Protocol),
+				zap.String("ip", item.Ip),
+				zap.Int("port", item.Port),
+			)
 		}
 		item.Error = err
 		if err == nil {
@@ -80,13 +84,23 @@ func httpCheck(url string, host string, timeout time.Duration) error {
 	}
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
-		logger.Default.Errorf("invalid request, host:%s, url:%s : %s", host, url, err)
+		zap.L().Error(
+			"invalid request",
+			zap.String("host", host),
+			zap.String("url", url),
+			zap.Error(err),
+		)
 		return err
 	}
 	req.Host = strings.TrimRight(host, ".")
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Default.Errorf("request failed, host:%s, url:%s : %s", host, url, err)
+		zap.L().Error(
+			"request failed",
+			zap.String("host", host),
+			zap.String("url", url),
+			zap.Error(err),
+		)
 		return err
 	}
 	switch resp.StatusCode {
@@ -133,7 +147,7 @@ func pingCheck(ip string, timeout time.Duration) error {
 	}
 	switch rm.Type {
 	case ipv4.ICMPTypeEchoReply:
-		logger.Default.Error("@@@@@@@@@@@@ code = ", rm.Code)
+		zap.L().Error("icmp reply", zap.Int("code", rm.Code))
 		return nil
 	default:
 		return errors.New(fmt.Sprintf("got %+v; want echo reply", rm))
@@ -141,21 +155,21 @@ func pingCheck(ip string, timeout time.Duration) error {
 }
 
 type Config struct {
-	Enable             bool             `json:"enable"`
-	MaxRequests        int              `json:"max_requests"`
-	MaxPendingRequests int              `json:"max_pending_requests"`
-	UpdateInterval     int              `json:"update_interval"`
-	CheckInterval      int              `json:"check_interval"`
-	Log                logger.LogConfig `json:"log"`
+	Enable             bool `json:"enable"`
+	MaxRequests        int  `json:"max_requests"`
+	MaxPendingRequests int  `json:"max_pending_requests"`
+	UpdateInterval     int  `json:"update_interval"`
+	CheckInterval      int  `json:"check_interval"`
 }
 
-func NewHealthcheck(config *Config, redisData *storage.DataHandler, redisStat *storage.StatHandler) *Healthcheck {
+func NewHealthcheck(config *Config, redisData *storage.DataHandler, redisStat *storage.StatHandler, requestLogger *zap.Logger) *Healthcheck {
 	h := &Healthcheck{
 		Enable:             config.Enable,
 		maxRequests:        config.MaxRequests,
 		maxPendingRequests: config.MaxPendingRequests,
 		updateInterval:     time.Duration(config.UpdateInterval) * time.Second,
 		checkInterval:      time.Duration(config.CheckInterval) * time.Second,
+		logger:             requestLogger,
 	}
 
 	if h.Enable {
@@ -166,7 +180,6 @@ func NewHealthcheck(config *Config, redisData *storage.DataHandler, redisStat *s
 		for i := 0; i < config.MaxRequests; i++ {
 			h.dispatcher.AddWorker(HandleHealthCheck(h))
 		}
-		h.logger = logger.NewLogger(&config.Log, nil)
 		h.quit = make(chan struct{}, 1)
 	}
 
@@ -205,7 +218,7 @@ func (h *Healthcheck) Start() {
 	for {
 		itemKeys, err := h.redisStat.GetActiveHealthcheckItems()
 		if err != nil {
-			logger.Default.Errorf("cannot load healthcheck active items : %s", err)
+			zap.L().Error("cannot load healthcheck active items", zap.Error(err))
 		}
 		select {
 		case <-h.quit:
@@ -242,7 +255,15 @@ func (h *Healthcheck) logHealthcheck(item *types.HealthCheckItem) {
 		data["error"] = item.Error.Error()
 	}
 
-	h.logger.Log(data, "dns healthcheck")
+	h.logger.Info(
+		"healthcheck",
+		zap.String("ip", item.Ip),
+		zap.Int("port", item.Port),
+		zap.String("host", item.Host),
+		zap.String("domain.id", item.DomainId),
+		zap.String("url", item.Uri),
+		zap.Int("status", item.Status),
+	)
 }
 
 func statusDown(item *types.HealthCheckItem) {
@@ -280,14 +301,14 @@ func (h *Healthcheck) FilterHealthcheck(qname string, rrset *types.IP_RRSet, mas
 			}
 		}
 	}
-	// logger.Default.Debugf("min = %d", min)
+	// zap.L().Debug("min", zap.Int(min))
 	if min < rrset.HealthCheckConfig.UpCount-1 && min > rrset.HealthCheckConfig.DownCount {
 		min = rrset.HealthCheckConfig.DownCount + 1
 	}
-	// logger.Default.Debugf("min = %d", min)
+	// zap.L().Debug("min", zap.Int(min))
 	for i, x := range mask {
 		if x == types.IpMaskWhite {
-			// logger.Default.Debug("qname: ", rrset.Data[i].Ip.String(), " status: ", h.getStatus(qname, rrset.Data[i].Ip))
+			// zap.L().Debug("white", zap.String("qname", rrset.Data[i].Ip.String()), zap.String("status", h.getStatus(qname, rrset.Data[i].Ip)))
 			if h.redisStat.GetHealthStatus(qname, rrset.Data[i].Ip.String()) < min {
 				mask[i] = types.IpMaskBlack
 			}
@@ -325,7 +346,12 @@ func (h *Healthcheck) Transfer() {
 				case <-limiter:
 					record, err := h.redisData.GetLocation(domain, subdomain)
 					if err != nil {
-						logger.Default.Errorf("cannot get location : zone -> %s, location -> %s", domain, subdomain)
+						zap.L().Error(
+							"cannot get location",
+							zap.String("zone", domain),
+							zap.String("location", subdomain),
+							zap.Error(err),
+						)
 						continue
 					}
 					for _, rrset := range []*types.IP_RRSet{&record.A, &record.AAAA} {

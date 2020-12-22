@@ -3,12 +3,12 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/test"
 	"github.com/hawell/z42/internal/upstream"
 	"github.com/hawell/z42/pkg/geoip"
 	"github.com/hawell/z42/pkg/hiredis"
+	"go.uber.org/zap"
 	"testing"
 )
 
@@ -27,10 +27,9 @@ type TestCase struct {
 }
 
 func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-
 	r := storage.NewDataHandler(&testCase.RedisDataConfig)
-	h := NewHandler(&testCase.HandlerConfig, r)
+	l, _ := zap.NewProduction()
+	h := NewHandler(&testCase.HandlerConfig, r, l)
 	if err := h.RedisData.Clear(); err != nil {
 		return nil, err
 	}
@@ -100,10 +99,7 @@ var DefaultRedisDataTestConfig = storage.DataHandlerConfig{
 
 var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
 	MaxTtl: 3600,
-	Log: logger.LogConfig{
-		Enable: false,
-	},
-	Upstream: []upstream.UpstreamConfig{
+	Upstream: []upstream.Config{
 		{
 			Ip:       "1.1.1.1",
 			Port:     53,

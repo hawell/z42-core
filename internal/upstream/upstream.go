@@ -2,34 +2,34 @@ package upstream
 
 import (
 	"errors"
+	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 	"strconv"
 	"time"
 
-	"github.com/hawell/logger"
 	"github.com/miekg/dns"
 	"github.com/patrickmn/go-cache"
 )
 
-type UpstreamConnection struct {
+type Connection struct {
 	client        *dns.Client
 	connectionStr string
 }
 
 type Upstream struct {
-	connections []*UpstreamConnection
+	connections []*Connection
 	cache       *cache.Cache
 	inflight    *singleflight.Group
 }
 
-type UpstreamConfig struct {
+type Config struct {
 	Ip       string `json:"ip"`
 	Port     int    `json:"port"`
 	Protocol string `json:"protocol"`
 	Timeout  int    `json:"timeout"`
 }
 
-func NewUpstream(config []UpstreamConfig) *Upstream {
+func NewUpstream(config []Config) *Upstream {
 	u := &Upstream{
 		inflight: new(singleflight.Group),
 	}
@@ -41,7 +41,7 @@ func NewUpstream(config []UpstreamConfig) *Upstream {
 			Timeout: time.Duration(upstreamConfig.Timeout) * time.Millisecond,
 		}
 		connectionStr := upstreamConfig.Ip + ":" + strconv.Itoa(upstreamConfig.Port)
-		connection := &UpstreamConnection{
+		connection := &Connection{
 			client:        client,
 			connectionStr: connectionStr,
 		}
@@ -67,11 +67,16 @@ func (u *Upstream) Query(location string, qtype uint16) ([]dns.RR, int) {
 		for _, c := range u.connections {
 			r, _, err := c.client.Exchange(m, c.connectionStr)
 			if err != nil {
-				logger.Default.Errorf("failed to retrieve record %s from upstream %s : %s", location, c.connectionStr, err)
+				zap.L().Error(
+					"failed to retrieve record from upstream",
+					zap.String("location", location),
+					zap.String("upstream", c.connectionStr),
+					zap.Error(err),
+				)
 				continue
 			}
 			if r.Rcode != dns.RcodeSuccess {
-				logger.Default.Errorf("upstream error response : %s for %s", dns.RcodeToString[r.Rcode], location)
+				zap.L().Error("upstream error response", zap.String("rcode", dns.RcodeToString[r.Rcode]), zap.String("location", location))
 				return r, nil
 			}
 			if len(r.Answer) == 0 {

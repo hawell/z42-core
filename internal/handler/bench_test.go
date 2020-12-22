@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/test"
 	"github.com/miekg/dns"
+	"go.uber.org/zap"
 	"log"
 	"os"
 	"testing"
@@ -31,10 +31,9 @@ var benchEntries = [][]string{
 var benchTestHandler *DnsRequestHandler
 
 func TestMain(m *testing.M) {
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-
 	r := storage.NewDataHandler(&DefaultRedisDataTestConfig)
-	benchTestHandler = NewHandler(&DefaultHandlerTestConfig, r)
+	l, _ := zap.NewProduction()
+	benchTestHandler = NewHandler(&DefaultHandlerTestConfig, r, l)
 	err := benchTestHandler.RedisData.Clear()
 	log.Println(err)
 	err = benchTestHandler.RedisData.EnableZone(benchZone)

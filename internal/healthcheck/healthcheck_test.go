@@ -6,13 +6,12 @@ import (
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
+	"go.uber.org/zap"
 	"log"
 	"net"
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/hawell/logger"
 )
 
 var healthcheckGetEntries = []*types.HealthCheckItem{
@@ -100,18 +99,14 @@ var healthcheckTestConfig = Config{
 	MaxPendingRequests: 100,
 	UpdateInterval:     600,
 	CheckInterval:      600,
-	Log: logger.LogConfig{
-		Enable: true,
-		Path:   "/tmp/healthcheck.log",
-	},
 }
 
 func TestGet(t *testing.T) {
 	log.Println("TestGet")
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
-	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
+	l, _ := zap.NewProduction()
+	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
 
 	h.redisStat.Clear()
 	h.redisData.Clear()
@@ -132,10 +127,10 @@ func TestGet(t *testing.T) {
 
 func TestFilter(t *testing.T) {
 	log.Println("TestFilter")
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
-	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
+	l, _ := zap.NewProduction()
+	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
 
 	h.redisStat.Clear()
 	h.redisData.Clear()
@@ -276,10 +271,10 @@ func TestFilter(t *testing.T) {
 
 func TestSet(t *testing.T) {
 	log.Println("TestSet")
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
-	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
+	l, _ := zap.NewProduction()
+	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
 
 	h.redisStat.Clear()
 	h.redisData.Clear()
@@ -326,10 +321,10 @@ func TestTransfer(t *testing.T) {
 		{Host: "w3.healthcheck.com.", Ip: "4.5.6.7", Protocol: "http", Uri: "/uri3", Port: 80, Status: 0, Timeout: 1000, UpCount: 3, DownCount: -3, Enable: true},
 	}
 
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
-	h := NewHealthcheck(&healthcheckTestConfig, dh, sh)
+	l, _ := zap.NewProduction()
+	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
 
 	h.redisData.Clear()
 	h.redisStat.Clear()
@@ -393,14 +388,7 @@ func TestHealthCheck(t *testing.T) {
 		},
 	}
 	var healthcheckConfig = Config{
-		Enable: true,
-		Log: logger.LogConfig{
-			Enable:     true,
-			Target:     "file",
-			Level:      "info",
-			Path:       "/tmp/hctest.log",
-			TimeFormat: "2006-01-02 15:04:05",
-		},
+		Enable:             true,
 		CheckInterval:      1,
 		UpdateInterval:     200,
 		MaxRequests:        20,
@@ -426,11 +414,11 @@ func TestHealthCheck(t *testing.T) {
 	}
 
 	log.Println("TestHealthCheck")
-	logger.Default = logger.NewLogger(&logger.LogConfig{Enable: true, Target: "stdout", Format: "text"}, nil)
 
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&healthcheckStatConfig)
-	hc := NewHealthcheck(&healthcheckConfig, dh, sh)
+	l, _ := zap.NewProduction()
+	hc := NewHealthcheck(&healthcheckConfig, dh, sh, l)
 	hc.redisStat.Clear()
 	hc.redisData.Clear()
 	hc.redisData.EnableZone("google.com.")
@@ -481,18 +469,14 @@ func TestExpire(t *testing.T) {
 		MaxPendingRequests: 100,
 		UpdateInterval:     1,
 		CheckInterval:      600,
-		Log: logger.LogConfig{
-			Enable: true,
-			Path:   "/tmp/healthcheck.log",
-		},
 	}
 
 	log.Printf("TestExpire")
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
 
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&statConfig)
-	hc := NewHealthcheck(&config, dh, sh)
+	l, _ := zap.NewProduction()
+	hc := NewHealthcheck(&config, dh, sh, l)
 
 	hc.redisData.Clear()
 	hc.redisStat.Clear()

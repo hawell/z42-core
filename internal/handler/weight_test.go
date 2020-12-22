@@ -6,13 +6,9 @@ import (
 	"log"
 	"net"
 	"testing"
-
-	"github.com/hawell/logger"
 )
 
 func TestWeight(t *testing.T) {
-	logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-
 	// distribution
 	rrset := types.IP_RRSet{
 		FilterConfig: types.IpFilterConfig{

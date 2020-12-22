@@ -3,9 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/Shopify/sarama"
-	"github.com/getsentry/raven-go"
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/handler"
 	"github.com/hawell/z42/internal/server"
 	"github.com/hawell/z42/internal/storage"
@@ -18,7 +15,6 @@ import (
 	"github.com/miekg/dns"
 	"github.com/oschwald/maxminddb-golang"
 	"log"
-	"log/syslog"
 	"net"
 	"os"
 	"strconv"
@@ -28,7 +24,6 @@ import (
 
 type Config struct {
 	Server    []server.ServerConfig           `json:"server"`
-	ErrorLog  logger.LogConfig                `json:"error_log"`
 	RedisData storage.DataHandlerConfig       `json:"redis_data"`
 	RedisStat storage.StatHandlerConfig       `json:"redis_stat"`
 	Handler   handler.DnsRequestHandlerConfig `json:"handler"`
@@ -94,7 +89,7 @@ var resolverDefaultConfig = &Config{
 		},
 	},
 	Handler: handler.DnsRequestHandlerConfig{
-		Upstream: []upstream.UpstreamConfig{
+		Upstream: []upstream.Config{
 			{
 				Ip:       "1.1.1.1",
 				Port:     53,
@@ -109,58 +104,6 @@ var resolverDefaultConfig = &Config{
 		},
 		MaxTtl:            3600,
 		LogSourceLocation: false,
-		Log: logger.LogConfig{
-			Enable:     true,
-			Target:     "file",
-			Level:      "info",
-			Path:       "/tmp/z42.log",
-			Format:     "json",
-			TimeFormat: time.RFC3339,
-			Sentry: logger.SentryConfig{
-				Enable: false,
-				DSN:    "",
-			},
-			Syslog: logger.SyslogConfig{
-				Enable:   false,
-				Protocol: "tcp",
-				Address:  "localhost:514",
-			},
-			Kafka: logger.KafkaConfig{
-				Enable:      false,
-				Topic:       "z42",
-				Brokers:     []string{"127.0.0.1:9092"},
-				Format:      "json",
-				Compression: "none",
-				Timeout:     3000,
-				BufferSize:  1000,
-			},
-		},
-	},
-	ErrorLog: logger.LogConfig{
-		Enable:     true,
-		Target:     "stdout",
-		Level:      "info",
-		Path:       "/tmp/error.log",
-		Format:     "text",
-		TimeFormat: time.RFC3339,
-		Sentry: logger.SentryConfig{
-			Enable: false,
-			DSN:    "",
-		},
-		Syslog: logger.SyslogConfig{
-			Enable:   false,
-			Protocol: "tcp",
-			Address:  "locahost:514",
-		},
-		Kafka: logger.KafkaConfig{
-			Enable:      false,
-			Topic:       "z42",
-			Brokers:     []string{"127.0.0.1:9092"},
-			Format:      "json",
-			Compression: "none",
-			Timeout:     3000,
-			BufferSize:  1000,
-		},
 	},
 	RateLimit: ratelimit.Config{
 		Enable:    false,
@@ -246,117 +189,6 @@ func Verify(configFile string) {
 			}
 		}
 		printResult(msg, err)
-	}
-
-	checkLog := func(config *logger.LogConfig) {
-		fmt.Println("checking log...")
-		msg := fmt.Sprintf("checking target : %s", config.Path)
-		var err error = nil
-		if config.Target != "stdout" && config.Target != "stderr" && config.Target != "file" && config.Target != "udp" {
-			err = errors.New("invalid target : " + config.Target)
-		}
-		printResult(msg, err)
-
-		if config.Target == "file" {
-			msg = fmt.Sprintf("checking file target : %s", config.Path)
-			var file *os.File
-			file, err = os.OpenFile(config.Target, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-			if err == nil {
-				_ = file.Close()
-			}
-			printResult(msg, err)
-		}
-		if config.Target == "udp" {
-			msg = fmt.Sprintf("checking udp target : %s", config.Target)
-			var raddr *net.UDPAddr
-			raddr, err = net.ResolveUDPAddr("udp", config.Path)
-			if err == nil {
-				var con *net.UDPConn
-				con, err = net.DialUDP("udp", nil, raddr)
-				if err == nil {
-					_ = con.Close()
-				}
-			}
-			printResult(msg, err)
-		}
-
-		msg = fmt.Sprintf("checking log level : %s", config.Level)
-		err = nil
-		if config.Level != "debug" && config.Level != "info" && config.Level != "warning" && config.Level != "error" {
-			err = errors.New("invalid log level : " + config.Level)
-		}
-		printResult(msg, err)
-
-		msg = fmt.Sprintf("checking format : %s", config.Format)
-		err = nil
-		if config.Format != "text" && config.Format != "json" && config.Format != "capnp_request" {
-			err = errors.New("invalid log format : " + config.Format)
-		}
-		printResult(msg, err)
-
-		msg = fmt.Sprintf("checking time format : %s", config.TimeFormat)
-		t1, _ := time.Parse(time.RFC3339, time.RFC3339)
-		timeStr := t1.Format(config.TimeFormat)
-		var t2 time.Time
-		t2, err = time.Parse(config.TimeFormat, timeStr)
-		if err == nil {
-			if t2 != t1 {
-				err = errors.New("invalid time format")
-			}
-		}
-		printResult(msg, err)
-
-		if config.Kafka.Enable {
-			fmt.Println("checking kafka at ", config.Kafka.Brokers)
-			msg = fmt.Sprintf("checking kafka")
-			cfg := sarama.NewConfig()
-			cfg.Producer.RequiredAcks = sarama.WaitForAll
-			cfg.Producer.Compression = sarama.CompressionNone
-			cfg.Producer.Flush.Frequency = 500 * time.Millisecond
-			cfg.Producer.Return.Errors = true
-			cfg.Producer.Return.Successes = true
-
-			cfg.Metadata.Timeout = time.Duration(config.Kafka.Timeout) * time.Millisecond
-
-			var producer sarama.SyncProducer
-			producerMessages := []*sarama.ProducerMessage{
-				{
-					Topic:    config.Kafka.Topic,
-					Value:    sarama.StringEncoder("test message"),
-					Metadata: "test",
-				},
-			}
-			producer, err = sarama.NewSyncProducer(config.Kafka.Brokers, cfg)
-			if err == nil {
-				err = producer.SendMessages(producerMessages)
-			}
-			printResult(msg, err)
-		}
-		if config.Sentry.Enable {
-			msg = fmt.Sprintf("checking sentry at %s", config.Sentry.DSN)
-			var client *raven.Client
-			client, err = raven.New(config.Sentry.DSN)
-			if err == nil {
-				packet := raven.NewPacket("test message", nil)
-				eventID, ch := client.Capture(packet, nil)
-				if eventID != "" {
-					err = <-ch
-				}
-				if err == nil && eventID == "" {
-					err = errors.New("sentry test failed")
-				}
-			}
-			printResult(msg, err)
-		}
-		if config.Syslog.Enable {
-			msg = fmt.Sprintf("checking syslog at %s", config.Syslog.Address)
-			var w *syslog.Writer
-			w, err = syslog.Dial(config.Syslog.Protocol, config.Syslog.Address, syslog.LOG_ERR, "syslog test")
-			if err == nil {
-				err = w.Err("test message")
-			}
-			printResult(msg, err)
-		}
 	}
 
 	fmt.Println("Starting Config Verification")
@@ -452,11 +284,5 @@ func Verify(configFile string) {
 				}
 			}
 		}
-	}
-	if config.ErrorLog.Enable {
-		checkLog(&config.ErrorLog)
-	}
-	if config.Handler.Log.Enable {
-		checkLog(&config.Handler.Log)
 	}
 }

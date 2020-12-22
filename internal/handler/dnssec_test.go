@@ -3,11 +3,11 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"github.com/hawell/logger"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/test"
 	"github.com/hawell/z42/internal/types"
 	"github.com/miekg/dns"
+	"go.uber.org/zap"
 	"sort"
 	"strings"
 	"testing"
@@ -96,10 +96,9 @@ Activate: 20200204092439
 func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testCase *TestCase) (requestHandler *DnsRequestHandler, e error) {
 	return func(testCase *TestCase) (requestHandler *DnsRequestHandler, e error) {
 
-		logger.Default = logger.NewLogger(&logger.LogConfig{}, nil)
-
 		r := storage.NewDataHandler(&DefaultRedisDataTestConfig)
-		h := NewHandler(&testCase.HandlerConfig, r)
+		l, _ := zap.NewProduction()
+		h := NewHandler(&testCase.HandlerConfig, r, l)
 		if err := h.RedisData.Clear(); err != nil {
 			return nil, err
 		}

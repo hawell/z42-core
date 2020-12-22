@@ -1,32 +1,4 @@
 {
-  "error_log": {
-    "enable": true,
-    "target": "stdout",
-    "level": "info",
-    "path": "/tmp/error.log",
-    "format": "text",
-    "time_format": "2006-01-02T15:04:05Z07:00",
-    "sentry": {
-      "enable": false,
-      "dsn": ""
-    },
-    "syslog": {
-      "enable": false,
-      "protocol": "tcp",
-      "address": "locahost:514"
-    },
-    "kafka": {
-      "enable": false,
-      "topic": "z42",
-      "brokers": [
-        "127.0.0.1:9092"
-      ],
-      "format": "json",
-      "compression": "none",
-      "timeout": 3000,
-      "buffer_size": 1000
-    }
-  },
   "redis_data": {
     "zone_cache_size": 10000,
     "zone_cache_timeout": 60,
@@ -75,34 +47,6 @@
     "max_requests": 10,
     "max_pending_requests": 100,
     "update_interval": 600,
-    "check_interval": 600,
-    "log": {
-      "enable": true,
-      "target": "file",
-      "level": "info",
-      "path": "/tmp/healthcheck.log",
-      "format": "json",
-      "time_format": "2006-01-02T15:04:05Z07:00",
-      "sentry": {
-        "enable": false,
-        "dsn": ""
-      },
-      "syslog": {
-        "enable": false,
-        "protocol": "tcp",
-        "address": "localhost:514"
-      },
-      "kafka": {
-        "enable": false,
-        "topic": "z42",
-        "brokers": [
-          "127.0.0.1:9092"
-        ],
-        "format": "json",
-        "compression": "none",
-        "timeout": 3000,
-        "buffer_size": 1000
-      }
-    }
+    "check_interval": 600
   }
 }

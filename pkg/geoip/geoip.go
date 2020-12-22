@@ -2,10 +2,10 @@ package geoip
 
 import (
 	"errors"
+	"go.uber.org/zap"
 	"math"
 	"net"
 
-	"github.com/hawell/logger"
 	"github.com/oschwald/maxminddb-golang"
 )
 
@@ -37,13 +37,13 @@ func NewGeoIp(config *Config) *GeoIp {
 	if config.CountryDB != "" {
 		g.countryDB, err = maxminddb.Open(config.CountryDB)
 		if err != nil {
-			logger.Default.Errorf("cannot open maxminddb file %s: %s", config.CountryDB, err)
+			zap.L().Error("cannot open maxminddb file", zap.String("file", config.CountryDB), zap.Error(err))
 		}
 	}
 	if config.ASNDB != "" {
 		g.asnDB, err = maxminddb.Open(config.ASNDB)
 		if err != nil {
-			logger.Default.Errorf("cannot open maxminddb file %s: %s", config.ASNDB, err)
+			zap.L().Error("cannot open maxminddb file", zap.String("file", config.ASNDB), zap.Error(err))
 		}
 	}
 
@@ -61,7 +61,7 @@ func GetDistance(slat, slong, dlat, dlong float64) float64 {
 		math.Cos(slat)*math.Cos(dlat)*math.Sin(deltaLong/2.0)*math.Sin(deltaLong/2.0)
 	c := 2.0 * math.Atan2(math.Sqrt(a), math.Sqrt(1.0-a))
 
-	// logger.Default.Debugf("distance = %f", c)
+	// zap.L().Debug("distance", zap.Float64("distance", c))
 
 	return c
 }
@@ -81,11 +81,11 @@ func (g *GeoIp) GetCoordinates(ip net.IP) (latitude float64, longitude float64, 
 	}
 
 	if err := g.countryDB.Lookup(ip, &record); err != nil {
-		logger.Default.Errorf("lookup failed : %s", err)
+		zap.L().Error("lookup failed", zap.Error(err))
 		return 0, 0, err
 	}
 	_ = g.countryDB.Decode(record.Location.LongitudeOffset, &longitude)
-	// logger.Default.Debug("lat = ", record.Location.Latitude, " lang = ", longitude)
+	// zap.L().Debug("lat lang", zap.Float64("lat", latrecord.Location.Latitude), zap.Float64("lang", longitude))
 	return record.Location.Latitude, longitude, nil
 }
 
@@ -101,12 +101,12 @@ func (g *GeoIp) GetCountry(ip net.IP) (string, error) {
 			ISOCode string `maxminddb:"iso_code"`
 		} `maxminddb:"country"`
 	}
-	// logger.Default.Debugf("ip : %s", ip)
+	// zap.L().Debug("ip", zap.String("ip", ip.String())
 	if err := g.countryDB.Lookup(ip, &record); err != nil {
-		logger.Default.Errorf("lookup failed : %s", err)
+		zap.L().Error("lookup failed", zap.Error(err))
 		return "", err
 	}
-	// logger.Default.Debug(" country = ", record.Country.ISOCode)
+	// zap.L().Debug("country", zap.String(record.Country.ISOCode))
 	return record.Country.ISOCode, nil
 }
 
@@ -122,9 +122,9 @@ func (g *GeoIp) GetASN(ip net.IP) (uint, error) {
 	}
 	err := g.asnDB.Lookup(ip, &record)
 	if err != nil {
-		logger.Default.Errorf("lookup failed : %s", err)
+		zap.L().Error("lookup failed", zap.Error(err))
 		return 0, err
 	}
-	// logger.Default.Debug("asn = ", record.AutonomousSystemNumber)
+	// zap.L().Debug("asn", zap.String("asn", record.AutonomousSystemNumber))
 	return record.AutonomousSystemNumber, nil
 }

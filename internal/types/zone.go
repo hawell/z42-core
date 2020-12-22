@@ -3,9 +3,9 @@ package types
 import (
 	"bytes"
 	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/hawell/logger"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
+	"go.uber.org/zap"
 	"strings"
 	"time"
 )
@@ -46,7 +46,7 @@ func ZoneConfigFromJson(zone string, configStr string) *ZoneConfig {
 	if len(configStr) > 0 {
 		err := jsoniter.Unmarshal([]byte(configStr), config)
 		if err != nil {
-			logger.Default.Errorf("cannot parse zone config : %s", err)
+			zap.L().Error("cannot parse zone config", zap.Error(err))
 		}
 	}
 	config.SOA.Ns = dns.Fqdn(config.SOA.Ns)
