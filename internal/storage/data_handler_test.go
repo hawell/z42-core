@@ -1,11 +1,11 @@
 package storage
 
 import (
-	"fmt"
 	redisCon "github.com/gomodule/redigo/redis"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
+	. "github.com/onsi/gomega"
 	"net"
 	"reflect"
 	"sort"
@@ -41,283 +41,178 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 }
 
 func TestEnableZone(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zone := dh.GetZone(zoneName)
-	if zone == nil {
-		t.FailNow()
-	}
-	if zone.Name != zoneName {
-		t.Fail()
-	}
+	g.Expect(zone).NotTo(BeNil())
+	g.Expect(zone.Name).To(Equal(zoneName))
 }
 
 func TestDisableZone(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zone := dh.FindZone(zoneName)
-	if zone == "" {
-		t.FailNow()
-	}
-	if zone != zoneName {
-		t.Fail()
-	}
+	g.Expect(zone).NotTo(BeEmpty())
+	g.Expect(zone).To(Equal(zoneName))
 	err = dh.DisableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	zone = dh.FindZone(zoneName)
-	if zone != "" {
-		fmt.Println(dh.GetZones())
-		t.Fail()
-	}
+	g.Expect(zone).To(BeEmpty())
 }
 
 func TestFindZone(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zone1Name := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	z := dh.FindZone(zone1Name)
-	if z != "" {
-		t.Fail()
-	}
+	g.Expect(z).To(BeEmpty())
 	err = dh.EnableZone(zone1Name)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	z = dh.FindZone(zone1Name)
-	if z != zone1Name {
-		t.Fail()
-	}
+	g.Expect(z).To(Equal(zone1Name))
 	z = dh.FindZone("a.b.c.d." + zone1Name)
-	if z != zone1Name {
-		t.Fail()
-	}
+	g.Expect(z).To(Equal(zone1Name))
 	subZoneName := "sub.zone1.com."
 	err = dh.EnableZone(subZoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	z = dh.FindZone("a.b.c." + subZoneName)
-	if z != subZoneName {
-		t.Fail()
-	}
+	g.Expect(z).To(Equal(subZoneName))
 	err = dh.DisableZone(subZoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	z = dh.FindZone("a.b.c." + subZoneName)
-	if z != zone1Name {
-		t.Fail()
-	}
+	g.Expect(z).To(Equal(zone1Name))
 	err = dh.DisableZone(zone1Name)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	z = dh.FindZone("a.b.c." + subZoneName)
-	if z != "" {
-		t.Fail()
-	}
+	g.Expect(z).To(BeEmpty())
 }
 
 func TestGetZone(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zone := dh.GetZone(zoneName)
-	if zone == nil {
-		fmt.Println("load zone failed")
-		t.FailNow()
-	}
-	if zone.Name != zoneName {
-		fmt.Println("zone name mismatch")
-		t.Fail()
-	}
+	g.Expect(zone).NotTo(BeNil())
+	g.Expect(zone.Name).To(Equal(zoneName))
 	defaultConfig := types.ZoneConfigFromJson(zoneName, "")
-	if cmp.Equal(zone.Config, defaultConfig) == false {
-		fmt.Println(cmp.Diff(zone.Config, defaultConfig))
-		fmt.Println("config mismatch")
-		t.Fail()
-	}
+	g.Expect(zone.Config).To(Equal(defaultConfig))
 }
 
 func TestGetZoneConfig(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	defaultConfig := types.ZoneConfigFromJson(zoneName, "")
 	zoneConfig, err := dh.GetZoneConfig(zoneName)
-	if err != nil {
-		t.Fail()
-	}
-	if cmp.Equal(defaultConfig, zoneConfig) == false {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(zoneConfig).To(Equal(defaultConfig))
 }
 
 func TestGetZones(t *testing.T) {
+	g := NewGomegaWithT(t)
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zones := []string{"zone1.com.", "zone2.com.", "zone3.com.", "zone4.com.", "zone5.com."}
 	for _, z := range zones {
 		err = dh.EnableZone(z)
-		if err != nil {
-			t.Fail()
-		}
+		g.Expect(err).To(BeNil())
 	}
 	time.Sleep(time.Millisecond * 200)
 	recvdZones := dh.GetZones()
 	sort.Strings(recvdZones)
-	if !cmp.Equal(zones, recvdZones) {
-		t.Fail()
-	}
+	g.Expect(zones).To(Equal(recvdZones))
 }
 
 func TestGetZoneLocations(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	locations := dh.GetZoneLocations(zoneName)
-	if len(locations) != 0 {
-		t.Fail()
-	}
+	g.Expect(locations).To(BeEmpty())
 }
 
 func TestSetZoneConfig(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
 	oldZoneConfig, err := dh.GetZoneConfig(zoneName)
-	if err != nil {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
 	oldZoneConfig.DomainId = "12345"
 	err = dh.SetZoneConfig(zoneName, oldZoneConfig)
-	if err != nil {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Second * 2)
 	newZoneConfig, err := dh.GetZoneConfig(zoneName)
-	if err != nil {
-		t.Fail()
-	}
-	if cmp.Equal(oldZoneConfig, newZoneConfig) == false {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(cmp.Equal(oldZoneConfig, newZoneConfig)).To(BeTrue())
 }
 
 func TestSetZoneConfigFromJson(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
 	configStr := `{"soa":{"ttl":311, "minttl":111, "mbox":"hostmaster.example.root.","ns":"ns1.example.root.","refresh":44,"retry":55,"expire":66}, "cname_flattening":true, "domain_id":"12345"}`
 	err = dh.SetZoneConfigFromJson(zoneName, configStr)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	config, err := dh.GetZoneConfig(zoneName)
-	if err != nil {
-		t.FailNow()
-	}
-	if config.SOA.Ttl != 311 {
-		t.Fail()
-	}
-	if config.SOA.MinTtl != 111 {
-		t.Fail()
-	}
-	if config.SOA.MBox != "hostmaster.example.root." {
-		t.Fail()
-	}
-	if config.SOA.Ns != "ns1.example.root." {
-		t.Fail()
-	}
-	if config.SOA.Refresh != 44 || config.SOA.Retry != 55 || config.SOA.Expire != 66 {
-		t.Fail()
-	}
-	if config.CnameFlattening != true {
-		t.Fail()
-	}
-	if config.DomainId != "12345" {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(config.SOA.Ttl).To(Equal(uint32(311)))
+	g.Expect(config.SOA.MinTtl).To(Equal(uint32(111)))
+	g.Expect(config.SOA.MBox).To(Equal("hostmaster.example.root."))
+	g.Expect(config.SOA.Ns).To(Equal("ns1.example.root."))
+	g.Expect(config.SOA.Refresh).To(Equal(uint32(44)))
+	g.Expect(config.SOA.Retry).To(Equal(uint32(55)))
+	g.Expect(config.SOA.Expire).To(Equal(uint32(66)))
+	g.Expect(config.CnameFlattening).To(BeTrue())
+	g.Expect(config.DomainId).To(Equal("12345"))
 }
 
 func TestGetLocation(t *testing.T) {
+	g := NewGomegaWithT(t)
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.FailNow()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone("zone1.com.")
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.SetLocationFromJson("zone1.com.", "@", `{"a":{"ttl":300, "records":[{"ip":"5.5.5.5"}]}}`)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	location := types.Record{
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
@@ -334,30 +229,19 @@ func TestGetLocation(t *testing.T) {
 		},
 	}
 	l, err := dh.GetLocation("zone1.com.", "@")
-	if err != nil {
-		t.FailNow()
-	}
-	if l == nil {
-		t.Fail()
-	}
-	if reflect.DeepEqual(l.A, location.A) == false {
-		fmt.Println(l.A)
-		fmt.Println(location.A)
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(l).NotTo(BeNil())
+	g.Expect(reflect.DeepEqual(l.A, location.A)).To(BeTrue())
 }
 
 func TestSetLocation(t *testing.T) {
+	g := NewGomegaWithT(t)
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zoneName := "zone1.com."
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	location := types.Record{
 		RRSets: types.RRSets{
 			A: types.IP_RRSet{
@@ -374,20 +258,14 @@ func TestSetLocation(t *testing.T) {
 		},
 	}
 	err = dh.SetLocation(zoneName, "@", &location)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	l, err := dh.GetLocation(zoneName, "@")
-	if err != nil {
-		t.FailNow()
-	}
-	if reflect.DeepEqual(l.A, location.A) == false {
-		fmt.Println("l.A not equal location.A", l.A, location.A)
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(reflect.DeepEqual(l.A, location.A)).To(BeTrue())
 }
 
 func TestSetLocationFromJson(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "example.com."
 	locationStr :=
 		`{
@@ -407,35 +285,17 @@ func TestSetLocationFromJson(t *testing.T) {
 		CacheTimeout: time.Now().Unix() + int64(dataHandlerDefaultTestConfig.RecordCacheTimeout),
 	}
 	err := jsoniter.Unmarshal([]byte(locationStr), &location)
-	if err != nil {
-		fmt.Println("1", err)
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err = dh.Clear()
-	if err != nil {
-		fmt.Println("2")
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		fmt.Println("3")
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.SetLocationFromJson(zoneName, "@", locationStr)
-	if err != nil {
-		fmt.Println("4")
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	l, err := dh.GetLocation(zoneName, "@")
-	if err != nil {
-		fmt.Println("5")
-		t.FailNow()
-	}
-	if cmp.Equal(&location, l) != true {
-		fmt.Println(cmp.Diff(&location, l))
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(cmp.Equal(&location, l)).To(BeTrue())
 }
 
 var zone1ZskPriv = `
@@ -479,16 +339,13 @@ zone1.com. IN DNSKEY 257 3 5 AwEAAeVrjiD9xhyA+UJnnei/tnoQQpLrEwFzb/blH6c80yR7APm
 `
 
 func TestSetZoneKey(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "zone1.com."
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zoneConfig := types.ZoneConfig{
 		DomainId: "123456",
 		SOA: &types.SOA_RRSet{
@@ -521,132 +378,79 @@ func TestSetZoneKey(t *testing.T) {
 		CnameFlattening: false,
 	}
 	err = dh.SetZoneConfig(zoneName, &zoneConfig)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.SetZoneKey(zoneName, "zsk", zone1ZskPub, zone1ZskPriv)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.SetZoneKey(zoneName, "ksk", zone1KskPub, zone1KskPriv)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zoneConfig.DnsSec = true
 	err = dh.SetZoneConfig(zoneName, &zoneConfig)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	zone := dh.GetZone(zoneName)
-	if zone == nil {
-		t.FailNow()
-	}
-	if zone.Config.DnsSec == false {
-		t.Fail()
-	}
+	g.Expect(zone).NotTo(BeNil())
+	g.Expect(zone.Config.DnsSec).To(BeTrue())
 }
 
 func TestLocationUpdate(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "example.com."
 	locationStr := `{"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]}}`
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	_, err = dh.GetLocation(zoneName, "@")
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 
 	err = dh.SetLocationFromJson(zoneName, "@", locationStr)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	location, err := dh.GetLocation(zoneName, "@")
-	if err != nil {
-		t.FailNow()
-	}
-	if len(location.A.Data) != 2 {
-		t.FailNow()
-	}
-	if location.A.Data[0].Ip.String() != "1.2.3.4" {
-		t.Fail()
-	}
-	if location.A.Data[1].Ip.String() != "5.6.7.8" {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(len(location.A.Data)).To(Equal(2))
+	g.Expect(location.A.Data[0].Ip.String()).To(Equal("1.2.3.4"))
+	g.Expect(location.A.Data[1].Ip.String()).To(Equal("5.6.7.8"))
 }
 
 func TestRemoveLocation(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "example.com."
 	locationStr := `{"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]}}`
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.SetLocationFromJson(zoneName, "www", locationStr)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	_, err = dh.GetLocation(zoneName, "www")
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.RemoveLocation(zoneName, "www")
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	location, err := dh.GetLocation(zoneName, "www")
-	if err != redisCon.ErrNil {
-		t.Fail()
-	}
-	if location != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(Equal(redisCon.ErrNil))
+	g.Expect(location).To(BeNil())
 }
 
 func TestConfigUpdate(t *testing.T) {
+	g := NewGomegaWithT(t)
 	zoneName := "example.com."
 	configStr := `{"cname_flattening":true, "domain_id":"12345"}`
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	_, err = dh.GetZoneConfig(zoneName)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 
 	err = dh.SetZoneConfigFromJson(zoneName, configStr)
-	if err != nil {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
 	config, err := dh.GetZoneConfig(zoneName)
-	if err != nil {
-		t.FailNow()
-	}
-	if config.DomainId != "12345" {
-		t.Fail()
-	}
-	if config.CnameFlattening != true {
-		t.Fail()
-	}
+	g.Expect(err).To(BeNil())
+	g.Expect(config.DomainId).To(Equal("12345"))
+	g.Expect(config.CnameFlattening).To(BeTrue())
 }

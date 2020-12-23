@@ -8,6 +8,7 @@ import (
 	"github.com/hawell/z42/internal/upstream"
 	"github.com/hawell/z42/pkg/geoip"
 	"github.com/hawell/z42/pkg/hiredis"
+	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"testing"
 )
@@ -52,7 +53,8 @@ func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 }
 
 func DefaultApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler, t *testing.T) {
-	for i, tc := range testCase.TestCases {
+	g := NewGomegaWithT(t)
+	for _, tc := range testCase.TestCases {
 
 		r := tc.Msg()
 		w := test.NewRecorder(&test.ResponseWriter{})
@@ -61,14 +63,8 @@ func DefaultApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler
 
 		resp := w.Msg
 
-		if err := test.SortAndCheck(resp, tc); err != nil {
-			fmt.Println(tc.Desc)
-			fmt.Println(i, err, tc.Qname)
-			fmt.Println(tc.Answer, resp.Answer)
-			fmt.Println(tc.Ns, resp.Ns)
-			fmt.Println(tc.Extra, resp.Extra)
-			t.Fail()
-		}
+		err := test.SortAndCheck(resp, tc)
+		g.Expect(err).To(BeNil())
 	}
 }
 

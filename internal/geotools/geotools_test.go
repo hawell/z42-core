@@ -1,9 +1,9 @@
 package geotools
 
 import (
-	"fmt"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/geoip"
+	. "github.com/onsi/gomega"
 	"log"
 	"net"
 	"strconv"
@@ -57,20 +57,19 @@ func TestGeoIpAutomatic(t *testing.T) {
 		{"37.148.176.54", "BE"},
 	}
 
+	g := NewGomegaWithT(t)
 	cfg := geoip.Config{
 		Enable:    true,
 		CountryDB: countryDB,
 	}
 
-	g := geoip.NewGeoIp(&cfg)
+	geoIp := geoip.NewGeoIp(&cfg)
 
 	for i := range sip {
 		dest := new(types.IP_RRSet)
 		for j := range dip {
-			cc, _ := g.GetCountry(net.ParseIP(dip[j][0]))
-			if cc != dip[j][1] {
-				t.Fail()
-			}
+			cc, _ := geoIp.GetCountry(net.ParseIP(dip[j][0]))
+			g.Expect(cc).To(Equal(dip[j][1]))
 			r := types.IP_RR{
 				Ip: net.ParseIP(dip[j][0]),
 			}
@@ -78,11 +77,8 @@ func TestGeoIpAutomatic(t *testing.T) {
 		}
 		dest.Ttl = 100
 		mask := make([]int, len(dest.Data))
-		mask, err := GetMinimumDistance(g, net.ParseIP(sip[i][0]), dest.Data, mask)
-		if err != nil {
-			fmt.Println(err)
-			t.Fail()
-		}
+		mask, err := GetMinimumDistance(geoIp, net.ParseIP(sip[i][0]), dest.Data, mask)
+		g.Expect(err).To(BeNil())
 		index := 0
 		for j, x := range mask {
 			if x == types.IpMaskWhite {
@@ -91,9 +87,7 @@ func TestGeoIpAutomatic(t *testing.T) {
 			}
 		}
 		log.Println("[DEBUG]", sip[i][0], " ", dest.Data[index].Ip.String())
-		if sip[i][2] != dest.Data[index].Ip.String() {
-			t.Fail()
-		}
+		g.Expect(sip[i][2]).To(Equal(dest.Data[index].Ip.String()))
 	}
 }
 
@@ -105,12 +99,13 @@ func TestGetSameCountry(t *testing.T) {
 		{"127.0.0.1", "", "3.4.5.6"},
 	}
 
+	g := NewGomegaWithT(t)
 	cfg := geoip.Config{
 		Enable:    true,
 		CountryDB: countryDB,
 	}
 
-	g := geoip.NewGeoIp(&cfg)
+	geoIp := geoip.NewGeoIp(&cfg)
 
 	for i := range sip {
 		var dest types.IP_RRSet
@@ -120,11 +115,8 @@ func TestGetSameCountry(t *testing.T) {
 			{Ip: net.ParseIP("3.4.5.6"), Country: []string{""}},
 		}
 		mask := make([]int, len(dest.Data))
-		mask, err := GetSameCountry(g, net.ParseIP(sip[i][0]), dest.Data, mask)
-		if err != nil {
-			fmt.Println(err)
-			t.Fail()
-		}
+		mask, err := GetSameCountry(geoIp, net.ParseIP(sip[i][0]), dest.Data, mask)
+		g.Expect(err).To(BeNil())
 		index := -1
 		for j, x := range mask {
 			if x == types.IpMaskWhite {
@@ -132,13 +124,10 @@ func TestGetSameCountry(t *testing.T) {
 				break
 			}
 		}
-		if index == -1 {
-			t.Fail()
-		}
+		g.Expect(index).NotTo(Equal(-1))
 		log.Println("[DEBUG]", sip[i][1], sip[i][2], dest.Data[index].Country, dest.Data[index].Ip.String())
-		if dest.Data[index].Country[0] != sip[i][1] || dest.Data[index].Ip.String() != sip[i][2] {
-			t.Fail()
-		}
+		g.Expect(dest.Data[index].Country[0]).To(Equal(sip[i][1]))
+		g.Expect(dest.Data[index].Ip.String()).To(Equal(sip[i][2]))
 	}
 
 }
@@ -170,16 +159,14 @@ func TestGetSameASN(t *testing.T) {
 		Enable: true,
 		ASNDB:  asnDB,
 	}
+	g := NewGomegaWithT(t)
 
-	g := geoip.NewGeoIp(&cfg)
+	geoIp := geoip.NewGeoIp(&cfg)
 
 	for i := range sip {
 		mask := make([]int, len(dip.Data))
-		mask, err := GetSameASN(g, net.ParseIP(sip[i]), dip.Data, mask)
-		if err != nil {
-			fmt.Println(err)
-			t.Fail()
-		}
+		mask, err := GetSameASN(geoIp, net.ParseIP(sip[i]), dip.Data, mask)
+		g.Expect(err).To(BeNil())
 		index := -1
 		for j, x := range mask {
 			if x == types.IpMaskWhite {
@@ -187,12 +174,9 @@ func TestGetSameASN(t *testing.T) {
 				break
 			}
 		}
-		if index == -1 {
-			t.Fail()
-		}
-		if strconv.Itoa(int(dip.Data[index].ASN[0])) != res[i][0] || dip.Data[index].Ip.String() != res[i][1] {
-			t.Fail()
-		}
+		g.Expect(index).NotTo(Equal(-1))
+		g.Expect(strconv.Itoa(int(dip.Data[index].ASN[0]))).To(Equal(res[i][0]))
+		g.Expect(dip.Data[index].Ip.String()).To(Equal(res[i][1]))
 	}
 }
 
@@ -202,38 +186,34 @@ func TestDisabled(t *testing.T) {
 		CountryDB: countryDB,
 		ASNDB:     asnDB,
 	}
-	g := geoip.NewGeoIp(&cfg)
+	g := NewGomegaWithT(t)
 
-	_, err := GetMinimumDistance(g, net.ParseIP("1.2.3.4"),
+	geoIp := geoip.NewGeoIp(&cfg)
+
+	_, err := GetMinimumDistance(geoIp, net.ParseIP("1.2.3.4"),
 		[]types.IP_RR{{
 			Weight:  0,
 			Ip:      nil,
 			Country: nil,
 			ASN:     nil,
 		}}, []int{0})
-	if err != geoip.ErrGeoIpDisabled {
-		t.Fail()
-	}
-	_, err = GetSameASN(g, net.ParseIP("1.2.3.4"),
+	g.Expect(err).To(Equal(geoip.ErrGeoIpDisabled))
+	_, err = GetSameASN(geoIp, net.ParseIP("1.2.3.4"),
 		[]types.IP_RR{{
 			Weight:  0,
 			Ip:      nil,
 			Country: nil,
 			ASN:     nil,
 		}}, []int{0})
-	if err != geoip.ErrGeoIpDisabled {
-		t.Fail()
-	}
-	_, err = GetSameCountry(g, net.ParseIP("1.2.3.4"),
+	g.Expect(err).To(Equal(geoip.ErrGeoIpDisabled))
+	_, err = GetSameCountry(geoIp, net.ParseIP("1.2.3.4"),
 		[]types.IP_RR{{
 			Weight:  0,
 			Ip:      nil,
 			Country: nil,
 			ASN:     nil,
 		}}, []int{0})
-	if err != geoip.ErrGeoIpDisabled {
-		t.Fail()
-	}
+	g.Expect(err).To(Equal(geoip.ErrGeoIpDisabled))
 }
 
 func TestBadDB(t *testing.T) {
@@ -242,36 +222,31 @@ func TestBadDB(t *testing.T) {
 		CountryDB: "ddd",
 		ASNDB:     "ddds",
 	}
-	g := geoip.NewGeoIp(&cfg)
+	g := NewGomegaWithT(t)
+	geoIp := geoip.NewGeoIp(&cfg)
 
-	_, err := GetMinimumDistance(g, net.ParseIP("1.2.3.4"),
+	_, err := GetMinimumDistance(geoIp, net.ParseIP("1.2.3.4"),
 		[]types.IP_RR{{
 			Weight:  0,
 			Ip:      nil,
 			Country: nil,
 			ASN:     nil,
 		}}, []int{0})
-	if err != geoip.ErrBadDB {
-		t.Fail()
-	}
-	_, err = GetSameASN(g, net.ParseIP("1.2.3.4"),
+	g.Expect(err).To(Equal(geoip.ErrBadDB))
+	_, err = GetSameASN(geoIp, net.ParseIP("1.2.3.4"),
 		[]types.IP_RR{{
 			Weight:  0,
 			Ip:      nil,
 			Country: nil,
 			ASN:     nil,
 		}}, []int{0})
-	if err != geoip.ErrBadDB {
-		t.Fail()
-	}
-	_, err = GetSameCountry(g, net.ParseIP("1.2.3.4"),
+	g.Expect(err).To(Equal(geoip.ErrBadDB))
+	_, err = GetSameCountry(geoIp, net.ParseIP("1.2.3.4"),
 		[]types.IP_RR{{
 			Weight:  0,
 			Ip:      nil,
 			Country: nil,
 			ASN:     nil,
 		}}, []int{0})
-	if err != geoip.ErrBadDB {
-		t.Fail()
-	}
+	g.Expect(err).To(Equal(geoip.ErrBadDB))
 }

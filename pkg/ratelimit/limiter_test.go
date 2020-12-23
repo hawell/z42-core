@@ -2,11 +2,13 @@ package ratelimit
 
 import (
 	"fmt"
+	. "github.com/onsi/gomega"
 	"testing"
 	"time"
 )
 
 func TestLimiter(t *testing.T) {
+	g := NewGomegaWithT(t)
 	cfg := Config{
 		Enable:    true,
 		Rate:      60000,
@@ -26,9 +28,8 @@ func TestLimiter(t *testing.T) {
 		}
 	}
 	fmt.Println("fail : ", fail, " success : ", success)
-	if fail != 0 {
-		t.Fail()
-	}
+
+	g.Expect(fail).To(Equal(0))
 	fail = 0
 	success = 0
 	for i := 0; i < 20; i++ {
@@ -39,38 +40,25 @@ func TestLimiter(t *testing.T) {
 		}
 	}
 	fmt.Println("fail : ", fail, " success : ", success)
-	if fail != 9 || success != 11 {
-		t.Fail()
-	}
+	g.Expect(fail).To(Equal(9))
+	g.Expect(success).To(Equal(11))
 
-	if rl.CanHandle("b1") == true {
-		t.Fail()
-	}
-	if rl.CanHandle("b2") == true {
-		t.Fail()
-	}
+	g.Expect(rl.CanHandle("b1")).To(BeFalse())
+	g.Expect(rl.CanHandle("b2")).To(BeFalse())
 
 	for i := 0; i < 100; i++ {
-		if rl.CanHandle("w1") == false {
-			t.Fail()
-		}
-		if rl.CanHandle("w2") == false {
-			t.Fail()
-		}
+		g.Expect(rl.CanHandle("w1")).To(BeTrue())
+		g.Expect(rl.CanHandle("w2")).To(BeTrue())
 	}
 
 	fail = 0
 	success = 0
 	for i := 0; i < 10; i++ {
-		if rl.CanHandle("3") != true {
-			t.Fail()
-		}
+		g.Expect(rl.CanHandle("3")).To(BeTrue())
 	}
 	for i := 0; i < 100; i++ {
 		time.Sleep(time.Millisecond)
-		if rl.CanHandle("3") != true {
-			t.Fail()
-		}
+		g.Expect(rl.CanHandle("3")).To(BeTrue())
 	}
 	fmt.Println("fail : ", fail, " success : ", success)
 }

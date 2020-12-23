@@ -7,6 +7,7 @@ import (
 	"github.com/hawell/z42/internal/test"
 	"github.com/hawell/z42/internal/types"
 	"github.com/miekg/dns"
+	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"sort"
 	"strings"
@@ -128,6 +129,7 @@ func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testC
 }
 
 func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler, t *testing.T) {
+	g := NewGomegaWithT(t)
 	var zsk dns.RR
 	var ksk dns.RR
 	{
@@ -179,7 +181,6 @@ func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestH
 		state := NewRequestContext(w, r)
 		requestHandler.HandleRequest(state)
 		resp := w.Msg
-	next:
 		for _, rrs := range [][]dns.RR{tc0.Answer, tc0.Ns, resp.Answer, resp.Ns} {
 			sets := types.SplitSets(rrs)
 			rrsigs := make(map[types.RRSetKey]*dns.RRSIG)
@@ -194,36 +195,17 @@ func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestH
 					continue
 				}
 				if tc.Qtype == dns.TypeDNSKEY {
-					if err := rrsig.Verify(ksk.(*dns.DNSKEY), set); err != nil {
-						fmt.Println(tc.Desc)
-						fmt.Println(err)
-						fmt.Println(set)
-						t.Fail()
-						continue next
-					}
+					err := rrsig.Verify(ksk.(*dns.DNSKEY), set)
+					g.Expect(err).To(BeNil())
 				} else {
-					if err := rrsig.Verify(zsk.(*dns.DNSKEY), set); err != nil {
-						fmt.Println(tc.Desc)
-						fmt.Println(err)
-						fmt.Println(set)
-						t.Fail()
-						continue next
-					}
+					err := rrsig.Verify(zsk.(*dns.DNSKEY), set)
+					g.Expect(err).To(BeNil())
 				}
 			}
 		}
 		//fmt.Println("dddd")
-		if err := test.SortAndCheck(resp, tc); err != nil {
-			fmt.Println(tc.Desc)
-			fmt.Println(err)
-			fmt.Println(resp.Answer)
-			fmt.Println(tc.Answer)
-			fmt.Println(resp.Ns)
-			fmt.Println(tc.Ns)
-			fmt.Println(resp.Extra)
-			fmt.Println(tc.Extra)
-			t.Fail()
-		}
+		err := test.SortAndCheck(resp, tc)
+		g.Expect(err).To(BeNil())
 		//fmt.Println("xxxx")
 	}
 }
@@ -663,6 +645,7 @@ var dnssecTestCases = []*TestCase{
 }
 
 func TestAllDnssec(t *testing.T) {
+	g := NewGomegaWithT(t)
 	for _, testCase := range dnssecTestCases {
 		if !testCase.Enabled {
 			continue
@@ -671,10 +654,7 @@ func TestAllDnssec(t *testing.T) {
 		fmt.Println(testCase.Description)
 		fmt.Println(strings.Repeat("-", 80))
 		h, err := testCase.Initialize(testCase)
-		if err != nil {
-			fmt.Println("initialization failed : ", err)
-			t.Fail()
-		}
+		g.Expect(err).To(BeNil())
 		testCase.ApplyAndVerify(testCase, h, t)
 		fmt.Println(strings.Repeat("-", 80))
 	}

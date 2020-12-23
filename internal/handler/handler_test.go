@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/z42/internal/storage"
+	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"net"
 	"strings"
@@ -1088,6 +1089,7 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+			g := NewGomegaWithT(t)
 			ipsCount := []int{0, 0, 0}
 			for i := 0; i < 1000; i++ {
 				r := testCase.TestCases[0].Msg()
@@ -1096,14 +1098,8 @@ var handlerTestCases = []*TestCase{
 				handler.HandleRequest(state)
 
 				resp := w.Msg
-				if resp.Rcode != dns.RcodeSuccess {
-					fmt.Println("RcodeSuccess expected ", dns.RcodeToString[resp.Rcode], " received")
-					t.Fail()
-				}
-				if len(resp.Answer) == 0 {
-					fmt.Println("empty answer")
-					t.Fail()
-				}
+				g.Expect(resp.Rcode).To(Equal(dns.RcodeSuccess))
+				g.Expect(len(resp.Answer)).NotTo(Equal(0))
 				a := resp.Answer[0].(*dns.A)
 				switch a.A.String() {
 				case "1.1.1.1":
@@ -1113,14 +1109,11 @@ var handlerTestCases = []*TestCase{
 				case "3.3.3.3":
 					ipsCount[2]++
 				default:
+					g.Expect(true).To(BeFalse())
 					fmt.Println("invalid ip : ", a.A.String())
-					t.Fail()
 				}
 			}
-			if !(ipsCount[0] < ipsCount[1] && ipsCount[1] < ipsCount[2]) {
-				fmt.Println("bad ip weight balance")
-				t.Fail()
-			}
+			g.Expect(ipsCount[0] < ipsCount[1] && ipsCount[1] < ipsCount[2]).To(BeTrue())
 			ipsCount = []int{0, 0, 0}
 			for i := 0; i < 1000; i++ {
 				r := testCase.TestCases[1].Msg()
@@ -1129,14 +1122,8 @@ var handlerTestCases = []*TestCase{
 				handler.HandleRequest(state)
 
 				resp := w.Msg
-				if resp.Rcode != dns.RcodeSuccess {
-					fmt.Println("RcodeSuccess expected ", dns.RcodeToString[resp.Rcode], " received")
-					t.Fail()
-				}
-				if len(resp.Answer) == 0 {
-					fmt.Println("empty answer")
-					t.Fail()
-				}
+				g.Expect(resp.Rcode).To(Equal(dns.RcodeSuccess))
+				g.Expect(len(resp.Answer)).NotTo(Equal(0))
 				aaaa := resp.Answer[0].(*dns.AAAA)
 				switch aaaa.AAAA.String() {
 				case "2001:db8::1":
@@ -1146,14 +1133,11 @@ var handlerTestCases = []*TestCase{
 				case "2001:db8::3":
 					ipsCount[2]++
 				default:
+					g.Expect(true).To(BeFalse())
 					fmt.Println("invalid ip : ", aaaa.AAAA.String())
-					t.Fail()
 				}
 			}
-			if !(ipsCount[0] < ipsCount[1] && ipsCount[1] < ipsCount[2]) {
-				fmt.Println("bad ip weight balance")
-				t.Fail()
-			}
+			g.Expect(ipsCount[0] < ipsCount[1] && ipsCount[1] < ipsCount[2]).To(BeTrue())
 		},
 		Zones: []string{"example.com."},
 		ZoneConfigs: []string{
@@ -1191,6 +1175,7 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+			g := NewGomegaWithT(t)
 			var filterGeoSourceIps = []string{
 				"127.0.0.1",
 				"127.0.0.1",
@@ -1232,10 +1217,8 @@ var handlerTestCases = []*TestCase{
 				resp := w.Msg
 				resp.Extra = nil
 
-				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(i, err)
-					t.Fail()
-				}
+				err := test.SortAndCheck(resp, tc)
+				g.Expect(err).To(BeNil())
 			}
 		},
 		Zones:       []string{"filtergeo.com."},
@@ -1460,6 +1443,7 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+			g := NewGomegaWithT(t)
 			for i := 0; i < 10; i++ {
 				tc := testCase.TestCases[0]
 				r := tc.Msg()
@@ -1469,10 +1453,8 @@ var handlerTestCases = []*TestCase{
 
 				resp := w.Msg
 
-				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(1, err)
-					t.Fail()
-				}
+				err := test.SortAndCheck(resp, tc)
+				g.Expect(err).To(BeNil())
 			}
 
 			w1, w4, w10, w2, w20 := 0, 0, 0, 0, 0
@@ -1484,10 +1466,7 @@ var handlerTestCases = []*TestCase{
 				handler.HandleRequest(state)
 
 				resp := w.Msg
-				if len(resp.Answer) != 5 {
-					fmt.Println("2 expected 5 results ", len(resp.Answer), " received")
-					t.Fail()
-				}
+				g.Expect(len(resp.Answer)).To(Equal(5))
 
 				resa := resp.Answer[0].(*dns.A)
 
@@ -1505,10 +1484,10 @@ var handlerTestCases = []*TestCase{
 				}
 			}
 			// fmt.Println(w1, w2, w4, w10, w20)
-			if w1 > w2 || w2 > w4 || w4 > w10 || w10 > w20 {
-				fmt.Println("3 bad ip weight balance")
-				t.Fail()
-			}
+			g.Expect(w1 <= w2).To(BeTrue())
+			g.Expect(w2 <= w4).To(BeTrue())
+			g.Expect(w4 <= w10).To(BeTrue())
+			g.Expect(w10 <= w20).To(BeTrue())
 
 			rr := make([]int, 5)
 			for i := 0; i < 10000; i++ {
@@ -1519,10 +1498,7 @@ var handlerTestCases = []*TestCase{
 				handler.HandleRequest(state)
 
 				resp := w.Msg
-				if len(resp.Answer) != 5 {
-					fmt.Println("4 expected 5 results ", len(resp.Answer), " received")
-					t.Fail()
-				}
+				g.Expect(len(resp.Answer)).To(Equal(5))
 
 				resa := resp.Answer[0].(*dns.A)
 
@@ -1541,10 +1517,8 @@ var handlerTestCases = []*TestCase{
 			}
 			// fmt.Println(rr)
 			for i := range rr {
-				if rr[i] < 1500 || rr[i] > 2500 {
-					fmt.Println("5 bad ip weight balance")
-					t.Fail()
-				}
+				g.Expect(rr[i] >= 1500).To(BeTrue())
+				g.Expect(rr[i] <= 2500).To(BeTrue())
 			}
 		},
 		Zones:       []string{"filtermulti.com."},
@@ -1620,6 +1594,7 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+			g := NewGomegaWithT(t)
 			for i := 0; i < 10; i++ {
 				tc := testCase.TestCases[0]
 				r := tc.Msg()
@@ -1629,10 +1604,8 @@ var handlerTestCases = []*TestCase{
 
 				resp := w.Msg
 
-				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println(1, err)
-					t.Fail()
-				}
+				err := test.SortAndCheck(resp, tc)
+				g.Expect(err).To(BeNil())
 			}
 
 			w1, w4, w10, w2, w20 := 0, 0, 0, 0, 0
@@ -1644,10 +1617,7 @@ var handlerTestCases = []*TestCase{
 				handler.HandleRequest(state)
 
 				resp := w.Msg
-				if len(resp.Answer) != 1 {
-					fmt.Println("2 expected 1 answer ", len(resp.Answer), " received")
-					t.Fail()
-				}
+				g.Expect(len(resp.Answer)).To(Equal(1))
 
 				resa := resp.Answer[0].(*dns.A)
 
@@ -1665,10 +1635,10 @@ var handlerTestCases = []*TestCase{
 				}
 			}
 			// fmt.Println(w1, w2, w4, w10, w20)
-			if w1 > w2 || w2 > w4 || w4 > w10 || w10 > w20 {
-				fmt.Println("3 bad ip weight balance")
-				t.Fail()
-			}
+			g.Expect(w1 <= w2).To(BeTrue())
+			g.Expect(w2 <= w4).To(BeTrue())
+			g.Expect(w4 <= w10).To(BeTrue())
+			g.Expect(w10 <= w20).To(BeTrue())
 
 			rr := make([]int, 5)
 			for i := 0; i < 10000; i++ {
@@ -1679,10 +1649,7 @@ var handlerTestCases = []*TestCase{
 				handler.HandleRequest(state)
 
 				resp := w.Msg
-				if len(resp.Answer) != 1 {
-					fmt.Println("4 expected 1 answer ", len(resp.Answer), " received")
-					t.Fail()
-				}
+				g.Expect(len(resp.Answer)).To(Equal(1))
 
 				resa := resp.Answer[0].(*dns.A)
 
@@ -1701,10 +1668,8 @@ var handlerTestCases = []*TestCase{
 			}
 			// fmt.Println(rr)
 			for i := range rr {
-				if rr[i] < 1500 || rr[i] > 2500 {
-					fmt.Println("5 bad ip weight balance")
-					t.Fail()
-				}
+				g.Expect(rr[i] >= 1500).To(BeTrue())
+				g.Expect(rr[i] <= 2500).To(BeTrue())
 			}
 		},
 		Zones:       []string{"filtersingle.com."},
@@ -1775,6 +1740,7 @@ var handlerTestCases = []*TestCase{
 		HandlerConfig:   DefaultHandlerTestConfig,
 		Initialize:      DefaultInitialize,
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+			g := NewGomegaWithT(t)
 			tc := testCase.TestCases[0]
 			r := tc.Msg()
 			w := test.NewRecorder(&test.ResponseWriter{})
@@ -1783,15 +1749,9 @@ var handlerTestCases = []*TestCase{
 
 			resp := w.Msg
 			// fmt.Println(resp)
-			if resp.Rcode != dns.RcodeSuccess {
-				fmt.Println("invalid rcode, expected : RcodeSuccess, received : ", dns.RcodeToString[resp.Rcode])
-				t.Fail()
-			}
+			g.Expect(resp.Rcode).To(Equal(dns.RcodeSuccess))
 			cname := resp.Answer[0].(*dns.CNAME)
-			if cname.Target != "www.google.com." {
-				fmt.Println("invalid cname target, expected : www.google.com. received : ", cname.Target)
-				t.Fail()
-			}
+			g.Expect(cname.Target).To(Equal("www.google.com."))
 		},
 		Zones:       []string{"upstreamcname.com."},
 		ZoneConfigs: []string{`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.upstreamcname.com.","ns":"ns1.upstreamcname.com.","refresh":44,"retry":55,"expire":66}}`},
@@ -2371,6 +2331,7 @@ var handlerTestCases = []*TestCase{
 			return DefaultInitialize(testCase)
 		},
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+			g := NewGomegaWithT(t)
 			tc := testCase.TestCases[0]
 			r := tc.Msg()
 			w := test.NewRecorder(&test.ResponseWriter{})
@@ -2379,10 +2340,8 @@ var handlerTestCases = []*TestCase{
 
 			resp := w.Msg
 
-			if err := test.SortAndCheck(resp, tc); err != nil {
-				fmt.Println(err, tc.Qname, tc.Answer, resp.Answer)
-				t.Fail()
-			}
+			err := test.SortAndCheck(resp, tc)
+			g.Expect(err).To(BeNil())
 
 			time.Sleep(time.Duration(1200) * time.Millisecond)
 
@@ -2392,10 +2351,8 @@ var handlerTestCases = []*TestCase{
 			handler.HandleRequest(state)
 
 			resp = w.Msg
-			if err := test.SortAndCheck(resp, tc); err != nil {
-				fmt.Println(err, tc.Qname, tc.Answer, resp.Answer)
-				t.Fail()
-			}
+			err = test.SortAndCheck(resp, tc)
+			g.Expect(err).To(BeNil())
 		},
 		Zones:       []string{"stale.com."},
 		ZoneConfigs: []string{""},
@@ -2448,6 +2405,7 @@ var handlerTestCases = []*TestCase{
 			return h, nil
 		},
 		ApplyAndVerify: func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T) {
+			g := NewGomegaWithT(t)
 			{
 				_ = handler.RedisData.DisableZone(testCase.Zones[0])
 				time.Sleep(time.Millisecond * 1200)
@@ -2460,10 +2418,8 @@ var handlerTestCases = []*TestCase{
 
 				resp := w.Msg
 
-				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println("1", err, tc.Qname, tc.Answer, resp.Answer)
-					t.Fail()
-				}
+				err := test.SortAndCheck(resp, tc)
+				g.Expect(err).To(BeNil())
 			}
 
 			{
@@ -2478,10 +2434,8 @@ var handlerTestCases = []*TestCase{
 
 				resp := w.Msg
 
-				if err := test.SortAndCheck(resp, tc); err != nil {
-					fmt.Println("2", err, tc.Qname, tc.Answer, resp.Answer)
-					t.Fail()
-				}
+				err := test.SortAndCheck(resp, tc)
+				g.Expect(err).To(BeNil())
 			}
 		},
 		Zones:       []string{"zone1.zon.", "zone2.zon."},
@@ -2582,6 +2536,7 @@ var handlerTestCases = []*TestCase{
 }
 
 func TestAllHandler(t *testing.T) {
+	g := NewGomegaWithT(t)
 	for _, testCase := range handlerTestCases {
 		if !testCase.Enabled {
 			continue
@@ -2590,10 +2545,7 @@ func TestAllHandler(t *testing.T) {
 		fmt.Println(testCase.Description)
 		fmt.Println(strings.Repeat("-", 80))
 		h, err := testCase.Initialize(testCase)
-		if err != nil {
-			fmt.Println("initialization failed : ", err)
-			t.Fail()
-		}
+		g.Expect(err).To(BeNil())
 		testCase.ApplyAndVerify(testCase, h, t)
 		fmt.Println(strings.Repeat("-", 80))
 	}

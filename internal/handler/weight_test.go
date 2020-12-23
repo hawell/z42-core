@@ -1,14 +1,15 @@
 package handler
 
 import (
-	"fmt"
 	"github.com/hawell/z42/internal/types"
+	. "github.com/onsi/gomega"
 	"log"
 	"net"
 	"testing"
 )
 
 func TestWeight(t *testing.T) {
+	g := NewGomegaWithT(t)
 	// distribution
 	rrset := types.IP_RRSet{
 		FilterConfig: types.IpFilterConfig{
@@ -40,10 +41,9 @@ func TestWeight(t *testing.T) {
 			n[3]++
 		}
 	}
-	if n[0] > n[2] || n[2] > n[3] || n[1] > n[0] {
-		fmt.Println(1, n)
-		t.Fail()
-	}
+	g.Expect(n[0] <= n[2]).To(BeTrue())
+	g.Expect(n[2] <= n[3]).To(BeTrue())
+	g.Expect(n[1] <= n[0]).To(BeTrue())
 
 	// all zero
 	for i := range rrset.Data {
@@ -64,10 +64,7 @@ func TestWeight(t *testing.T) {
 		}
 	}
 	for i := 0; i < 4; i++ {
-		if n[i] < 2000 && n[i] > 3000 {
-			fmt.Println(2, n)
-			t.Fail()
-		}
+		g.Expect(n[i] < 2000 && n[i] > 3000).To(BeFalse())
 	}
 
 	// some zero
@@ -87,10 +84,8 @@ func TestWeight(t *testing.T) {
 		}
 	}
 	log.Println(n)
-	if n[0] > 0 || n[3] > 0 {
-		fmt.Println(3, n)
-		t.Fail()
-	}
+	g.Expect(n[0]).To(Equal(0))
+	g.Expect(n[3]).To(Equal(0))
 
 	// weighted = false
 	n[0], n[1], n[2], n[3] = 0, 0, 0, 0
@@ -111,9 +106,7 @@ func TestWeight(t *testing.T) {
 	}
 	log.Println(n)
 	for i := 0; i < 4; i++ {
-		if n[i] < 2000 && n[i] > 3000 {
-			fmt.Println(4, n)
-			t.Fail()
-		}
+		g.Expect(n[i] >= 20000).To(BeTrue())
+		g.Expect(n[i] <= 30000).To(BeTrue())
 	}
 }

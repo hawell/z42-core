@@ -3,12 +3,13 @@ package handler
 import (
 	"github.com/hawell/z42/internal/test"
 	"github.com/miekg/dns"
-	"log"
+	. "github.com/onsi/gomega"
 	"net"
 	"testing"
 )
 
 func TestSubnet(t *testing.T) {
+	g := NewGomegaWithT(t)
 	tc := test.Case{
 		Qname: "example.com.", Qtype: dns.TypeA,
 	}
@@ -27,21 +28,13 @@ func TestSubnet(t *testing.T) {
 	}
 	r := tc.Msg()
 	r.Extra = append(r.Extra, opt)
-	if r.IsEdns0() == nil {
-		log.Printf("no edns\n")
-		t.Fail()
-	}
+
+	g.Expect(r.IsEdns0()).NotTo(BeNil())
 	w := test.NewRecorder(&test.ResponseWriter{})
 	state := NewRequestContext(w, r)
 
 	subnet := state.SourceSubnet
-	if subnet != sa+"/32/0" {
-		log.Printf("subnet = %s should be %s\n", subnet, sa)
-		t.Fail()
-	}
+	g.Expect(subnet).To(Equal(sa + "/32/0"))
 	address := state.SourceIp
-	if address.String() != sa {
-		log.Printf("address = %s should be %s\n", address.String(), sa)
-		t.Fail()
-	}
+	g.Expect(address.String()).To(Equal(sa))
 }

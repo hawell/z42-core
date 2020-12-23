@@ -2,6 +2,7 @@ package geoip
 
 import (
 	"fmt"
+	. "github.com/onsi/gomega"
 	"net"
 	"testing"
 )
@@ -48,7 +49,7 @@ var (
 185.70.144.117 200567 DE
 62.220.128.73 6893 CH
 */
-func printCountryASN() {
+func _() {
 	ips := []string{
 		"82.220.3.51",
 		"192.30.252.225",
@@ -102,53 +103,39 @@ func printCountryASN() {
 }
 
 func TestDisabled(t *testing.T) {
+	g := NewGomegaWithT(t)
 	cfg := Config{
 		Enable:    false,
 		CountryDB: countryDB,
 		ASNDB:     asnDB,
 	}
-	g := NewGeoIp(&cfg)
+	geoIp := NewGeoIp(&cfg)
 
-	if g.enable {
-		t.Fail()
-	}
+	g.Expect(geoIp.enable).To(BeFalse())
 
-	_, err := g.GetASN(net.ParseIP("1.2.3.4"))
-	if err != ErrGeoIpDisabled {
-		t.Fail()
-	}
-	_, err = g.GetCountry(net.ParseIP("1.2.3.4"))
-	if err != ErrGeoIpDisabled {
-		t.Fail()
-	}
-	_, _, err = g.GetCoordinates(net.ParseIP("1.2.3.4"))
-	if err != ErrGeoIpDisabled {
-		t.Fail()
-	}
+	_, err := geoIp.GetASN(net.ParseIP("1.2.3.4"))
+	g.Expect(err).To(Equal(ErrGeoIpDisabled))
+	_, err = geoIp.GetCountry(net.ParseIP("1.2.3.4"))
+	g.Expect(err).To(Equal(ErrGeoIpDisabled))
+	_, _, err = geoIp.GetCoordinates(net.ParseIP("1.2.3.4"))
+	g.Expect(err).To(Equal(ErrGeoIpDisabled))
 }
 
 func TestBadDB(t *testing.T) {
+	g := NewGomegaWithT(t)
 	cfg := Config{
 		Enable:    true,
 		CountryDB: "ddd",
 		ASNDB:     "ddds",
 	}
-	g := NewGeoIp(&cfg)
+	geoIp := NewGeoIp(&cfg)
 
-	if !g.enable {
-		t.Fail()
-	}
+	g.Expect(geoIp.enable).To(BeTrue())
 
-	_, err := g.GetASN(net.ParseIP("1.2.3.4"))
-	if err != ErrBadDB {
-		t.Fail()
-	}
-	_, err = g.GetCountry(net.ParseIP("1.2.3.4"))
-	if err != ErrBadDB {
-		t.Fail()
-	}
-	_, _, err = g.GetCoordinates(net.ParseIP("1.2.3.4"))
-	if err != ErrBadDB {
-		t.Fail()
-	}
+	_, err := geoIp.GetASN(net.ParseIP("1.2.3.4"))
+	g.Expect(err).To(Equal(ErrBadDB))
+	_, err = geoIp.GetCountry(net.ParseIP("1.2.3.4"))
+	g.Expect(err).To(Equal(ErrBadDB))
+	_, _, err = geoIp.GetCoordinates(net.ParseIP("1.2.3.4"))
+	g.Expect(err).To(Equal(ErrBadDB))
 }

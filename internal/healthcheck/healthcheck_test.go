@@ -6,6 +6,7 @@ import (
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
+	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"log"
 	"net"
@@ -102,6 +103,7 @@ var healthcheckTestConfig = Config{
 }
 
 func TestGet(t *testing.T) {
+	g := NewGomegaWithT(t)
 	log.Println("TestGet")
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
@@ -117,15 +119,14 @@ func TestGet(t *testing.T) {
 	for i, item := range healthcheckGetEntries {
 		stat := h.redisStat.GetHealthStatus(item.Host, item.Ip)
 		log.Println("[DEBUG]", stat, " ", stats[i])
-		if stat != stats[i] {
-			t.Fail()
-		}
+		g.Expect(stat).To(Equal(stats[i]))
 	}
 	// h.Stop()
 	h.redisStat.Clear()
 }
 
 func TestFilter(t *testing.T) {
+	g := NewGomegaWithT(t)
 	log.Println("TestFilter")
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
@@ -261,9 +262,7 @@ func TestFilter(t *testing.T) {
 				count++
 			}
 		}
-		if count != filterResult[i] {
-			t.Fail()
-		}
+		g.Expect(count).To(Equal(filterResult[i]))
 	}
 	h.redisStat.Clear()
 	// h.Stop()
@@ -294,6 +293,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestTransfer(t *testing.T) {
+	g := NewGomegaWithT(t)
 	log.Printf("TestTransfer")
 
 	var healthcheckTransferItems = [][]string{
@@ -354,29 +354,15 @@ func TestTransfer(t *testing.T) {
 		return true
 	}
 
-	for i, item := range healthCheckTransferResults {
+	for _, item := range healthCheckTransferResults {
 		key := item.Host + ":" + item.Ip
 		storedItem, _ := h.redisStat.GetHealthcheckItem(key)
-		if !itemsEqual(item, storedItem) {
-			log.Println(i, "failed")
-			log.Println("** key : ", key)
-			log.Println("** expected : ", item)
-			log.Println("** stored : ", storedItem)
-			t.Fail()
-		}
+		g.Expect(itemsEqual(item, storedItem)).To(BeTrue())
 	}
 }
-
-/*
-func TestPing(t *testing.T) {
-	log.Println("TestPing")
-	if err := pingCheck("4.2.2.4", time.Second); err != nil {
-		t.Fail()
-	}
-}
-*/
 
 func TestHealthCheck(t *testing.T) {
+	g := NewGomegaWithT(t)
 	var healthcheckStatConfig = storage.StatHandlerConfig{
 		Redis: hiredis.Config{
 			Address:  "redis:6379",
@@ -436,23 +422,16 @@ func TestHealthCheck(t *testing.T) {
 		h4 := hc.getStatus("z.google.com.", net.ParseIP("192.168.200.2"))
 	*/
 	log.Println(h1, " ", h2, " " /*, h3,, " ", h4*/)
-	if h1 != 3 {
-		t.Fail()
-	}
-	if h2 != -3 {
-		t.Fail()
-	}
+	g.Expect(h1).To(Equal(3))
+	g.Expect(h2).To(Equal(-3))
 	/*
-	   if h3 != 3 {
-	       t.Fail()
-	   }
-	   if h4 != -3 {
-	       t.Fail()
-	   }
+		g.Expect(h3).To(Equal(3))
+		g.Expect(h4).To(Equal(-3))
 	*/
 }
 
 func TestExpire(t *testing.T) {
+	g := NewGomegaWithT(t)
 	var statConfig = storage.StatHandlerConfig{
 		Redis: hiredis.Config{
 			Address:  "redis:6379",
@@ -498,10 +477,7 @@ func TestExpire(t *testing.T) {
 	go hc.Start()
 	time.Sleep(time.Second * 2)
 	status := hc.redisStat.GetHealthStatus("w0.healthcheck.exp.", "1.2.3.4")
-	if status != 3 {
-		fmt.Println("1")
-		t.Fail()
-	}
+	g.Expect(status).To(Equal(3))
 
 	a = fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", expireItem[1], expireItem[3])
 	log.Println(a)
@@ -509,8 +485,5 @@ func TestExpire(t *testing.T) {
 
 	time.Sleep(time.Second * 5)
 	status = hc.redisStat.GetHealthStatus("w0.healthcheck.exp.", "1.2.3.4")
-	if status != 0 {
-		fmt.Println("2", status)
-		t.Fail()
-	}
+	g.Expect(status).To(Equal(0))
 }
