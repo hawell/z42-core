@@ -17,13 +17,13 @@ var benchEntries = [][]string{
 		"www",
 		`{
 				"a":{"ttl":300, "records":[{"ip":"1.2.3.4"}]},
-				"aaaa":{"ttl":300, "records":[{"ip":"::1"}]},
+				"aaaa":{"ttl":300, "records":[{"ip":"::1"}]}
 			}`,
 	},
 	{
 		"www2",
 		`{
-				"cname":{"ttl":300, "host":"www.bench.zon."},
+				"cname":{"ttl":300, "host":"www.bench.zon."}
 			}`,
 	},
 }
@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 	for _, cmd := range benchEntries {
 		err := benchTestHandler.RedisData.SetLocationFromJson(benchZone, cmd[0], cmd[1])
 		if err != nil {
-			log.Printf("[ERROR] cannot connect to redis: %s", err)
+			log.Printf("[ERROR] 1: %s\n%s", err, cmd[1])
 			return
 		}
 	}

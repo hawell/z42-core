@@ -75,6 +75,8 @@ var healthcheckRedisDataConfig = storage.DataHandlerConfig{
 	ZoneReload:         60,
 	RecordCacheSize:    10000000,
 	RecordCacheTimeout: 1,
+	MinTTL:             5,
+	MaxTTL:             300,
 	Redis: hiredis.Config{
 		Address:  "redis:6379",
 		Net:      "tcp",
@@ -139,122 +141,102 @@ func TestFilter(t *testing.T) {
 		h.redisStat.SetHealthcheckItem(entry)
 	}
 
-	w := []types.Record{
+	w := []types.IP_RRSet{
 		{
-			RRSets: types.RRSets{
-				A: types.IP_RRSet{
-					Data: []types.IP_RR{
-						{Ip: net.ParseIP("1.2.3.4")},
-						{Ip: net.ParseIP("2.3.4.5")},
-						{Ip: net.ParseIP("3.4.5.6")},
-						{Ip: net.ParseIP("4.5.6.7")},
-						{Ip: net.ParseIP("5.6.7.8")},
-					},
-					FilterConfig: types.IpFilterConfig{
-						Count:     "multi",
-						Order:     "none",
-						GeoFilter: "none",
-					},
-					HealthCheckConfig: types.IpHealthCheckConfig{
-						Enable:    true,
-						DownCount: -3,
-						UpCount:   3,
-						Timeout:   1000,
-					},
-				},
+			Data: []types.IP_RR{
+				{Ip: net.ParseIP("1.2.3.4")},
+				{Ip: net.ParseIP("2.3.4.5")},
+				{Ip: net.ParseIP("3.4.5.6")},
+				{Ip: net.ParseIP("4.5.6.7")},
+				{Ip: net.ParseIP("5.6.7.8")},
+			},
+			FilterConfig: types.IpFilterConfig{
+				Count:     "multi",
+				Order:     "none",
+				GeoFilter: "none",
+			},
+			HealthCheckConfig: types.IpHealthCheckConfig{
+				Enable:    true,
+				DownCount: -3,
+				UpCount:   3,
+				Timeout:   1000,
 			},
 		},
 		{
-			RRSets: types.RRSets{
-				A: types.IP_RRSet{
-					Data: []types.IP_RR{
-						{Ip: net.ParseIP("2.3.4.5")},
-						{Ip: net.ParseIP("3.4.5.6")},
-						{Ip: net.ParseIP("4.5.6.7")},
-						{Ip: net.ParseIP("5.6.7.8")},
-					},
-					FilterConfig: types.IpFilterConfig{
-						Count:     "multi",
-						Order:     "none",
-						GeoFilter: "none",
-					},
-					HealthCheckConfig: types.IpHealthCheckConfig{
-						Enable:    true,
-						DownCount: -3,
-						UpCount:   3,
-						Timeout:   1000,
-					},
-				},
+			Data: []types.IP_RR{
+				{Ip: net.ParseIP("2.3.4.5")},
+				{Ip: net.ParseIP("3.4.5.6")},
+				{Ip: net.ParseIP("4.5.6.7")},
+				{Ip: net.ParseIP("5.6.7.8")},
+			},
+			FilterConfig: types.IpFilterConfig{
+				Count:     "multi",
+				Order:     "none",
+				GeoFilter: "none",
+			},
+			HealthCheckConfig: types.IpHealthCheckConfig{
+				Enable:    true,
+				DownCount: -3,
+				UpCount:   3,
+				Timeout:   1000,
 			},
 		},
 		{
-			RRSets: types.RRSets{
-				A: types.IP_RRSet{
-					Data: []types.IP_RR{
-						{Ip: net.ParseIP("3.4.5.6")},
-						{Ip: net.ParseIP("4.5.6.7")},
-						{Ip: net.ParseIP("5.6.7.8")},
-					},
-					FilterConfig: types.IpFilterConfig{
-						Count:     "multi",
-						Order:     "none",
-						GeoFilter: "none",
-					},
-					HealthCheckConfig: types.IpHealthCheckConfig{
-						Enable:    true,
-						DownCount: -3,
-						UpCount:   3,
-						Timeout:   1000,
-					},
-				},
+			Data: []types.IP_RR{
+				{Ip: net.ParseIP("3.4.5.6")},
+				{Ip: net.ParseIP("4.5.6.7")},
+				{Ip: net.ParseIP("5.6.7.8")},
+			},
+			FilterConfig: types.IpFilterConfig{
+				Count:     "multi",
+				Order:     "none",
+				GeoFilter: "none",
+			},
+			HealthCheckConfig: types.IpHealthCheckConfig{
+				Enable:    true,
+				DownCount: -3,
+				UpCount:   3,
+				Timeout:   1000,
 			},
 		},
 		{
-			RRSets: types.RRSets{
-				A: types.IP_RRSet{
-					Data: []types.IP_RR{
-						{Ip: net.ParseIP("4.5.6.7")},
-						{Ip: net.ParseIP("5.6.7.8")},
-					},
-					FilterConfig: types.IpFilterConfig{
-						Count:     "multi",
-						Order:     "none",
-						GeoFilter: "none",
-					},
-					HealthCheckConfig: types.IpHealthCheckConfig{
-						Enable:    true,
-						DownCount: -3,
-						UpCount:   3,
-						Timeout:   1000,
-					},
-				},
+			Data: []types.IP_RR{
+				{Ip: net.ParseIP("4.5.6.7")},
+				{Ip: net.ParseIP("5.6.7.8")},
+			},
+			FilterConfig: types.IpFilterConfig{
+				Count:     "multi",
+				Order:     "none",
+				GeoFilter: "none",
+			},
+			HealthCheckConfig: types.IpHealthCheckConfig{
+				Enable:    true,
+				DownCount: -3,
+				UpCount:   3,
+				Timeout:   1000,
 			},
 		},
 		{
-			RRSets: types.RRSets{
-				A: types.IP_RRSet{
-					Data: []types.IP_RR{
-						{Ip: net.ParseIP("5.6.7.8")},
-					},
-					FilterConfig: types.IpFilterConfig{
-						Count:     "multi",
-						Order:     "none",
-						GeoFilter: "none",
-					},
-					HealthCheckConfig: types.IpHealthCheckConfig{
-						Enable:    true,
-						DownCount: -3,
-						UpCount:   3,
-						Timeout:   1000,
-					},
-				},
+			Data: []types.IP_RR{
+				{Ip: net.ParseIP("5.6.7.8")},
+			},
+			FilterConfig: types.IpFilterConfig{
+				Count:     "multi",
+				Order:     "none",
+				GeoFilter: "none",
+			},
+			HealthCheckConfig: types.IpHealthCheckConfig{
+				Enable:    true,
+				DownCount: -3,
+				UpCount:   3,
+				Timeout:   1000,
 			},
 		},
 	}
 	for i := range w {
 		log.Println("[DEBUG]", w[i])
-		mask := make([]int, len(w[i].A.Data))
-		mask = h.FilterHealthcheck("w"+strconv.Itoa(i)+".healthcheck.com.", &w[i].A, mask)
+		mask := make([]int, len(w[i].Data))
+		mask = h.FilterHealthcheck("w"+strconv.Itoa(i)+".healthcheck.com.", &w[i], mask)
 		log.Println("[DEBUG]", w[i])
 		count := 0
 		for _, x := range mask {

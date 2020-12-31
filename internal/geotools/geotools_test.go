@@ -75,7 +75,7 @@ func TestGeoIpAutomatic(t *testing.T) {
 			}
 			dest.Data = append(dest.Data, r)
 		}
-		dest.Ttl = 100
+		dest.TtlValue = 100
 		mask := make([]int, len(dest.Data))
 		mask, err := GetMinimumDistance(geoIp, net.ParseIP(sip[i][0]), dest.Data, mask)
 		g.Expect(err).To(BeNil())

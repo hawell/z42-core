@@ -41,7 +41,7 @@ func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 		for _, cmd := range testCase.Entries[i] {
 			err := h.RedisData.SetLocationFromJson(zone, cmd[0], cmd[1])
 			if err != nil {
-				return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
+				return nil, errors.New(fmt.Sprintf("[ERROR] 4: %s\n%s", err, cmd[1]))
 			}
 		}
 		if err := h.RedisData.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {
@@ -74,6 +74,8 @@ var DefaultRedisDataTestConfig = storage.DataHandlerConfig{
 	ZoneReload:         60,
 	RecordCacheSize:    1000000,
 	RecordCacheTimeout: 60,
+	MinTTL:             5,
+	MaxTTL:             3600,
 	Redis: hiredis.Config{
 		Address:  "redis:6379",
 		Net:      "tcp",
@@ -94,7 +96,6 @@ var DefaultRedisDataTestConfig = storage.DataHandlerConfig{
 }
 
 var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
-	MaxTtl: 3600,
 	Upstream: []upstream.Config{
 		{
 			Ip:       "1.1.1.1",

@@ -59,6 +59,8 @@ func main() {
 		ZoneReload:         1,
 		RecordCacheSize:    1000000,
 		RecordCacheTimeout: 60,
+		MinTTL:             5,
+		MaxTTL:             300,
 		Redis: hiredis.Config{
 			Suffix:  "",
 			Prefix:  "",

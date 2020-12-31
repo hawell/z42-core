@@ -110,17 +110,17 @@ func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testC
 			for _, cmd := range testCase.Entries[i] {
 				err := h.RedisData.SetLocationFromJson(zone, cmd[0], cmd[1])
 				if err != nil {
-					return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
+					return nil, errors.New(fmt.Sprintf("[ERROR] 2: %s\n%s", err, cmd[1]))
 				}
 			}
 			if err := h.RedisData.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {
 				return nil, err
 			}
 			if err := h.RedisData.SetZoneKey(zone, "zsk", zskPub, zskPriv); err != nil {
-				fmt.Println(err)
+				zap.L().Error("cannot set zsk", zap.Error(err))
 			}
 			if err := h.RedisData.SetZoneKey(zone, "ksk", kskPub, kskPriv); err != nil {
-				fmt.Println(err)
+				zap.L().Error("cannot set ksk", zap.Error(err))
 			}
 		}
 		h.RedisData.LoadZones()

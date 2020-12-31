@@ -12,13 +12,15 @@ func TestWeight(t *testing.T) {
 	g := NewGomegaWithT(t)
 	// distribution
 	rrset := types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{
+			TtlValue: 300,
+		},
 		FilterConfig: types.IpFilterConfig{
 			Count:     "single",
 			Order:     "weighted",
 			GeoFilter: "",
 		},
 		HealthCheckConfig: types.IpHealthCheckConfig{},
-		Ttl:               300,
 		Data: []types.IP_RR{
 			{Ip: net.ParseIP("1.2.3.4"), Weight: 4},
 			{Ip: net.ParseIP("2.3.4.5"), Weight: 1},

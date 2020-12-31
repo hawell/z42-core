@@ -30,7 +30,6 @@ type DnsRequestHandler struct {
 type DnsRequestHandlerConfig struct {
 	Upstream          []upstream.Config `json:"upstream"`
 	GeoIp             geoip.Config      `json:"geoip"`
-	MaxTtl            int               `json:"max_ttl"`
 	LogSourceLocation bool              `json:"log_source_location"`
 }
 
@@ -161,35 +160,46 @@ loop:
 				zap.String("qname", currentQName),
 				zap.String("location", location),
 			)
-			currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
+			ns, err := h.RedisData.NS(context.zone.Name, location)
 			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
-			if len(currentRecord.NS.Data) > 0 {
+			if !ns.Empty() {
 				zap.L().Debug(
 					"sub delegation",
 					zap.Uint16("id", context.Req.Id),
 					zap.String("qname", currentQName),
 					zap.String("location", location),
 				)
+				if len(ns.Data) == 0 {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
 				cutPoint := location + "." + zoneName
-				context.Authority = append(context.Authority, h.ns(cutPoint, currentRecord)...)
-				ds := h.ds(cutPoint, currentRecord)
-				if len(ds) == 0 {
+				context.Authority = append(context.Authority, ns.Value(cutPoint)...)
+				ds, err := h.RedisData.DS(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				if ds.Empty() {
 					addNSec(context, cutPoint, dns.TypeDS)
 				}
-				context.Authority = append(context.Authority, ds...)
-				for _, ns := range currentRecord.NS.Data {
+				context.Authority = append(context.Authority, ds.Value(cutPoint)...)
+				for _, ns := range ns.Data {
 					glueLocation, match := context.zone.FindLocation(ns.Host)
 					if match != types.NoMatch {
-						glueRecord, err := h.RedisData.GetLocation(context.zone.Name, glueLocation)
+						glueA, err := h.RedisData.A(context.zone.Name, glueLocation)
 						// XXX : should we return with RcodeServerFailure?
 						if err == nil {
-							ips := h.filter(context.SourceIp, &glueRecord.A)
-							context.Additional = append(context.Additional, h.a(ns.Host, glueRecord, ips)...)
-							ips = h.filter(context.SourceIp, &glueRecord.AAAA)
-							context.Additional = append(context.Additional, h.aaaa(ns.Host, glueRecord, ips)...)
+							ips := h.filter(context.SourceIp, glueA)
+							context.Additional = append(context.Additional, generateA(ns.Host, glueA.Ttl(), ips)...)
+						}
+						glueAAAA, err := h.RedisData.AAAA(context.zone.Name, glueLocation)
+						if err == nil {
+							ips := h.filter(context.SourceIp, glueAAAA)
+							context.Additional = append(context.Additional, generateAAAA(ns.Host, glueAAAA.Ttl(), ips)...)
 						}
 					}
 				}
@@ -212,59 +222,74 @@ loop:
 				zap.String("qname", currentQName),
 				zap.String("location", location),
 			)
-			currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
+			cname, err := h.RedisData.CNAME(context.zone.Name, location)
 			if err != nil {
 				context.Res = dns.RcodeServerFailure
 				break loop
 			}
-			if currentRecord.CNAME != nil && context.QType() != dns.TypeCNAME {
+			if !cname.Empty() && context.QType() != dns.TypeCNAME {
 				zap.L().Debug(
 					"cname chain",
 					zap.Uint16("id", context.Req.Id),
 					zap.String("source", currentQName),
-					zap.String("destination", currentRecord.CNAME.Host),
+					zap.String("destination", cname.Host),
 				)
 				if !cnameFlattening {
-					context.Answer = append(context.Answer, h.cname(currentQName, currentRecord)...)
-				} else if h.RedisData.FindZone(currentRecord.CNAME.Host) != zoneName {
-					context.Answer = append(context.Answer, h.cname(context.RawName(), currentRecord)...)
+					context.Answer = append(context.Answer, cname.Value(currentQName)...)
+				} else if h.RedisData.FindZone(cname.Host) != zoneName {
+					context.Answer = append(context.Answer, cname.Value(context.RawName())...)
 					context.Res = dns.RcodeSuccess
 					break loop
 				}
-				currentQName = dns.Fqdn(currentRecord.CNAME.Host)
+				currentQName = dns.Fqdn(cname.Host)
 				continue
 			}
-			if len(currentRecord.NS.Data) > 0 && currentQName != context.zone.Name {
-				zap.L().Debug(
-					"delegation",
-					zap.Uint16("id", context.Req.Id),
-				)
-				ds := h.ds(currentQName, currentRecord)
-				if len(ds) == 0 {
-					addNSec(context, currentQName, dns.TypeDS)
+			if currentQName != context.zone.Name {
+				ns, err := h.RedisData.NS(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
 				}
-				if context.QType() == dns.TypeDS {
-					context.Answer = append(context.Answer, ds...)
+				if !ns.Empty() {
+					zap.L().Debug(
+						"delegation",
+						zap.Uint16("id", context.Req.Id),
+					)
+					ds, err := h.RedisData.DS(context.zone.Name, location)
+					if err != nil {
+						context.Res = dns.RcodeServerFailure
+						break loop
+					}
+					if ds.Empty() {
+						addNSec(context, currentQName, dns.TypeDS)
+					} else {
+						if context.QType() == dns.TypeDS {
+							context.Answer = append(context.Answer, ds.Value(currentQName)...)
+							context.Res = dns.RcodeSuccess
+							break loop
+						}
+						context.Authority = append(context.Authority, ds.Value(currentQName)...)
+					}
+					context.Authority = append(context.Authority, ns.Value(currentQName)...)
+					for _, data := range ns.Data {
+						glueLocation, match := context.zone.FindLocation(data.Host)
+						if match != types.NoMatch {
+							glueA, err := h.RedisData.A(context.zone.Name, glueLocation)
+							// XXX : should we return with RcodeServerFailure?
+							if err == nil {
+								ips := h.filter(context.SourceIp, glueA)
+								context.Additional = append(context.Additional, generateA(data.Host, glueA.Ttl(), ips)...)
+							}
+							glueAAAA, err := h.RedisData.AAAA(context.zone.Name, glueLocation)
+							if err == nil {
+								ips := h.filter(context.SourceIp, glueAAAA)
+								context.Additional = append(context.Additional, generateAAAA(data.Host, glueAAAA.Ttl(), ips)...)
+							}
+						}
+					}
 					context.Res = dns.RcodeSuccess
 					break loop
 				}
-				context.Authority = append(context.Authority, h.ns(currentQName, currentRecord)...)
-				context.Authority = append(context.Authority, ds...)
-				for _, ns := range currentRecord.NS.Data {
-					glueLocation, match := context.zone.FindLocation(ns.Host)
-					if match != types.NoMatch {
-						glueRecord, err := h.RedisData.GetLocation(context.zone.Name, glueLocation)
-						// XXX : should we return with RcodeServerFailure?
-						if err == nil {
-							ips := h.filter(context.SourceIp, &glueRecord.A)
-							context.Additional = append(context.Additional, h.a(ns.Host, glueRecord, ips)...)
-							ips = h.filter(context.SourceIp, &glueRecord.AAAA)
-							context.Additional = append(context.Additional, h.aaaa(ns.Host, glueRecord, ips)...)
-						}
-					}
-				}
-				context.Res = dns.RcodeSuccess
-				break loop
 			}
 
 			zap.L().Debug(
@@ -280,43 +305,99 @@ loop:
 			case dns.TypeA:
 				var ips []net.IP
 				var ttl uint32
-				if len(currentRecord.A.Data) == 0 && currentRecord.ANAME != nil {
-					ips, context.Res, ttl = h.findANAME(context, currentRecord.ANAME.Location, dns.TypeA)
-					currentRecord.A.Ttl = ttl
-				} else {
-					ips = h.filter(context.SourceIp, &currentRecord.A)
+				a, err := h.RedisData.A(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
 				}
-				answer = h.a(currentQName, currentRecord, ips)
+				aname, err := h.RedisData.ANAME(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				if a.Empty() && !aname.Empty() {
+					ips, context.Res, ttl = h.findANAME(context, aname.Location, dns.TypeA)
+				} else {
+					ttl = a.Ttl()
+					ips = h.filter(context.SourceIp, a)
+				}
+				answer = generateA(currentQName, ttl, ips)
 			case dns.TypeAAAA:
 				var ips []net.IP
 				var ttl uint32
-				if len(currentRecord.AAAA.Data) == 0 && currentRecord.ANAME != nil {
-					ips, context.Res, ttl = h.findANAME(context, currentRecord.ANAME.Location, dns.TypeAAAA)
-					currentRecord.AAAA.Ttl = ttl
-				} else {
-					ips = h.filter(context.SourceIp, &currentRecord.AAAA)
+				aaaa, err := h.RedisData.AAAA(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
 				}
-				answer = h.aaaa(currentQName, currentRecord, ips)
+				aname, err := h.RedisData.ANAME(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				if aaaa.Empty() && !aname.Empty() {
+					ips, context.Res, ttl = h.findANAME(context, aname.Location, dns.TypeAAAA)
+				} else {
+					ttl = aaaa.Ttl()
+					ips = h.filter(context.SourceIp, aaaa)
+				}
+				answer = generateAAAA(currentQName, ttl, ips)
 			case dns.TypeCNAME:
-				answer = h.cname(currentQName, currentRecord)
+				cname, err := h.RedisData.CNAME(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				answer = cname.Value(currentQName)
 			case dns.TypeTXT:
-				answer = h.txt(currentQName, currentRecord)
+				txt, err := h.RedisData.TXT(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				answer = txt.Value(currentQName)
 			case dns.TypeNS:
-				answer = h.ns(currentQName, currentRecord)
+				ns, err := h.RedisData.NS(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				answer = ns.Value(currentQName)
 			case dns.TypeMX:
-				answer = h.mx(currentQName, currentRecord)
+				mx, err := h.RedisData.MX(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				answer = mx.Value(currentQName)
 			case dns.TypeSRV:
-				answer = h.srv(currentQName, currentRecord)
+				srv, err := h.RedisData.SRV(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				answer = srv.Value(currentQName)
 			case dns.TypeCAA:
 				// TODO: handle findCAA error response
-				caaRecord := h.findCAA(context, currentQName)
-				if caaRecord != nil {
-					answer = h.caa(currentQName, caaRecord)
+				caa := h.findCAA(context, currentQName)
+				if caa != nil {
+					answer = caa.Value(currentQName)
 				}
 			case dns.TypePTR:
-				answer = h.ptr(currentQName, currentRecord)
+				ptr, err := h.RedisData.PTR(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				answer = ptr.Value(currentQName)
 			case dns.TypeTLSA:
-				answer = h.tlsa(currentQName, currentRecord)
+
+				tlsa, err := h.RedisData.TLSA(context.zone.Name, location)
+				if err != nil {
+					context.Res = dns.RcodeServerFailure
+					break loop
+				}
+				answer = tlsa.Value(currentQName)
 			case dns.TypeSOA:
 				answer = []dns.RR{context.zone.Config.SOA.Data}
 			case dns.TypeDNSKEY:
@@ -376,7 +457,8 @@ func (h *DnsRequestHandler) filter(sourceIp net.IP, rrset *types.IP_RRSet) []net
 func (h *DnsRequestHandler) logRequest(state *RequestContext) {
 	h.requestLogger.Info("query",
 		zap.String("domain.id", state.DomainUid),
-		zap.String("zone", state.Zone),
+		zap.String("qname", state.Name()),
+		zap.String("qtype", state.Type()),
 		zap.String("source.ip", state.SourceIp.String()),
 		zap.String("source.subnet", state.SourceSubnet),
 		zap.String("source.country", state.SourceCountry),
@@ -386,191 +468,32 @@ func (h *DnsRequestHandler) logRequest(state *RequestContext) {
 	)
 }
 
-func (h *DnsRequestHandler) a(name string, record *types.Record, ips []net.IP) (answers []dns.RR) {
+func generateA(name string, ttl uint32, ips []net.IP) (answers []dns.RR) {
 	for _, ip := range ips {
 		if ip == nil {
 			continue
 		}
 		r := new(dns.A)
 		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeA,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.A.Ttl)}
+			Class: dns.ClassINET, Ttl: ttl}
 		r.A = ip
 		answers = append(answers, r)
 	}
 	return
 }
 
-func (h *DnsRequestHandler) aaaa(name string, record *types.Record, ips []net.IP) (answers []dns.RR) {
+func generateAAAA(name string, ttl uint32, ips []net.IP) (answers []dns.RR) {
 	for _, ip := range ips {
 		if ip == nil {
 			continue
 		}
 		r := new(dns.AAAA)
 		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeAAAA,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.AAAA.Ttl)}
+			Class: dns.ClassINET, Ttl: ttl}
 		r.AAAA = ip
 		answers = append(answers, r)
 	}
 	return
-}
-
-func (h *DnsRequestHandler) cname(name string, record *types.Record) (answers []dns.RR) {
-	if record.CNAME == nil {
-		return
-	}
-	r := new(dns.CNAME)
-	r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME,
-		Class: dns.ClassINET, Ttl: h.getTtl(record.CNAME.Ttl)}
-	r.Target = dns.Fqdn(record.CNAME.Host)
-	answers = append(answers, r)
-	return
-}
-
-func (h *DnsRequestHandler) txt(name string, record *types.Record) (answers []dns.RR) {
-	for _, txt := range record.TXT.Data {
-		if len(txt.Text) == 0 {
-			continue
-		}
-		r := new(dns.TXT)
-		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeTXT,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.TXT.Ttl)}
-		r.Txt = split255(txt.Text)
-		answers = append(answers, r)
-	}
-	return
-}
-
-func (h *DnsRequestHandler) ns(name string, record *types.Record) (answers []dns.RR) {
-	for _, ns := range record.NS.Data {
-		if len(ns.Host) == 0 {
-			continue
-		}
-		r := new(dns.NS)
-		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeNS,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.NS.Ttl)}
-		r.Ns = dns.Fqdn(ns.Host)
-		answers = append(answers, r)
-	}
-	return
-}
-
-func (h *DnsRequestHandler) mx(name string, record *types.Record) (answers []dns.RR) {
-	for _, mx := range record.MX.Data {
-		if len(mx.Host) == 0 {
-			continue
-		}
-		r := new(dns.MX)
-		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeMX,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.MX.Ttl)}
-		r.Mx = dns.Fqdn(mx.Host)
-		r.Preference = mx.Preference
-		answers = append(answers, r)
-	}
-	return
-}
-
-func (h *DnsRequestHandler) srv(name string, record *types.Record) (answers []dns.RR) {
-	for _, srv := range record.SRV.Data {
-		if len(srv.Target) == 0 {
-			continue
-		}
-		r := new(dns.SRV)
-		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeSRV,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.SRV.Ttl)}
-		r.Target = dns.Fqdn(srv.Target)
-		r.Weight = srv.Weight
-		r.Port = srv.Port
-		r.Priority = srv.Priority
-		answers = append(answers, r)
-	}
-	return
-}
-
-func (h *DnsRequestHandler) caa(name string, record *types.Record) (answers []dns.RR) {
-	for _, caa := range record.CAA.Data {
-		r := new(dns.CAA)
-		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeCAA,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.CAA.Ttl)}
-		r.Value = caa.Value
-		r.Flag = caa.Flag
-		r.Tag = caa.Tag
-		answers = append(answers, r)
-	}
-	return
-}
-
-func (h *DnsRequestHandler) ptr(name string, record *types.Record) (answers []dns.RR) {
-	if record.PTR == nil {
-		return
-	}
-	r := new(dns.PTR)
-	r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypePTR,
-		Class: dns.ClassINET, Ttl: h.getTtl(record.PTR.Ttl)}
-	r.Ptr = dns.Fqdn(record.PTR.Domain)
-	answers = append(answers, r)
-	return
-}
-
-func (h *DnsRequestHandler) tlsa(name string, record *types.Record) (answers []dns.RR) {
-	for _, tlsa := range record.TLSA.Data {
-		r := new(dns.TLSA)
-		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeTLSA,
-			Class: dns.ClassNONE, Ttl: h.getTtl(record.TLSA.Ttl)}
-		r.Usage = tlsa.Usage
-		r.Selector = tlsa.Selector
-		r.MatchingType = tlsa.MatchingType
-		r.Certificate = tlsa.Certificate
-		answers = append(answers, r)
-	}
-	return
-}
-
-func (h *DnsRequestHandler) ds(name string, record *types.Record) (answers []dns.RR) {
-	for _, ds := range record.DS.Data {
-		r := new(dns.DS)
-		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeDS,
-			Class: dns.ClassINET, Ttl: h.getTtl(record.DS.Ttl)}
-		r.KeyTag = ds.KeyTag
-		r.Algorithm = ds.Algorithm
-		r.DigestType = ds.DigestType
-		r.Digest = ds.Digest
-		answers = append(answers, r)
-	}
-	return
-}
-
-func (h *DnsRequestHandler) getTtl(ttl uint32) uint32 {
-	maxTtl := uint32(h.Config.MaxTtl)
-	if ttl == 0 {
-		return maxTtl
-	}
-	if maxTtl == 0 {
-		return ttl
-	}
-	if ttl > maxTtl {
-		return maxTtl
-	}
-	return ttl
-}
-
-func split255(s string) []string {
-	if len(s) < 255 {
-		return []string{s}
-	}
-	var sx []string
-	p, i := 0, 255
-	for {
-		if i <= len(s) {
-			sx = append(sx, s[p:i])
-		} else {
-			sx = append(sx, s[p:])
-			break
-
-		}
-		p, i = p+255, i+255
-	}
-
-	return sx
 }
 
 func orderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
@@ -642,12 +565,12 @@ func orderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 	}
 }
 
-func (h *DnsRequestHandler) findCAA(context *RequestContext, query string) *types.Record {
+func (h *DnsRequestHandler) findCAA(context *RequestContext, query string) *types.CAA_RRSet {
 	zone := context.zone
 	currentLocation, _ := zone.FindLocation(query)
-	currentRecord, err := h.RedisData.GetLocation(zone.Name, currentLocation)
-	if err == nil && len(currentRecord.CAA.Data) != 0 {
-		return currentRecord
+	currentCAA, err := h.RedisData.CAA(zone.Name, currentLocation)
+	if err == nil && !currentCAA.Empty() {
+		return currentCAA
 	}
 	for {
 		zap.L().Debug("caa location", zap.String("location", currentLocation))
@@ -661,23 +584,20 @@ func (h *DnsRequestHandler) findCAA(context *RequestContext, query string) *type
 			currentLocation = splits[1]
 			continue
 		}
-		currentRecord, err := h.RedisData.GetLocation(zone.Name, currentLocation)
+		currentCAA, err := h.RedisData.CAA(zone.Name, currentLocation)
 		if err != nil {
 			currentLocation = splits[1]
 			continue
 		}
-		if len(currentRecord.CAA.Data) != 0 {
-			return currentRecord
+		if !currentCAA.Empty() {
+			return currentCAA
 		}
 	}
-	currentRecord, err = h.RedisData.GetLocation(zone.Name, "@")
+	currentCAA, err = h.RedisData.CAA(zone.Name, "@")
 	if err != nil {
 		return nil
 	}
-	if len(currentRecord.CAA.Data) != 0 {
-		return currentRecord
-	}
-	return nil
+	return currentCAA
 }
 
 func (h *DnsRequestHandler) findANAME(context *RequestContext, aname string, qtype uint16) ([]net.IP, int, uint32) {
@@ -736,27 +656,43 @@ func (h *DnsRequestHandler) findANAME(context *RequestContext, aname string, qty
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
 
-		currentRecord, err := h.RedisData.GetLocation(context.zone.Name, location)
+		cname, err := h.RedisData.CNAME(context.zone.Name, location)
 		if err != nil {
 			return []net.IP{}, dns.RcodeServerFailure, 0
 		}
-		if currentRecord.CNAME != nil {
+		if !cname.Empty() {
 			zap.L().Debug("cname")
-			currentQName = currentRecord.CNAME.Host
+			currentQName = cname.Host
 			continue
 		}
 
-		if qtype == dns.TypeA && len(currentRecord.A.Data) > 0 {
-			zap.L().Debug("found a")
-			return h.filter(context.SourceIp, &currentRecord.A), dns.RcodeSuccess, currentRecord.A.Ttl
-		} else if qtype == dns.TypeAAAA && len(currentRecord.AAAA.Data) > 0 {
-			zap.L().Debug("found aaaa")
-			return h.filter(context.SourceIp, &currentRecord.AAAA), dns.RcodeSuccess, currentRecord.AAAA.Ttl
+		if qtype == dns.TypeA {
+			a, err := h.RedisData.A(context.zone.Name, location)
+			if err != nil {
+				return []net.IP{}, dns.RcodeServerFailure, 0
+			}
+			if !a.Empty() {
+				zap.L().Debug("found a")
+				return h.filter(context.SourceIp, a), dns.RcodeSuccess, a.TtlValue
+			}
+		} else if qtype == dns.TypeAAAA {
+			aaaa, err := h.RedisData.AAAA(context.zone.Name, location)
+			if err != nil {
+				return []net.IP{}, dns.RcodeServerFailure, 0
+			}
+			if !aaaa.Empty() {
+				zap.L().Debug("found aaaa")
+				return h.filter(context.SourceIp, aaaa), dns.RcodeSuccess, aaaa.TtlValue
+			}
 		}
 
-		if currentRecord.ANAME != nil {
+		aname, err := h.RedisData.ANAME(context.zone.Name, location)
+		if err != nil {
+			return []net.IP{}, dns.RcodeServerFailure, 0
+		}
+		if !aname.Empty() {
 			zap.L().Debug("aname")
-			currentQName = currentRecord.ANAME.Location
+			currentQName = aname.Location
 			continue
 		}
 

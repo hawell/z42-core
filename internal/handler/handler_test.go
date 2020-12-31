@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/internal/types"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"net"
@@ -334,7 +335,7 @@ var handlerTestCases = []*TestCase{
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"ns":{"ttl":300, "records":[{"host":"ns1.example.aaa."},{"ttl":300, "host":"ns2.example.aaa."}]},}`,
+					`{"ns":{"ttl":300, "records":[{"host":"ns1.example.aaa."},{"ttl":300, "host":"ns2.example.aaa."}]}}`,
 				},
 				{"x",
 					`{
@@ -2239,22 +2240,54 @@ var handlerTestCases = []*TestCase{
 		Enabled:         true,
 		RedisDataConfig: DefaultRedisDataTestConfig,
 		HandlerConfig:   DefaultHandlerTestConfig,
-		Initialize:      DefaultInitialize,
-		ApplyAndVerify:  DefaultApplyAndVerify,
-		Zones:           []string{"example.mal."},
+		Initialize: func(testCase *TestCase) (*DnsRequestHandler, error) {
+			r := storage.NewDataHandler(&testCase.RedisDataConfig)
+			l, _ := zap.NewProduction()
+			h := NewHandler(&testCase.HandlerConfig, r, l)
+			if err := h.RedisData.Clear(); err != nil {
+				return nil, err
+			}
+			for i, zone := range testCase.Zones {
+				if err := h.RedisData.EnableZone(zone); err != nil {
+					return nil, err
+				}
+				if err := h.RedisData.EnableLocation(zone, "www"); err != nil {
+					return nil, errors.New(fmt.Sprintf("cannot enable location : www, %s", err))
+				}
+				if err := h.RedisData.EnableLocation(zone, "mal1"); err != nil {
+					return nil, errors.New(fmt.Sprintf("cannot enable location : mal1, %s", err))
+				}
+				if err := h.RedisData.SetRRSetFromJson(zone, testCase.Entries[0][0][0], types.TypeANAME, testCase.Entries[0][0][1]); err != nil {
+					return nil, errors.New(fmt.Sprintf("[ERROR] SetRRSetFromJson: %s\n%s", err, testCase.Entries[0][0][1]))
+				}
+				if err := h.RedisData.SetRRSetFromJson(zone, testCase.Entries[0][1][0], types.TypeANAME, testCase.Entries[0][1][1]); err != nil {
+					return nil, errors.New(fmt.Sprintf("[ERROR] SetRRSetFromJson: %s\n%s", err, testCase.Entries[0][1][1]))
+				}
+				if err := h.RedisData.SetRRSetFromJson(zone, testCase.Entries[0][2][0], types.TypeANAME, testCase.Entries[0][2][1]); err != nil {
+					return nil, errors.New(fmt.Sprintf("[ERROR] SetRRSetFromJson: %s\n%s", err, testCase.Entries[0][2][1]))
+				}
+				if err := h.RedisData.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {
+					return nil, err
+				}
+			}
+			h.RedisData.LoadZones()
+			return h, nil
+		},
+		ApplyAndVerify: DefaultApplyAndVerify,
+		Zones:          []string{"example.mal."},
 		ZoneConfigs: []string{
 			`{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.example.mal.","ns":"ns1.example.mal.","refresh":44,"retry":55,"expire":66}}`,
 		},
 		Entries: [][][]string{
 			{
 				{"@",
-					`{"aname":{"location":"mal1.example.mal."}}`,
+					`{"location":"mal1.example.mal."}`,
 				},
 				{"www",
-					`{"a":{"ttl":"300", "records":[{"ip":"3.3.3.1"}]}}`,
+					`{"ttl":"300", "records":[{"ip":"3.3.3.1"}]}`,
 				},
 				{"mal1",
-					`!@#$$^$*^&^dfgsfdg@#@EWDS`,
+					`"!@#$$^$*^&^dfgsfdg@#@EWDS"`,
 				},
 			},
 		},
@@ -2291,7 +2324,7 @@ var handlerTestCases = []*TestCase{
 		Entries: [][][]string{
 			{
 				{"www",
-					`{"a":{"ttl":"300", "records":[{"ip":"3.3.3.1"}]}}`,
+					`{"a":{"ttl":300, "records":[{"ip":"3.3.3.1"}]}}`,
 				},
 			},
 		},
@@ -2393,7 +2426,7 @@ var handlerTestCases = []*TestCase{
 				for _, cmd := range testCase.Entries[i] {
 					err := h.RedisData.SetLocationFromJson(zone, cmd[0], cmd[1])
 					if err != nil {
-						return nil, errors.New(fmt.Sprintf("[ERROR] cannot connect to redis: %s", err))
+						return nil, errors.New(fmt.Sprintf("[ERROR] 3: %s\n%s", err, cmd[1]))
 					}
 				}
 				if err := h.RedisData.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {

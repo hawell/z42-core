@@ -19,6 +19,8 @@ func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
 		ZoneReload:         1,
 		RecordCacheSize:    1000000,
 		RecordCacheTimeout: 60,
+		MinTTL:             5,
+		MaxTTL:             300,
 		Redis: hiredis.Config{
 			Suffix:  "_redis2",
 			Prefix:  "",

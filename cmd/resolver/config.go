@@ -51,6 +51,8 @@ var resolverDefaultConfig = &Config{
 		ZoneReload:         60,
 		RecordCacheSize:    1000000,
 		RecordCacheTimeout: 60,
+		MinTTL:             5,
+		MaxTTL:             300,
 		Redis: hiredis.Config{
 			Address:  "127.0.0.1:6379",
 			Net:      "tcp",
@@ -102,7 +104,6 @@ var resolverDefaultConfig = &Config{
 			CountryDB: "geoCity.mmdb",
 			ASNDB:     "geoIsp.mmdb",
 		},
-		MaxTtl:            3600,
 		LogSourceLocation: false,
 	},
 	RateLimit: ratelimit.Config{

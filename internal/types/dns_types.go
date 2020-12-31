@@ -12,25 +12,22 @@ const (
 	IpMaskBlack
 )
 
-type RRSets struct {
-	A     IP_RRSet      `json:"a,omitempty"`
-	AAAA  IP_RRSet      `json:"aaaa,omitempty"`
-	TXT   TXT_RRSet     `json:"txt,omitempty"`
-	CNAME *CNAME_RRSet  `json:"cname,omitempty"`
-	NS    NS_RRSet      `json:"ns,omitempty"`
-	MX    MX_RRSet      `json:"mx,omitempty"`
-	SRV   SRV_RRSet     `json:"srv,omitempty"`
-	CAA   CAA_RRSet     `json:"caa,omitempty"`
-	PTR   *PTR_RRSet    `json:"ptr,omitempty"`
-	TLSA  TLSA_RRSet    `json:"tlsa,omitempty"`
-	DS    DS_RRSet      `json:"ds,omitempty"`
-	ANAME *ANAME_Record `json:"aname,omitempty"`
+const (
+	TypeANAME = 500
+)
+
+type RRSet interface {
+	Value(name string) []dns.RR
+	Empty() bool
+	Ttl() uint32
 }
 
-type Record struct {
-	RRSets
-	Label        string `json:"-"`
-	CacheTimeout int64  `json:"-"`
+type GenericRRSet struct {
+	TtlValue uint32 `json:"ttl,omitempty"`
+}
+
+func (rrset *GenericRRSet) Ttl() uint32 {
+	return rrset.TtlValue
 }
 
 type ZoneKey struct {
@@ -38,13 +35,6 @@ type ZoneKey struct {
 	PrivateKey    crypto.PrivateKey
 	KeyInception  uint32
 	KeyExpiration uint32
-}
-
-type IP_RRSet struct {
-	FilterConfig      IpFilterConfig      `json:"filter,omitempty"`
-	HealthCheckConfig IpHealthCheckConfig `json:"health_check,omitempty"`
-	Ttl               uint32              `json:"ttl,omitempty"`
-	Data              []IP_RR             `json:"records,omitempty"`
 }
 
 type IP_RR struct {
@@ -70,32 +60,95 @@ type IpFilterConfig struct {
 	GeoFilter string `json:"geo_filter,omitempty"` // "country", "location", "asn", "asn+country", "none"
 }
 
-type CNAME_RRSet struct {
-	Host string `json:"host"`
-	Ttl  uint32 `json:"ttl,omitempty"`
+type IP_RRSet struct {
+	GenericRRSet
+	FilterConfig      IpFilterConfig      `json:"filter,omitempty"`
+	HealthCheckConfig IpHealthCheckConfig `json:"health_check,omitempty"`
+	Data              []IP_RR             `json:"records,omitempty"`
 }
 
-type TXT_RRSet struct {
-	Ttl  uint32   `json:"ttl,omitempty"`
-	Data []TXT_RR `json:"records,omitempty"`
+func (*IP_RRSet) Value(string) []dns.RR {
+	return nil
+}
+
+func (rrset *IP_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
+}
+
+type CNAME_RRSet struct {
+	GenericRRSet
+	Host string `json:"host"`
+}
+
+func (rrset *CNAME_RRSet) Value(name string) []dns.RR {
+	if len(rrset.Host) == 0 {
+		return []dns.RR{}
+	}
+	r := new(dns.CNAME)
+	r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME,
+		Class: dns.ClassINET, Ttl: rrset.TtlValue}
+	r.Target = dns.Fqdn(rrset.Host)
+	return []dns.RR{r}
+}
+
+func (rrset *CNAME_RRSet) Empty() bool {
+	return len(rrset.Host) == 0
 }
 
 type TXT_RR struct {
 	Text string `json:"text"`
 }
 
-type NS_RRSet struct {
-	Ttl  uint32  `json:"ttl,omitempty"`
-	Data []NS_RR `json:"records,omitempty"`
+type TXT_RRSet struct {
+	GenericRRSet
+	Data []TXT_RR `json:"records,omitempty"`
+}
+
+func (rrset *TXT_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, txt := range rrset.Data {
+		if len(txt.Text) == 0 {
+			continue
+		}
+		r := new(dns.TXT)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeTXT,
+			Class: dns.ClassINET, Ttl: rrset.TtlValue}
+		r.Txt = split255(txt.Text)
+		res = append(res, r)
+	}
+	return res
+}
+
+func (rrset *TXT_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
 }
 
 type NS_RR struct {
 	Host string `json:"host"`
 }
 
-type MX_RRSet struct {
-	Ttl  uint32  `json:"ttl,omitempty"`
-	Data []MX_RR `json:"records,omitempty"`
+type NS_RRSet struct {
+	GenericRRSet
+	Data []NS_RR `json:"records,omitempty"`
+}
+
+func (rrset *NS_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, ns := range rrset.Data {
+		if len(ns.Host) == 0 {
+			continue
+		}
+		r := new(dns.NS)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeNS,
+			Class: dns.ClassINET, Ttl: rrset.TtlValue}
+		r.Ns = dns.Fqdn(ns.Host)
+		res = append(res, r)
+	}
+	return res
+}
+
+func (rrset *NS_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
 }
 
 type MX_RR struct {
@@ -103,9 +156,29 @@ type MX_RR struct {
 	Preference uint16 `json:"preference"`
 }
 
-type SRV_RRSet struct {
-	Ttl  uint32   `json:"ttl,omitempty"`
-	Data []SRV_RR `json:"records,omitempty"`
+type MX_RRSet struct {
+	GenericRRSet
+	Data []MX_RR `json:"records,omitempty"`
+}
+
+func (rrset *MX_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, mx := range rrset.Data {
+		if len(mx.Host) == 0 {
+			continue
+		}
+		r := new(dns.MX)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeMX,
+			Class: dns.ClassINET, Ttl: rrset.TtlValue}
+		r.Mx = dns.Fqdn(mx.Host)
+		r.Preference = mx.Preference
+		res = append(res, r)
+	}
+	return res
+}
+
+func (rrset *MX_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
 }
 
 type SRV_RR struct {
@@ -115,8 +188,35 @@ type SRV_RR struct {
 	Port     uint16 `json:"port"`
 }
 
+type SRV_RRSet struct {
+	GenericRRSet
+	Data []SRV_RR `json:"records,omitempty"`
+}
+
+func (rrset *SRV_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, srv := range rrset.Data {
+		if len(srv.Target) == 0 {
+			continue
+		}
+		r := new(dns.SRV)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeSRV,
+			Class: dns.ClassINET, Ttl: rrset.TtlValue}
+		r.Target = dns.Fqdn(srv.Target)
+		r.Weight = srv.Weight
+		r.Port = srv.Port
+		r.Priority = srv.Priority
+		res = append(res, r)
+	}
+	return res
+}
+
+func (rrset *SRV_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
+}
+
 type CAA_RRSet struct {
-	Ttl  uint32   `json:"ttl,omitempty"`
+	GenericRRSet
 	Data []CAA_RR `json:"records,omitempty"`
 }
 
@@ -126,14 +226,42 @@ type CAA_RR struct {
 	Flag  uint8  `json:"flag"`
 }
 
-type PTR_RRSet struct {
-	Domain string `json:"domain"`
-	Ttl    uint32 `json:"ttl,omitempty"`
+func (rrset *CAA_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, caa := range rrset.Data {
+		r := new(dns.CAA)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeCAA,
+			Class: dns.ClassINET, Ttl: rrset.TtlValue}
+		r.Value = caa.Value
+		r.Flag = caa.Flag
+		r.Tag = caa.Tag
+		res = append(res, r)
+	}
+	return res
 }
 
-type TLSA_RRSet struct {
-	Ttl  uint32    `json:"ttl,omitempty"`
-	Data []TLSA_RR `json:"records,omitempty"`
+func (rrset *CAA_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
+}
+
+type PTR_RRSet struct {
+	GenericRRSet
+	Domain string `json:"domain"`
+}
+
+func (rrset *PTR_RRSet) Value(name string) []dns.RR {
+	if len(rrset.Domain) == 0 {
+		return []dns.RR{}
+	}
+	r := new(dns.PTR)
+	r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypePTR,
+		Class: dns.ClassINET, Ttl: rrset.TtlValue}
+	r.Ptr = dns.Fqdn(rrset.Domain)
+	return []dns.RR{r}
+}
+
+func (rrset *PTR_RRSet) Empty() bool {
+	return len(rrset.Domain) == 0
 }
 
 type TLSA_RR struct {
@@ -143,9 +271,28 @@ type TLSA_RR struct {
 	Certificate  string `json:"certificate"`
 }
 
-type DS_RRSet struct {
-	Ttl  uint32  `json:"ttl,omitempty"`
-	Data []DS_RR `json:"records,omitempty"`
+type TLSA_RRSet struct {
+	GenericRRSet
+	Data []TLSA_RR `json:"records,omitempty"`
+}
+
+func (rrset *TLSA_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, tlsa := range rrset.Data {
+		r := new(dns.TLSA)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeTLSA,
+			Class: dns.ClassNONE, Ttl: rrset.TtlValue}
+		r.Usage = tlsa.Usage
+		r.Selector = tlsa.Selector
+		r.MatchingType = tlsa.MatchingType
+		r.Certificate = tlsa.Certificate
+		res = append(res, r)
+	}
+	return res
+}
+
+func (rrset *TLSA_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
 }
 
 type DS_RR struct {
@@ -153,6 +300,30 @@ type DS_RR struct {
 	Algorithm  uint8  `json:"algorithm"`
 	DigestType uint8  `json:"digest_type"`
 	Digest     string `json:"digest"`
+}
+
+type DS_RRSet struct {
+	GenericRRSet
+	Data []DS_RR `json:"records,omitempty"`
+}
+
+func (rrset *DS_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, ds := range rrset.Data {
+		r := new(dns.DS)
+		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeDS,
+			Class: dns.ClassINET, Ttl: rrset.TtlValue}
+		r.KeyTag = ds.KeyTag
+		r.Algorithm = ds.Algorithm
+		r.DigestType = ds.DigestType
+		r.Digest = ds.Digest
+		res = append(res, r)
+	}
+	return res
+}
+
+func (rrset *DS_RRSet) Empty() bool {
+	return len(rrset.Data) == 0
 }
 
 type SOA_RRSet struct {
@@ -167,8 +338,17 @@ type SOA_RRSet struct {
 	Serial  uint32   `json:"serial"`
 }
 
-type ANAME_Record struct {
+type ANAME_RRSet struct {
+	GenericRRSet
 	Location string `json:"location,omitempty"`
+}
+
+func (*ANAME_RRSet) Value(string) []dns.RR {
+	return nil
+}
+
+func (rrset *ANAME_RRSet) Empty() bool {
+	return len(rrset.Location) == 0
 }
 
 type RRSetKey struct {
@@ -199,4 +379,24 @@ func SplitSets(rrs []dns.RR) map[RRSetKey][]dns.RR {
 		return m
 	}
 	return nil
+}
+
+func split255(s string) []string {
+	if len(s) < 255 {
+		return []string{s}
+	}
+	var sx []string
+	p, i := 0, 255
+	for {
+		if i <= len(s) {
+			sx = append(sx, s[p:i])
+		} else {
+			sx = append(sx, s[p:])
+			break
+
+		}
+		p, i = p+255, i+255
+	}
+
+	return sx
 }

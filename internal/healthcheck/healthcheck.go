@@ -344,17 +344,19 @@ func (h *Healthcheck) Transfer() {
 					h.quitWG.Done()
 					return
 				case <-limiter:
-					record, err := h.redisData.GetLocation(domain, subdomain)
-					if err != nil {
+					a, errA := h.redisData.A(domain, subdomain)
+					aaaa, errAAAA := h.redisData.AAAA(domain, subdomain)
+					if errA != nil || errAAAA != nil {
 						zap.L().Error(
 							"cannot get location",
 							zap.String("zone", domain),
 							zap.String("location", subdomain),
-							zap.Error(err),
+							zap.Error(errA),
+							zap.Error(errAAAA),
 						)
 						continue
 					}
-					for _, rrset := range []*types.IP_RRSet{&record.A, &record.AAAA} {
+					for _, rrset := range []*types.IP_RRSet{a, aaaa} {
 						if !rrset.HealthCheckConfig.Enable {
 							continue
 						}

@@ -1,13 +1,10 @@
 package storage
 
 import (
-	redisCon "github.com/gomodule/redigo/redis"
 	"github.com/google/go-cmp/cmp"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
-	"net"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -22,6 +19,8 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 	ZoneReload:         1,
 	RecordCacheSize:    1000000,
 	RecordCacheTimeout: 60,
+	MinTTL:             5,
+	MaxTTL:             300,
 	Redis: hiredis.Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
@@ -158,7 +157,8 @@ func TestGetZoneLocations(t *testing.T) {
 	err = dh.EnableZone(zoneName)
 	g.Expect(err).To(BeNil())
 	locations := dh.GetZoneLocations(zoneName)
-	g.Expect(locations).To(BeEmpty())
+	g.Expect(len(locations)).To(Equal(1))
+	g.Expect(locations[0]).To(Equal("@"))
 }
 
 func TestSetZoneConfig(t *testing.T) {
@@ -204,98 +204,84 @@ func TestSetZoneConfigFromJson(t *testing.T) {
 	g.Expect(config.DomainId).To(Equal("12345"))
 }
 
-func TestGetLocation(t *testing.T) {
+func testRRSet(rtype uint16, r1 types.RRSet, r2 types.RRSet, value string, t *testing.T) {
 	g := NewGomegaWithT(t)
-	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	err := dh.Clear()
-	g.Expect(err).To(BeNil())
-	err = dh.EnableZone("zone1.com.")
-	g.Expect(err).To(BeNil())
-	err = dh.SetLocationFromJson("zone1.com.", "@", `{"a":{"ttl":300, "records":[{"ip":"5.5.5.5"}]}}`)
-	g.Expect(err).To(BeNil())
-	location := types.Record{
-		RRSets: types.RRSets{
-			A: types.IP_RRSet{
-				FilterConfig: types.IpFilterConfig{
-					Count:     "",
-					Order:     "",
-					GeoFilter: "",
-				},
-				Ttl: 300,
-				Data: []types.IP_RR{
-					{Ip: net.ParseIP("5.5.5.5")},
-				},
-			},
-		},
-	}
-	l, err := dh.GetLocation("zone1.com.", "@")
-	g.Expect(err).To(BeNil())
-	g.Expect(l).NotTo(BeNil())
-	g.Expect(reflect.DeepEqual(l.A, location.A)).To(BeTrue())
-}
-
-func TestSetLocation(t *testing.T) {
-	g := NewGomegaWithT(t)
-	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	err := dh.Clear()
-	g.Expect(err).To(BeNil())
 	zoneName := "zone1.com."
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
 	g.Expect(err).To(BeNil())
-	location := types.Record{
-		RRSets: types.RRSets{
-			A: types.IP_RRSet{
-				FilterConfig: types.IpFilterConfig{
-					Count:     "multi",
-					Order:     "none",
-					GeoFilter: "none",
-				},
-				Ttl: 300,
-				Data: []types.IP_RR{
-					{Ip: net.ParseIP("5.5.5.5")},
-				},
-			},
-		},
-	}
-	err = dh.SetLocation(zoneName, "@", &location)
+	err = dh.SetRRSetFromJson(zoneName, "@", rtype, value)
 	g.Expect(err).To(BeNil())
-	l, err := dh.GetLocation(zoneName, "@")
+	err = jsoniter.Unmarshal([]byte(value), r1)
 	g.Expect(err).To(BeNil())
-	g.Expect(reflect.DeepEqual(l.A, location.A)).To(BeTrue())
+	r2, err = dh.getRRSet(zoneName, "@", rtype, r2)
+	g.Expect(err).To(BeNil())
+	g.Expect(r2).NotTo(BeNil())
+	g.Expect(cmp.Equal(r1, r2)).To(BeTrue())
 }
 
-func TestSetLocationFromJson(t *testing.T) {
-	g := NewGomegaWithT(t)
-	zoneName := "example.com."
-	locationStr :=
-		`{
-			"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]},
-			"aaaa":{"ttl":300, "records":[{"ip":"::1"}]},
-			"cname":{"ttl":300, "host":"x.example.com."},
-			"txt":{"ttl":300, "records":[{"text":"foo"},{"text":"bar"}]},
-			"ns":{"ttl":300, "records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]},
-			"mx":{"ttl":300, "records":[{"host":"mx1.example.com.", "preference":10},{"host":"mx2.example.com.", "preference":10}]},
-			"srv":{"ttl":300, "records":[{"target":"sip.example.com.","port":555,"priority":10,"weight":100}]},
-			"tlsa":{"ttl":300, "records":[{"usage":0, "selector":0, "matching_type":1, "certificate":"d2abde240d7cd3ee6b4b28c54df034b97983a1d16e8a410e4561cb106618e971"}]},
-			"ds":{"ttl":300, "records":[{"key_tag":57855, "algorithm":5, "digest_type":1, "digest":"B6DCD485719ADCA18E5F3D48A2331627FDD3636B"}]},
-			"aname":{"location":"aname.example.com."},
-			"caa":{"ttl":300, "records":[{"tag":"issue", "value":"godaddy2.com;", "flag":0}]}
+func TestA(t *testing.T) {
+	aStr := `
+		{
+			"ttl":300,
+			"filter": {"count":"single", "order": "weighted", "geo_filter":"none"},
+			"records":[{"ip":"1.1.1.1", "weight":1},{"ip":"2.2.2.2", "weight":5},{"ip":"3.3.3.3", "weight":10}],
+			"health_check": {"protocol": "http", "uri": "/test", "port": 80, "timeout": 20, "up_count":3, "down_count": -3, "enable": true}
 		}`
-	location := types.Record{
-		CacheTimeout: time.Now().Unix() + int64(dataHandlerDefaultTestConfig.RecordCacheTimeout),
-	}
-	err := jsoniter.Unmarshal([]byte(locationStr), &location)
-	g.Expect(err).To(BeNil())
-	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
-	err = dh.Clear()
-	g.Expect(err).To(BeNil())
-	err = dh.EnableZone(zoneName)
-	g.Expect(err).To(BeNil())
-	err = dh.SetLocationFromJson(zoneName, "@", locationStr)
-	g.Expect(err).To(BeNil())
-	l, err := dh.GetLocation(zoneName, "@")
-	g.Expect(err).To(BeNil())
-	g.Expect(cmp.Equal(&location, l)).To(BeTrue())
+	testRRSet(dns.TypeA, &types.IP_RRSet{}, &types.IP_RRSet{}, aStr, t)
+}
+
+func TestAAAA(t *testing.T) {
+	aaaaStr := `
+		{
+			"ttl":300,
+			"filter": {"count":"single", "order": "weighted", "geo_filter":"none"},
+			"records":[{"ip":"2001:db8::1", "weight":1},{"ip":"2001:db8::2", "weight":5},{"ip":"2001:db8::3", "weight":10}],
+			"health_check": {"protocol": "http", "uri": "/test", "port": 80, "timeout": 20, "up_count":3, "down_count": -3, "enable": true}
+		}`
+	testRRSet(dns.TypeAAAA, &types.IP_RRSet{}, &types.IP_RRSet{}, aaaaStr, t)
+}
+
+func TestCNAME(t *testing.T) {
+	cnameStr := `{"ttl":300, "host":"x.example.com."}`
+	testRRSet(dns.TypeCNAME, &types.CNAME_RRSet{}, &types.CNAME_RRSet{}, cnameStr, t)
+}
+
+func TestTXT(t *testing.T) {
+	txtStr := `{"ttl":300, "records":[{"text":"foo"},{"text":"bar"}]}`
+	testRRSet(dns.TypeTXT, &types.TXT_RRSet{}, &types.TXT_RRSet{}, txtStr, t)
+}
+
+func TestNS(t *testing.T) {
+	nsStr := `{"ttl":300, "records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]}`
+	testRRSet(dns.TypeNS, &types.NS_RRSet{}, &types.NS_RRSet{}, nsStr, t)
+}
+
+func TestMX(t *testing.T) {
+	mxStr := `{"ttl":300, "records":[{"host":"mx1.example.com.", "preference":10},{"host":"mx2.example.com.", "preference":10}]}`
+	testRRSet(dns.TypeMX, &types.MX_RRSet{}, &types.MX_RRSet{}, mxStr, t)
+}
+
+func TestSRV(t *testing.T) {
+	srvStr := `{"ttl":300, "records":[{"target":"sip.example.com.","port":555,"priority":10,"weight":100}]}`
+	testRRSet(dns.TypeSRV, &types.SRV_RRSet{}, &types.SRV_RRSet{}, srvStr, t)
+}
+
+func TestCAA(t *testing.T) {
+	caaStr := `{"ttl":300, "records":[{"tag":"issue", "value":"godaddy.com;", "flag":0}]}`
+	testRRSet(dns.TypeCAA, &types.CAA_RRSet{}, &types.CAA_RRSet{}, caaStr, t)
+}
+
+func TestTLSA(t *testing.T) {
+	tlsaStr := `{"ttl":300, "records":[{"usage":0, "selector":0, "matching_type":1, "certificate":"d2abde240d7cd3ee6b4b28c54df034b97983a1d16e8a410e4561cb106618e971"}]}`
+	testRRSet(dns.TypeTLSA, &types.TLSA_RRSet{}, &types.TLSA_RRSet{}, tlsaStr, t)
+}
+
+func TestDS(t *testing.T) {
+	dsStr := `{"ttl":300, "records":[{"key_tag":57855, "algorithm":5, "digest_type":1, "digest":"B6DCD485719ADCA18E5F3D48A2331627FDD3636B"}]}`
+	testRRSet(dns.TypeDS, &types.DS_RRSet{}, &types.DS_RRSet{}, dsStr, t)
 }
 
 var zone1ZskPriv = `
@@ -394,44 +380,69 @@ func TestSetZoneKey(t *testing.T) {
 func TestLocationUpdate(t *testing.T) {
 	g := NewGomegaWithT(t)
 	zoneName := "example.com."
-	locationStr := `{"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]}}`
+	locationStr := `{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]}`
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
 	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
 	g.Expect(err).To(BeNil())
-	_, err = dh.GetLocation(zoneName, "@")
+	a, err := dh.A(zoneName, "@")
 	g.Expect(err).To(BeNil())
+	g.Expect(a.Empty()).To(BeTrue())
 
-	err = dh.SetLocationFromJson(zoneName, "@", locationStr)
+	err = dh.SetRRSetFromJson(zoneName, "@", dns.TypeA, locationStr)
 	g.Expect(err).To(BeNil())
 	time.Sleep(time.Millisecond * 1200)
-	location, err := dh.GetLocation(zoneName, "@")
+	a, err = dh.A(zoneName, "@")
 	g.Expect(err).To(BeNil())
-	g.Expect(len(location.A.Data)).To(Equal(2))
-	g.Expect(location.A.Data[0].Ip.String()).To(Equal("1.2.3.4"))
-	g.Expect(location.A.Data[1].Ip.String()).To(Equal("5.6.7.8"))
+	g.Expect(a.Empty()).To(BeFalse())
+	g.Expect(len(a.Data)).To(Equal(2))
+	g.Expect(a.Data[0].Ip.String()).To(Equal("1.2.3.4"))
+	g.Expect(a.Data[1].Ip.String()).To(Equal("5.6.7.8"))
 }
 
-func TestRemoveLocation(t *testing.T) {
+func TestEnableLocation(t *testing.T) {
 	g := NewGomegaWithT(t)
 	zoneName := "example.com."
-	locationStr := `{"a":{"ttl":300, "records":[{"ip":"1.2.3.4", "country":["ES"]},{"ip":"5.6.7.8", "country":[""]}]}}`
+	locationName := "www"
 	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
 	err := dh.Clear()
 	g.Expect(err).To(BeNil())
 	err = dh.EnableZone(zoneName)
 	g.Expect(err).To(BeNil())
-	err = dh.SetLocationFromJson(zoneName, "www", locationStr)
-	g.Expect(err).To(BeNil())
-	_, err = dh.GetLocation(zoneName, "www")
-	g.Expect(err).To(BeNil())
-	err = dh.RemoveLocation(zoneName, "www")
-	g.Expect(err).To(BeNil())
+	err = dh.EnableLocation(zoneName, "www")
 	time.Sleep(time.Millisecond * 1200)
-	location, err := dh.GetLocation(zoneName, "www")
-	g.Expect(err).To(Equal(redisCon.ErrNil))
-	g.Expect(location).To(BeNil())
+	z := dh.GetZone(zoneName)
+	g.Expect(z).NotTo(BeNil())
+	l, r := z.FindLocation(locationName + "." + zoneName)
+	g.Expect(r).To(Equal(types.ExactMatch))
+	g.Expect(l).To(Equal(locationName))
+
+}
+
+func TestDisableLocation(t *testing.T) {
+	g := NewGomegaWithT(t)
+	zoneName := "example.com."
+	locationName := "www"
+	dh := NewDataHandler(&dataHandlerDefaultTestConfig)
+	err := dh.Clear()
+	g.Expect(err).To(BeNil())
+	err = dh.EnableZone(zoneName)
+	g.Expect(err).To(BeNil())
+	err = dh.EnableLocation(zoneName, "www")
+	time.Sleep(time.Millisecond * 1200)
+	z := dh.GetZone(zoneName)
+	g.Expect(z).NotTo(BeNil())
+	l, r := z.FindLocation(locationName + "." + zoneName)
+	g.Expect(r).To(Equal(types.ExactMatch))
+	g.Expect(l).To(Equal(locationName))
+	err = dh.DisableLocation(zoneName, "www")
+	time.Sleep(time.Millisecond * 1200)
+	z = dh.GetZone(zoneName)
+	g.Expect(z).NotTo(BeNil())
+	l, r = z.FindLocation(locationName + "." + zoneName)
+	g.Expect(r).To(Equal(types.NoMatch))
+	g.Expect(l).To(Equal(""))
 }
 
 func TestConfigUpdate(t *testing.T) {

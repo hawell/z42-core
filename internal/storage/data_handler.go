@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"github.com/dgraph-io/ristretto"
+	redisCon "github.com/gomodule/redigo/redis"
 	"github.com/hashicorp/go-immutable-radix"
 	"github.com/hawell/z42/internal/dnssec"
 	"github.com/hawell/z42/internal/types"
@@ -18,25 +19,26 @@ import (
 
 type DataHandlerConfig struct {
 	ZoneCacheSize      int            `json:"zone_cache_size"`
-	ZoneCacheTimeout   int            `json:"zone_cache_timeout"`
+	ZoneCacheTimeout   int64          `json:"zone_cache_timeout"`
 	ZoneReload         int            `json:"zone_reload"`
 	RecordCacheSize    int            `json:"record_cache_size"`
-	RecordCacheTimeout int            `json:"record_cache_timeout"`
+	RecordCacheTimeout int64          `json:"record_cache_timeout"`
 	Redis              hiredis.Config `json:"redis"`
+	MinTTL             uint32         `json:"min_ttl,default:5"`
+	MaxTTL             uint32         `json:"max_ttl,default:3600"`
 }
 
 type DataHandler struct {
-	redis              *hiredis.Redis
-	zones              *iradix.Tree
-	lastZoneUpdate     time.Time
-	recordCache        *ristretto.Cache
-	recordInflight     *singleflight.Group
-	recordCacheTimeout int64
-	zoneCache          *ristretto.Cache
-	zoneInflight       *singleflight.Group
-	zoneCacheTimeout   int64
-	quit               chan struct{}
-	quitWG             sync.WaitGroup
+	config         *DataHandlerConfig
+	redis          *hiredis.Redis
+	zones          *iradix.Tree
+	lastZoneUpdate time.Time
+	recordCache    *ristretto.Cache
+	recordInflight *singleflight.Group
+	zoneCache      *ristretto.Cache
+	zoneInflight   *singleflight.Group
+	quit           chan struct{}
+	quitWG         sync.WaitGroup
 }
 
 const (
@@ -45,15 +47,20 @@ const (
 	zonesKey         = "z42:zones"
 )
 
+var (
+	customTypeToString = map[uint16]string{
+		types.TypeANAME: "ANAME",
+	}
+)
+
 func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	dh := &DataHandler{
-		redis:              hiredis.NewRedis(&config.Redis),
-		zones:              iradix.New(),
-		recordInflight:     new(singleflight.Group),
-		zoneInflight:       new(singleflight.Group),
-		quit:               make(chan struct{}),
-		recordCacheTimeout: int64(config.RecordCacheTimeout),
-		zoneCacheTimeout:   int64(config.ZoneCacheTimeout),
+		config:         config,
+		redis:          hiredis.NewRedis(&config.Redis),
+		zones:          iradix.New(),
+		recordInflight: new(singleflight.Group),
+		zoneInflight:   new(singleflight.Group),
+		quit:           make(chan struct{}),
 	}
 	dh.zoneCache, _ = ristretto.NewCache(&ristretto.Config{
 		NumCounters: int64(config.ZoneCacheSize) * 10,
@@ -87,12 +94,12 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		zonesQuitChan := make(chan *sync.WaitGroup, 1)
 		go dh.redis.SubscribeEvent(keyPrefix+"*", func() {
 		}, func(channel string, data string) {
-			keyStr := strings.TrimPrefix(channel, keyPrefix)
+			keyStr := channel
 			keyParts := splitDbKey(keyStr)
-			if zone, label, ok := isLocationEntry(keyParts); ok {
-				dh.recordCache.Del(label + "." + zone)
-			} else if zone, ok := isConfigEntry(keyParts); ok {
-				dh.zoneCache.Del(zone)
+			if isRRSetEntry(keyParts) {
+				dh.recordCache.Del(keyStr)
+			} else {
+				dh.zoneCache.Del(keyParts[0])
 			}
 		}, func(err error) {
 			zap.L().Error("error", zap.Error(err))
@@ -124,21 +131,15 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	return dh
 }
 
-func isConfigEntry(parts []string) (string, bool) {
-	if len(parts) == 2 && parts[1] == "config" {
-		return parts[0], true
+func isRRSetEntry(parts []string) bool {
+	if len(parts) == 4 && parts[1] == "labels" {
+		return true
 	}
-	return "", false
-}
-
-func isLocationEntry(parts []string) (string, string, bool) {
-	if len(parts) == 3 && parts[1] == "labels" {
-		return parts[0], parts[2], true
-	}
-	return "", "", false
+	return false
 }
 
 func splitDbKey(key string) []string {
+	key = strings.TrimPrefix(key, keyPrefix)
 	return strings.Split(key, ":")
 }
 
@@ -147,12 +148,20 @@ func (dh *DataHandler) ShutDown() {
 	dh.quitWG.Wait()
 }
 
+func zoneLocationsKey(zone string) string {
+	return keyPrefix + zone + ":labels"
+}
+
 func zoneConfigKey(zone string) string {
 	return keyPrefix + zone + ":config"
 }
 
-func zoneLocationKey(zone string, label string) string {
-	return keyPrefix + zone + ":labels:" + label
+func zoneLocationRRSetKey(zone string, label string, rtype uint16) string {
+	typeStr, ok := customTypeToString[rtype]
+	if !ok {
+		typeStr = dns.TypeToString[rtype]
+	}
+	return keyPrefix + zone + ":labels:" + label + ":" + typeStr
 }
 
 func zonePubKey(zone string, keyType string) string {
@@ -179,6 +188,9 @@ func (dh *DataHandler) LoadZones() {
 }
 
 func (dh *DataHandler) EnableZone(zone string) error {
+	if err := dh.redis.SAdd(zoneLocationsKey(zone), "@"); err != nil {
+		return err
+	}
 	return dh.redis.SAdd(zonesKey, zone)
 }
 
@@ -205,14 +217,10 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 	}
 
 	answer, _, _ := dh.zoneInflight.Do(zone, func() (interface{}, error) {
-		locations, err := dh.redis.GetKeys(zoneLocationKey(zone, "*"))
+		locations, err := dh.redis.SMembers(zoneLocationsKey(zone))
 		if err != nil {
 			zap.L().Error("cannot load zone locations", zap.String("zone", zone), zap.Error(err))
 			return nil, err
-		}
-		trm := zoneLocationKey(zone, "")
-		for i, s := range locations {
-			locations[i] = strings.TrimPrefix(s, trm)
 		}
 
 		configStr, err := dh.redis.Get(zoneConfigKey(zone))
@@ -222,7 +230,7 @@ func (dh *DataHandler) GetZone(zone string) *types.Zone {
 
 		z := types.NewZone(zone, locations, configStr)
 		dh.loadZoneKeys(z)
-		z.CacheTimeout = time.Now().Unix() + dh.zoneCacheTimeout
+		z.CacheTimeout = time.Now().Unix() + dh.config.ZoneCacheTimeout
 
 		dh.zoneCache.Set(zone, z, 1)
 		return z, nil
@@ -258,6 +266,14 @@ func (dh *DataHandler) GetZoneLocations(zone string) []string {
 	return z.LocationsList
 }
 
+func (dh *DataHandler) EnableLocation(zone string, location string) error {
+	return dh.redis.SAdd(zoneLocationsKey(zone), location)
+}
+
+func (dh *DataHandler) DisableLocation(zone string, location string) error {
+	return dh.redis.SRem(zoneLocationsKey(zone), location)
+}
+
 func (dh *DataHandler) SetZoneConfig(zone string, config *types.ZoneConfig) error {
 	json, err := jsoniter.Marshal(config)
 	if err != nil {
@@ -270,32 +286,27 @@ func (dh *DataHandler) SetZoneConfigFromJson(zone string, config string) error {
 	return dh.redis.Set(zoneConfigKey(zone), config)
 }
 
-func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, error) {
-	key := label + "." + zone
-	var r *types.Record = nil
-	cachedRecord, found := dh.recordCache.Get(key)
-	if found && cachedRecord != nil {
-		r = cachedRecord.(*types.Record)
-		if time.Now().Unix() <= r.CacheTimeout {
+func (dh *DataHandler) getRRSet(zone string, label string, rtype uint16, result types.RRSet) (types.RRSet, error) {
+	key := zoneLocationRRSetKey(zone, label, rtype)
+	cachedRRSet, found := dh.recordCache.Get(key)
+	var r types.RRSet
+	if found {
+		r = cachedRRSet.(types.RRSet)
+		if time.Now().Unix() <= dh.config.RecordCacheTimeout {
 			return r, nil
 		}
 	}
-
 	answer, err, _ := dh.recordInflight.Do(key, func() (interface{}, error) {
-		r := new(types.Record)
-		r.CacheTimeout = time.Now().Unix() + dh.recordCacheTimeout
-
-		val, err := dh.redis.Get(zoneLocationKey(zone, label))
-		if err != nil {
-			if label == "@" {
-				dh.recordCache.Set(key, r, 1)
-				return r, nil
-			}
+		val, err := dh.redis.Get(key)
+		if err == redisCon.ErrNil {
+			dh.recordCache.Set(key, result, 1)
+			return result, nil
+		} else if err != nil {
 			zap.L().Error("cannot get location", zap.Error(err), zap.String("label", label), zap.String("zone", zone))
 			return nil, err
 		}
 		if val != "" {
-			err := jsoniter.Unmarshal([]byte(val), r)
+			err := jsoniter.Unmarshal([]byte(val), result)
 			if err != nil {
 				zap.L().Error(
 					"cannot parse json",
@@ -307,30 +318,231 @@ func (dh *DataHandler) GetLocation(zone string, label string) (*types.Record, er
 				return nil, err
 			}
 		}
-		dh.recordCache.Set(key, r, 1)
-		return r, nil
+		dh.recordCache.Set(key, result, 1)
+		return result, nil
 	})
 
 	if answer == nil {
-		return nil, err
+		return r, err
 	}
-	return answer.(*types.Record), nil
+
+	return answer.(types.RRSet), nil
 }
 
-func (dh *DataHandler) SetLocation(zone string, label string, val *types.Record) error {
-	jsonValue, err := jsoniter.Marshal(val)
+func (dh *DataHandler) SetRRSetFromJson(zone string, label string, rtype uint16, value string) error {
+	return dh.redis.Set(zoneLocationRRSetKey(zone, label, rtype), value)
+}
+
+func (dh *DataHandler) SetRRSet(zone string, label string, rtype uint16, rrset types.RRSet) error {
+	jsonValue, err := jsoniter.Marshal(rrset)
 	if err != nil {
 		return err
 	}
-	return dh.SetLocationFromJson(zone, label, string(jsonValue))
+	return dh.SetRRSetFromJson(zone, label, rtype, string(jsonValue))
 }
 
-func (dh *DataHandler) SetLocationFromJson(zone string, label string, val string) error {
-	return dh.redis.Set(zoneLocationKey(zone, label), val)
+type locationEntry struct {
+	A     *types.IP_RRSet    `json:"a,omitempty"`
+	AAAA  *types.IP_RRSet    `json:"aaaa,omitempty"`
+	CNAME *types.CNAME_RRSet `json:"cname,omitempty"`
+	TXT   *types.TXT_RRSet   `json:"txt,omitempty"`
+	NS    *types.NS_RRSet    `json:"ns,omitempty"`
+	MX    *types.MX_RRSet    `json:"mx,omitempty"`
+	SRV   *types.SRV_RRSet   `json:"srv,omitempty"`
+	CAA   *types.CAA_RRSet   `json:"caa,omitempty"`
+	PTR   *types.PTR_RRSet   `json:"ptr,omitempty"`
+	TLSA  *types.TLSA_RRSet  `json:"tlsa,omitempty"`
+	DS    *types.DS_RRSet    `json:"ds,omitempty"`
+	ANAME *types.ANAME_RRSet `json:"aname,omitempty"`
 }
 
-func (dh *DataHandler) RemoveLocation(zone string, label string) error {
-	return dh.redis.Del(zoneLocationKey(zone, label))
+func (dh *DataHandler) SetLocationFromJson(zone string, location string, value string) error {
+	var entry locationEntry
+	if err := jsoniter.Unmarshal([]byte(value), &entry); err != nil {
+		return err
+	}
+	if err := dh.EnableLocation(zone, location); err != nil {
+		return err
+	}
+	if entry.A != nil {
+		entry.A.TtlValue = fixTTL(entry.A.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeA, entry.A); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.AAAA != nil {
+		entry.AAAA.TtlValue = fixTTL(entry.AAAA.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeAAAA, entry.AAAA); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.CNAME != nil {
+		entry.CNAME.TtlValue = fixTTL(entry.CNAME.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeCNAME, entry.CNAME); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.TXT != nil {
+		entry.TXT.TtlValue = fixTTL(entry.TXT.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeTXT, entry.TXT); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.NS != nil {
+		entry.NS.TtlValue = fixTTL(entry.NS.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeNS, entry.NS); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.MX != nil {
+		entry.MX.TtlValue = fixTTL(entry.MX.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeMX, entry.MX); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.SRV != nil {
+		entry.SRV.TtlValue = fixTTL(entry.SRV.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeSRV, entry.SRV); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.CAA != nil {
+		entry.CAA.TtlValue = fixTTL(entry.CAA.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeCAA, entry.CAA); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.PTR != nil {
+		entry.PTR.TtlValue = fixTTL(entry.PTR.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypePTR, entry.PTR); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.TLSA != nil {
+		entry.TLSA.TtlValue = fixTTL(entry.TLSA.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeTLSA, entry.TLSA); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.DS != nil {
+		entry.DS.TtlValue = fixTTL(entry.DS.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, dns.TypeDS, entry.DS); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	if entry.ANAME != nil {
+		entry.ANAME.TtlValue = fixTTL(entry.ANAME.TtlValue, dh.config.MinTTL, dh.config.MaxTTL)
+		if err := dh.SetRRSet(zone, location, types.TypeANAME, entry.ANAME); err != nil {
+			zap.L().Error("cannot set rrset", zap.Error(err))
+		}
+	}
+	return nil
+}
+
+func fixTTL(ttl uint32, min uint32, max uint32) uint32 {
+	if ttl < min {
+		ttl = min
+	}
+	if ttl > max {
+		ttl = max
+	}
+	return ttl
+}
+
+func (dh *DataHandler) A(zone string, label string) (*types.IP_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeA, &types.IP_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.IP_RRSet), nil
+}
+
+func (dh *DataHandler) AAAA(zone string, label string) (*types.IP_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeAAAA, &types.IP_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.IP_RRSet), nil
+}
+
+func (dh *DataHandler) CNAME(zone string, label string) (*types.CNAME_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeCNAME, &types.CNAME_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.CNAME_RRSet), nil
+}
+
+func (dh *DataHandler) TXT(zone string, label string) (*types.TXT_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeTXT, &types.TXT_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.TXT_RRSet), nil
+}
+
+func (dh *DataHandler) NS(zone string, label string) (*types.NS_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeNS, &types.NS_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.NS_RRSet), nil
+}
+
+func (dh *DataHandler) MX(zone string, label string) (*types.MX_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeMX, &types.MX_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.MX_RRSet), nil
+}
+
+func (dh *DataHandler) SRV(zone string, label string) (*types.SRV_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeSRV, &types.SRV_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.SRV_RRSet), nil
+}
+
+func (dh *DataHandler) CAA(zone string, label string) (*types.CAA_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeCAA, &types.CAA_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.CAA_RRSet), nil
+}
+
+func (dh *DataHandler) PTR(zone string, label string) (*types.PTR_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypePTR, &types.PTR_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.PTR_RRSet), nil
+}
+
+func (dh *DataHandler) TLSA(zone string, label string) (*types.TLSA_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeTLSA, &types.TLSA_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.TLSA_RRSet), nil
+}
+
+func (dh *DataHandler) DS(zone string, label string) (*types.DS_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, dns.TypeDS, &types.DS_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.DS_RRSet), nil
+}
+
+func (dh *DataHandler) ANAME(zone string, label string) (*types.ANAME_RRSet, error) {
+	r, err := dh.getRRSet(zone, label, types.TypeANAME, &types.ANAME_RRSet{})
+	if err != nil {
+		return nil, err
+	}
+	return r.(*types.ANAME_RRSet), nil
 }
 
 func (dh *DataHandler) SetZoneKey(zone string, keyType string, pub string, priv string) error {
