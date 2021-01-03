@@ -1,0 +1,713 @@
+openapi: '3.0.6'
+
+info:
+  title: 'Zone42 API'
+  description: 'Zone42 administrator api'
+  version: '1.0'
+
+servers:
+  - url: https://api.zone42.io/1.0/
+
+paths:
+  /zones:
+    get:
+      summary: 'list of all zones'
+      parameters:
+        - name: q
+          in: query
+          description: 'search query'
+          allowEmptyValue: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/zones'
+        400:
+          $ref: '#/components/responses/400'
+
+    post:
+      summary: 'create a new zone'
+      requestBody:
+        $ref: '#/components/requestBodies/zone'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/zone'
+        400:
+          $ref: '#/components/responses/400'
+        409:
+          description: 'already exists'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/zone'
+
+
+  /zones/{zone}:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 'get zone information'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/zone'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+    put:
+      summary: 'update zone information'
+      requestBody:
+        $ref: '#/components/requestBodies/zone'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/zone'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+    delete:
+      responses:
+        204:
+          $ref: '#/components/responses/204'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /zones/{zone}/locations:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 'list of all locations within zone'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/locations'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+    post:
+      summary: 'create a new location in zone'
+      requestBody:
+        $ref: '#/components/requestBodies/location'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/location'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        409:
+          description: 'already exists'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/location'
+
+
+  /zones/{zone}/locations/{location}:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 'get location of a zone'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/location'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+    put:
+      summary: 'update a location in zone'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/location'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+    delete:
+      summary: 'remove a location from zone'
+      responses:
+        204:
+          $ref: '#/components/responses/204'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /zones/{zone}/locations/{location}/rrsets:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 'list of all rrsets within location'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rrsets'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+    post:
+      summary: 'create a new rrset in location'
+      requestBody:
+        $ref: '#/components/requestBodies/rrset'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rrset'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        409:
+          description: 'already exists'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rrset'
+
+  /zones/{zone}/locations/{location}/rrsets/{rtype}:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: location
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: rtype
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/rtype'
+    get:
+      summary: 'get rrset of a zone'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rrset'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+    put:
+      summary: 'update a rrset in location'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/rrset'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+    delete:
+      summary: 'remove a rrset from location'
+      responses:
+        204:
+          $ref: '#/components/responses/204'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+components:
+  requestBodies:
+    zone:
+      description: 'zone'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/zone'
+    location:
+      description: 'location'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/location'
+    rrset:
+      description: 'rrset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/rrset'
+
+  responses:
+    204:
+      description: 'successful'
+
+    400:
+      description: 'bad request'
+      content:
+        text/plain:
+          schema:
+            title: 'bad request'
+            type: string
+
+    401:
+      description: 'unauthorized'
+      content:
+        text/plain:
+          schema:
+            title: 'unauthorized'
+            type: string
+
+    404:
+      description: 'not found'
+      content:
+        text/plain:
+          schema:
+            title: 'not found'
+            type: string
+
+  schemas:
+    zones:
+      title: zones
+      type: array
+      minItems: 0
+      uniqueItems: true
+      items:
+        type: string
+      example: '["example.com.", "my.zon."]'
+
+    zone:
+      title: zone
+      type: object
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+        enabled:
+          type: boolean
+        dnssec:
+          type: boolean
+        cname_flattening:
+          type: boolean
+      example: '{"name": "example.com.", "id": "1234", "enabled": true, "dnssec":true, "cname_flattening": false}'
+
+    locations:
+      title: locations
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        type: string
+      example: '["@", "www", "sub.x"]'
+
+    location:
+      title: location
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      example: '{"enabled": true}'
+
+    rrsets:
+      title: rrsets
+      type: array
+      minItems: 0
+      uniqueItems: true
+      items:
+        $ref: '#/components/schemas/rtype'
+      example: '["a", "aaaa", "ns", "txt"]'
+
+    rrset:
+      title: rrset
+      type: object
+      anyOf:
+        - $ref: '#/components/schemas/a'
+        - $ref: '#/components/schemas/aaaa'
+        - $ref: '#/components/schemas/cname'
+        - $ref: '#/components/schemas/txt'
+        - $ref: '#/components/schemas/ns'
+        - $ref: '#/components/schemas/mx'
+        - $ref: '#/components/schemas/srv'
+        - $ref: '#/components/schemas/caa'
+        - $ref: '#/components/schemas/ptr'
+        - $ref: '#/components/schemas/tlsa'
+        - $ref: '#/components/schemas/ds'
+        - $ref: '#/components/schemas/aname'
+
+    rtype:
+      type: string
+      enum: [a, aaaa, cname, txt, ns, mx srv, caa, ptr, tlsa, ds, aname]
+
+    a:
+      title: a
+      allOf:
+        - $ref: '#/components/schemas/ip'
+
+    aaaa:
+      title: aaaa
+      allOf:
+        - $ref: '#/components/schemas/ip'
+
+    ip:
+      type: object
+      required:
+        - records
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        filter:
+          type: object
+          title: filter
+          properties:
+            count:
+              type: string
+              enum: [multi, single]
+              default: multi
+            order:
+              type: string
+              enum: [weighted, rr, none]
+              default: none
+            geo_filter:
+              type: string
+              enum: [country, location, asn, asn+country, none]
+              default: none
+        health_check:
+          type: object
+          title: health_check
+          properties:
+            protocol:
+              type: string
+              enum: [http, https, ping]
+              default: http
+            uri:
+              type: string
+              default: /
+            port:
+              type: integer
+              default: 80
+            timeout:
+              type: integer
+              default: 1000
+            up_count:
+              type: integer
+              default: 3
+            down_count:
+              type: integer
+              default: -3
+            enable:
+              type: boolean
+              default: false
+        records:
+          title: records
+          type: array
+          items:
+            type: object
+            required:
+              - ip
+            properties:
+              weight:
+                type: integer
+                default: 0
+              ip:
+                type: string
+              country:
+                type: array
+                items:
+                  type: string
+                  default: ''
+              asn:
+                type: array
+                items:
+                  type: integer
+                  default: 0
+
+    cname:
+      title: cname
+      type: object
+      required:
+        - host
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        host:
+          type: string
+
+    txt:
+      title: txt
+      type: object
+      required:
+        - records
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        records:
+          type: array
+          title: records
+          uniqueItems: false
+          items:
+            type: string
+
+    ns:
+      title: ns
+      type: object
+      required:
+        - records
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        records:
+          type: array
+          title: records
+          uniqueItems: true
+          items:
+            type: string
+
+    mx:
+      title: mx
+      type: object
+      required:
+        - records
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        records:
+          type: array
+          title: records
+          items:
+            type: object
+            required:
+              - host
+              - preference
+            properties:
+              host:
+                type: string
+              preference:
+                type: string
+
+    srv:
+      title: srv
+      type: object
+      required:
+        - records
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        records:
+          type: array
+          title: records
+          items:
+            type: object
+            required:
+              - target
+              - priority
+              - weight
+              - port
+            properties:
+              target:
+                type: string
+              priority:
+                type: integer
+              weight:
+                type: integer
+              port:
+                type: integer
+
+    caa:
+      title: caa
+      type: object
+      required:
+        - tag
+        - value
+        - flag
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        tag:
+          type: string
+        value:
+          type: string
+        flag:
+          type: integer
+
+    ptr:
+      title: ptr
+      type: object
+      required:
+        - domain
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        domain:
+          type: string
+
+    tlsa:
+      title: tlsa
+      type: object
+      required:
+        - records
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        records:
+          type: array
+          title: records
+          items:
+            type: object
+            required:
+              - usage
+              - selector
+              - matching_type
+              - certificate
+            properties:
+              usage:
+                type: integer
+              selector:
+                type: integer
+              matching_type:
+                type: integer
+              certificate:
+                type: string
+
+    ds:
+      title: ds
+      type: object
+      required:
+        - records
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        records:
+          type: array
+          title: records
+          items:
+            type: object
+            required:
+              - key_tag
+              - algorithm
+              - digest_type
+              - digest
+            properties:
+              key_tag:
+                type: integer
+              algorithm:
+                type: integer
+              digest_type:
+                type: integer
+              digest:
+                type: string
+
+    aname:
+      title: aname
+      type: object
+      required:
+        - location
+      properties:
+        ttl:
+          type: integer
+          default: 300
+        location:
+          type: string
