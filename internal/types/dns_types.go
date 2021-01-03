@@ -56,7 +56,7 @@ type IpHealthCheckConfig struct {
 
 type IpFilterConfig struct {
 	Count     string `json:"count,omitempty"`      // "multi", "single"
-	Order     string `json:"order,omitmpty"`       // "weighted", "rr", "none"
+	Order     string `json:"order,omitempty"`      // "weighted", "rr", "none"
 	GeoFilter string `json:"geo_filter,omitempty"` // "country", "location", "asn", "asn+country", "none"
 }
 
