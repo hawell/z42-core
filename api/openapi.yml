@@ -8,6 +8,9 @@ info:
 servers:
   - url: https://api.zone42.io/1.0/
 
+security:
+  - app_id: []
+
 paths:
   /zones:
     get:
@@ -311,6 +314,13 @@ paths:
           $ref: '#/components/responses/404'
 
 components:
+  securitySchemes:
+    app_id:
+      type: apiKey
+      description: api key to authorize requests
+      name: appid
+      in: query
+
   requestBodies:
     zone:
       description: 'zone'
