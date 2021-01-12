@@ -23,11 +23,11 @@ func TestUser(t *testing.T) {
 	Expect(err).To(BeNil())
 
 	// add
-	_, err = db.AddUser("user1")
+	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
 
 	// duplicate
-	_, err = db.AddUser("user1")
+	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).NotTo(BeNil())
 
 	// delete
@@ -51,17 +51,17 @@ func TestZone(t *testing.T) {
 	Expect(err).To(BeNil())
 
 	// zone with no user
-	_, err = db.AddZone("user0", "example0.com.", true)
+	_, err = db.AddZone("user0", Zone{Name: "example0.com.", Enabled: true})
 	Expect(err).NotTo(BeNil())
 
 	// add zone for user
-	_, err = db.AddUser("user1")
+	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", "example1.com.", true)
+	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", "example2.com.", true)
+	_, err = db.AddZone("user1", Zone{Name: "example2.com.", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", "example3.com.", true)
+	_, err = db.AddZone("user1", Zone{Name: "example3.com.", Enabled: true})
 	Expect(err).To(BeNil())
 	zones, err := db.GetZones("user1", 0, 100)
 	Expect(len(zones)).To(Equal(3))
@@ -72,18 +72,27 @@ func TestZone(t *testing.T) {
 	Expect(zones[2].Enabled).To(BeTrue())
 	Expect(zones[2].Name).To(Equal("example3.com."))
 
+	// update
+	res, err := db.UpdateZone(Zone{Name: "example1.com.", Enabled: false})
+	Expect(err).To(BeNil())
+	Expect(res).To(Equal(int64(1)))
+	z, err := db.GetZone("example1.com.")
+	Expect(err).To(BeNil())
+	Expect(z.Name).To(Equal("example1.com."))
+	Expect(z.Enabled).To(BeFalse())
+
 	// duplicate add
-	_, err = db.AddZone("user1", "example1.com.", true)
+	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Enabled: true})
 	Expect(err).NotTo(BeNil())
 
 	// add zone for another user
-	_, err = db.AddUser("user2")
+	_, err = db.AddUser(User{Name: "user2"})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user2", "example4.com.", true)
+	_, err = db.AddZone("user2", Zone{Name: "example4.com.", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user2", "example5.com.", true)
+	_, err = db.AddZone("user2", Zone{Name: "example5.com.", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user2", "example6.com.", true)
+	_, err = db.AddZone("user2", Zone{Name: "example6.com.", Enabled: true})
 	Expect(err).To(BeNil())
 	zones, err = db.GetZones("user2", 0, 100)
 	Expect(len(zones)).To(Equal(3))
@@ -95,7 +104,7 @@ func TestZone(t *testing.T) {
 	Expect(zones[2].Name).To(Equal("example6.com."))
 
 	// cannot add already added zone for another user
-	_, err = db.AddZone("user2", "example1.com.", true)
+	_, err = db.AddZone("user2", Zone{Name: "example1.com.", Enabled: true})
 	Expect(err).NotTo(BeNil())
 }
 
@@ -106,30 +115,41 @@ func TestLocation(t *testing.T) {
 	err = db.Clear()
 	Expect(err).To(BeNil())
 
-	_, err = db.AddUser("user1")
+	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", "example.com.", true)
+	_, err = db.AddZone("user1", Zone{Name: "example.com.", Enabled: true})
 
 	// location with invalid zone
-	_, err = db.AddLocation("example2.com.", "www", true)
+	_, err = db.AddLocation("example2.com.", Location{Name: "www", Enabled: true})
 	Expect(err).NotTo(BeNil())
 
 	// add location to zone
-	_, err = db.AddLocation("example.com.", "www", true)
+	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddLocation("example.com.", "a", true)
+	_, err = db.AddLocation("example.com.", Location{Name: "a", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddLocation("example.com.", "b", true)
+	_, err = db.AddLocation("example.com.", Location{Name: "b", Enabled: true})
 	Expect(err).To(BeNil())
 
-	// add duplicate location
-	_, err = db.AddLocation("example.com.", "www2", true)
+	// update
+	_, err = db.AddLocation("example.com.", Location{Name: "x", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddLocation("example.com.", "www2", true)
+	res, err := db.UpdateLocation("example.com.", Location{Name: "x", Enabled: false})
+	Expect(err).To(BeNil())
+	Expect(res).To(Equal(int64(1)))
+	l, err := db.GetLocation("example.com.", "x")
+	Expect(err).To(BeNil())
+	Expect(l.Name).To(Equal("x"))
+	Expect(l.Enabled).To(BeFalse())
+
+	// add duplicate location
+	_, err = db.AddLocation("example.com.", Location{Name: "www2", Enabled: true})
+	Expect(err).To(BeNil())
+	_, err = db.AddLocation("example.com.", Location{Name: "www2", Enabled: true})
 	Expect(err).NotTo(BeNil())
 
 	locations, err := db.GetLocations("example.com.", 0, 100)
-	Expect(len(locations)).To(Equal(4))
+	Expect(len(locations)).To(Equal(5))
 	Expect(locations[0].Name).To(Equal("a"))
 	Expect(locations[0].Enabled).To(BeTrue())
 	Expect(locations[1].Name).To(Equal("b"))
@@ -147,22 +167,22 @@ func TestRecordSet(t *testing.T) {
 	err = db.Clear()
 	Expect(err).To(BeNil())
 
-	_, err = db.AddUser("user1")
+	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", "example.com.", true)
+	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddLocation("example.com.", "www", true)
+	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 
 	// recordset with invalid location
-	_, err = db.AddRecordSet("example.com.", "www2", "a", `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, true)
+	_, err = db.AddRecordSet("example.com.", "www2", RecordSet{Type: "a", Value: `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, Enabled: true})
 	Expect(err).NotTo(BeNil())
 
 	// recordset with invalid zone
-	_, err = db.AddRecordSet("example1.com.", "www", "a", `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, true)
+	_, err = db.AddRecordSet("example1.com.", "www", RecordSet{Type: "a", Value: `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, Enabled: true})
 	Expect(err).NotTo(BeNil())
 
 	// recordset with invalid type
-	_, err = db.AddRecordSet("example1.com.", "www", "abcd", `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, true)
+	_, err = db.AddRecordSet("example1.com.", "www", RecordSet{Type: "abcd", Value: `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, Enabled: true})
 	Expect(err).NotTo(BeNil())
 
 	// add recordset to location
@@ -181,7 +201,7 @@ func TestRecordSet(t *testing.T) {
 		{"txt", `{"ttl": 300, "records": [{"text": "foo"}, {"text": "bar"}]}`},
 	}
 	for _, rr := range rrs {
-		_, err = db.AddRecordSet("example.com.", "www", rr[0], rr[1], true)
+		_, err = db.AddRecordSet("example.com.", "www", RecordSet{Type: rr[0], Value: rr[1], Enabled: true})
 		Expect(err).To(BeNil())
 	}
 	sets, err := db.GetRecordSets("example.com.", "www")
@@ -192,6 +212,14 @@ func TestRecordSet(t *testing.T) {
 		Expect(set.Type).To(Equal(rrs[i][0]))
 		Expect(set.Value).To(Equal(rrs[i][1]))
 	}
+
+	// update
+	res, err := db.UpdateRecordSet("example.com.", "www", RecordSet{Type: rrs[0][0], Value: rrs[0][1], Enabled: false})
+	Expect(err).To(BeNil())
+	Expect(res).To(Equal(int64(1)))
+	r, err := db.GetRecordSet("example.com.", "www", rrs[0][0])
+	Expect(err).To(BeNil())
+	Expect(r.Enabled).To(BeFalse())
 }
 
 func TestCascadeDelete(t *testing.T) {
@@ -201,13 +229,13 @@ func TestCascadeDelete(t *testing.T) {
 	err = db.Clear()
 	Expect(err).To(BeNil())
 
-	_, err = db.AddUser("admin")
+	_, err = db.AddUser(User{ Name: "admin"})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("admin", "example.com.", true)
+	_, err = db.AddZone("admin", Zone{Name: "example.com.", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddLocation("example.com.", "www", true)
+	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 	Expect(err).To(BeNil())
-	_, err = db.AddRecordSet("example.com.", "www", "a", `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, true)
+	_, err = db.AddRecordSet("example.com.", "www", RecordSet{Type: "a", Value: `{"ttl": 300, "records":[{"ip":"1.2.3.4"}]}`, Enabled: true})
 	Expect(err).To(BeNil())
 
 	res, err := db.DeleteUser("admin")

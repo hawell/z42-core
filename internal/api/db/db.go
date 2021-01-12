@@ -26,8 +26,8 @@ func (db *DataBase) Clear() error {
 	return err
 }
 
-func (db *DataBase) AddUser(name string) (int64, error) {
-	res, err := db.db.Exec("INSERT INTO User(Name) VALUES (?)", name)
+func (db *DataBase) AddUser(u User) (int64, error) {
+	res, err := db.db.Exec("INSERT INTO User(Name) VALUES (?)", u.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -49,12 +49,12 @@ func (db *DataBase) DeleteUser(name string) (int64, error) {
 	return res.RowsAffected()
 }
 
-func (db *DataBase) AddZone(user string, zone string, enabled bool) (int64, error) {
+func (db *DataBase) AddZone(user string, z Zone) (int64, error) {
 	u, err := db.GetUser(user)
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("INSERT INTO Zone(Name, Enabled, User_Id) VALUES (?, ?, ?)", zone, enabled, u.Id)
+	res, err := db.db.Exec("INSERT INTO Zone(Name, Enabled, User_Id) VALUES (?, ?, ?)", z.Name, z.Enabled, u.Id)
 	if err != nil {
 		return 0, err
 	}
@@ -90,8 +90,8 @@ func (db *DataBase) GetZone(zone string) (Zone, error) {
 	return z, err
 }
 
-func (db *DataBase) UpdateZone(zone string, enabled bool) (int64, error) {
-	res, err := db.db.Exec("UPDATE Zone SET Enabled = ? WHERE Name = ?", enabled, zone)
+func (db *DataBase) UpdateZone(z Zone) (int64, error) {
+	res, err := db.db.Exec("UPDATE Zone SET Enabled = ? WHERE Name = ?", z.Enabled, z.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -106,12 +106,12 @@ func (db *DataBase) DeleteZone(zone string) (int64, error) {
 	return res.RowsAffected()
 }
 
-func (db *DataBase) AddLocation(zone string, location string, enabled bool) (int64, error) {
+func (db *DataBase) AddLocation(zone string, l Location) (int64, error) {
 	z, err := db.GetZone(zone)
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("INSERT INTO Location(Name, Enabled, Zone_Id) VALUES (?, ?, ?)", location, enabled, z.Id)
+	res, err := db.db.Exec("INSERT INTO Location(Name, Enabled, Zone_Id) VALUES (?, ?, ?)", l.Name, l.Enabled, z.Id)
 	if err != nil {
 		return 0, err
 	}
@@ -151,12 +151,12 @@ func (db *DataBase) GetLocation(zone string, location string) (Location, error) 
 	return l, err
 }
 
-func (db *DataBase) UpdateLocation(zone string, location string, enabled bool) (int64, error) {
+func (db *DataBase) UpdateLocation(zone string, l Location) (int64, error) {
 	z, err := db.GetZone(zone)
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("UPDATE Location SET Enabled = ? WHERE Zone_Id = ? AND Name = ?", enabled, z.Id, location)
+	res, err := db.db.Exec("UPDATE Location SET Enabled = ? WHERE Zone_Id = ? AND Name = ?", l.Enabled, z.Id, l.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -175,12 +175,12 @@ func (db *DataBase) DeleteLocation(zone string, location string) (int64, error) 
 	return res.RowsAffected()
 }
 
-func (db *DataBase) AddRecordSet(zone string, location string, rtype string, value string, enabled bool) (int64, error) {
+func (db *DataBase) AddRecordSet(zone string, location string, r RecordSet) (int64, error) {
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("INSERT INTO RecordSet(Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?)", l.Id, rtype, value, enabled)
+	res, err := db.db.Exec("INSERT INTO RecordSet(Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?)", l.Id, r.Type, r.Value, r.Enabled)
 	if err != nil {
 		return 0, err
 	}
@@ -220,19 +220,19 @@ func (db *DataBase) GetRecordSet(zone string, location string, rtype string) (Re
 	return r, err
 }
 
-func (db *DataBase) UpdateRecordSet(zone string, location string, rtype string, value string, enabled bool) (int64, error) {
+func (db *DataBase) UpdateRecordSet(zone string, location string, r RecordSet) (int64, error) {
 	l, err := db.GetLocation(zone , location)
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Location_Id = ? AND Type = ?", value, enabled, l.Id, rtype)
+	res, err := db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Location_Id = ? AND Type = ?", r.Value, r.Enabled, l.Id, r.Type)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
-func (db *DataBase) DeleteRecordSet(zone string, location string, rtype string) (int64, error){
+func (db *DataBase) DeleteRecordSet(zone string, location string, rtype string) (int64, error) {
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		return 0, err
