@@ -35,6 +35,8 @@ DROP TABLE IF EXISTS `z42`.`Zone` ;
 CREATE TABLE IF NOT EXISTS `z42`.`Zone` (
                                             `Id` INT NOT NULL AUTO_INCREMENT,
                                             `Name` VARCHAR(45) NOT NULL,
+                                            `CNameFlattening` TINYINT NOT NULL,
+                                            `Dnssec` TINYINT NOT NULL,
                                             `Enabled` TINYINT NOT NULL,
                                             `User_Id` INT NOT NULL,
                                             PRIMARY KEY (`Id`),

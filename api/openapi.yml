@@ -16,10 +16,22 @@ paths:
     get:
       summary: 'list of all zones'
       parameters:
+        - name: start
+          in: query
+          description: 'start index'
+          required: false
+          schema:
+            type: integer
+        - name: count
+          in: query
+          description: 'number of items in response'
+          required: false
+          schema:
+            type: integer
         - name: q
           in: query
           description: 'search query'
-          allowEmptyValue: true
+          required: false
           schema:
             type: string
       responses:
@@ -35,16 +47,16 @@ paths:
     post:
       summary: 'create a new zone'
       requestBody:
+        required: true
+        description: 'new zone data'
         $ref: '#/components/requestBodies/zone'
       responses:
-        200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/zone'
+        204:
+          $ref: '#/components/responses/204'
         400:
           $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
         409:
           description: 'already exists'
           content:
@@ -61,7 +73,7 @@ paths:
         schema:
           type: string
     get:
-      summary: 'get zone information'
+      summary: 'get zone data'
       responses:
         200:
           description: 'successful response'
@@ -77,16 +89,14 @@ paths:
           $ref: '#/components/responses/404'
 
     put:
-      summary: 'update zone information'
+      summary: 'updated zone data'
       requestBody:
+        required: true
+        description: 'updated zone data'
         $ref: '#/components/requestBodies/zone'
       responses:
-        200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/zone'
+        204:
+          $ref: '#/components/responses/204'
         400:
           $ref: '#/components/responses/400'
         401:
@@ -114,6 +124,25 @@ paths:
           type: string
     get:
       summary: 'list of all locations within zone'
+      parameters:
+        - name: start
+          in: query
+          description: 'start index'
+          required: false
+          schema:
+            type: integer
+        - name: count
+          in: query
+          description: 'number of items in response'
+          required: false
+          schema:
+            type: integer
+        - name: q
+          in: query
+          description: 'search query'
+          required: false
+          schema:
+            type: string
       responses:
         200:
           description: 'successful response'
@@ -131,14 +160,12 @@ paths:
     post:
       summary: 'create a new location in zone'
       requestBody:
+        required: true
+        description: 'new location data'
         $ref: '#/components/requestBodies/location'
       responses:
-        200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/location'
+        204:
+          $ref: '#/components/responses/204'
         400:
           $ref: '#/components/responses/400'
         401:
@@ -180,13 +207,13 @@ paths:
           $ref: '#/components/responses/404'
     put:
       summary: 'update a location in zone'
+      requestBody:
+        required: true
+        description: 'updated location data'
+        $ref: '#/components/requestBodies/location'
       responses:
-        200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/location'
+        204:
+          $ref: '#/components/responses/204'
         400:
           $ref: '#/components/responses/400'
         401:
@@ -235,14 +262,12 @@ paths:
     post:
       summary: 'create a new rrset in location'
       requestBody:
+        description: 'new rrset data'
+        required: true
         $ref: '#/components/requestBodies/rrset'
       responses:
-        200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/rrset'
+        204:
+          $ref: '#/components/responses/204'
         400:
           $ref: '#/components/responses/400'
         401:
@@ -288,13 +313,13 @@ paths:
           $ref: '#/components/responses/404'
     put:
       summary: 'update a rrset in location'
+      requestBody:
+        description: 'updated rrset data'
+        required: true
+        $ref: '#/components/requestBodies/rrset'
       responses:
-        200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/rrset'
+        204:
+          $ref: '#/components/responses/204'
         400:
           $ref: '#/components/responses/400'
         401:

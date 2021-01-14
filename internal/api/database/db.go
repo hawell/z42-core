@@ -1,4 +1,4 @@
-package db
+package database
 
 import (
 	"database/sql"
@@ -17,8 +17,8 @@ func Connect(connectionString string) (*DataBase, error) {
 	return &DataBase{db}, nil
 }
 
-func (db *DataBase) Close() {
-	db.db.Close()
+func (db *DataBase) Close() error {
+	return db.db.Close()
 }
 
 func (db *DataBase) Clear() error {
@@ -54,31 +54,32 @@ func (db *DataBase) AddZone(user string, z Zone) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("INSERT INTO Zone(Name, Enabled, User_Id) VALUES (?, ?, ?)", z.Name, z.Enabled, u.Id)
+	res, err := db.db.Exec("INSERT INTO Zone(Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?)", z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, u.Id)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
-func (db *DataBase) GetZones(user string, start int, count int) ([]Zone, error) {
+func (db *DataBase) GetZones(user string, start int, count int, q string) ([]string, error) {
 	u, err := db.GetUser(user)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.db.Query("SELECT Id, Name, Enabled FROM Zone WHERE User_Id = ? ORDER BY Name LIMIT ?, ?", u.Id, start, count)
+	like := "%" + q + "%"
+	rows, err := db.db.Query("SELECT Name FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?", u.Id, like, start, count)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var res []Zone
+	var res []string
 	for rows.Next() {
-		var z Zone
-		err := rows.Scan(&z.Id, &z.Name, &z.Enabled)
+		var zone string
+		err := rows.Scan(&zone)
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, z)
+		res = append(res, zone)
 	}
 	return res, nil
 }
@@ -118,24 +119,25 @@ func (db *DataBase) AddLocation(zone string, l Location) (int64, error) {
 	return res.LastInsertId()
 }
 
-func (db *DataBase) GetLocations(zone string, start int, count int) ([]Location, error) {
+func (db *DataBase) GetLocations(zone string, start int, count int, q string) ([]string, error) {
 	z, err := db.GetZone(zone)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.db.Query("SELECT Id, Name, Enabled FROM Location WHERE Zone_Id = ? ORDER BY Name LIMIT ?, ?", z.Id, start, count)
+	like := "%" + q + "%"
+	rows, err := db.db.Query("SELECT Name FROM Location WHERE Zone_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?", z.Id, like, start, count)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var res []Location
+	var res []string
 	for rows.Next() {
-		var l Location
-		err := rows.Scan(&l.Id, &l.Name, &l.Enabled)
+		var location string
+		err := rows.Scan(&location)
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, l)
+		res = append(res, location)
 	}
 	return res, nil
 }
@@ -187,20 +189,20 @@ func (db *DataBase) AddRecordSet(zone string, location string, r RecordSet) (int
 	return res.LastInsertId()
 }
 
-func (db *DataBase) GetRecordSets(zone string, location string) ([]RecordSet, error) {
+func (db *DataBase) GetRecordSets(zone string, location string) ([]string, error) {
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.db.Query("SELECT Id, Type, Value, Enabled FROM RecordSet WHERE Location_Id = ?", l.Id)
+	rows, err := db.db.Query("SELECT Type FROM RecordSet WHERE Location_Id = ?", l.Id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var res []RecordSet
+	var res []string
 	for rows.Next() {
-		var rset RecordSet
-		err := rows.Scan(&rset.Id, &rset.Type, &rset.Value, &rset.Enabled)
+		var rset string
+		err := rows.Scan(&rset)
 		if err != nil {
 			return nil, err
 		}
