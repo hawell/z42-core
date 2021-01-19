@@ -48,7 +48,7 @@ func TestUser(t *testing.T) {
 
 	// delete non-existing user
 	res, err = db.DeleteUser("user1")
-	Expect(err).To(BeNil())
+	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 }
 
@@ -146,6 +146,11 @@ func TestGetZones(t *testing.T) {
 	Expect(err).To(BeNil())
 	Expect(len(zones)).To(Equal(1))
 	Expect(zones[0]).To(Equal("example2.com."))
+
+	// empty results
+	zones, err = db.GetZones("user1", 0, 100, "fkfkfkf")
+	Expect(err).To(BeNil())
+	Expect(len(zones)).To(Equal(0))
 }
 
 func TestGetZone(t *testing.T) {
@@ -198,7 +203,7 @@ func TestUpdateZone(t *testing.T) {
 
 	// non-existing zone
 	res, err = db.UpdateZone(Zone{Name: "example2.com.", Dnssec: false, CNameFlattening: false, Enabled: false})
-	Expect(err).To(BeNil())
+	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 }
 
@@ -221,7 +226,7 @@ func TestDeleteZone(t *testing.T) {
 
 	// non-existing zone
 	res, err = db.DeleteZone("example1.com.")
-	Expect(err).To(BeNil())
+	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 }
 
@@ -318,6 +323,11 @@ func TestGetLocations(t *testing.T) {
 	Expect(err).To(BeNil())
 	Expect(len(locations)).To(Equal(1))
 	Expect(locations[0]).To(Equal("b"))
+
+	// empty result
+	locations, err = db.GetLocations("example1.com.", 0, 100, "bdsdsds")
+	Expect(err).To(BeNil())
+	Expect(len(locations)).To(Equal(0))
 }
 
 func TestGetLocation(t *testing.T) {
@@ -371,7 +381,7 @@ func TestUpdateLocation(t *testing.T) {
 
 	// non-existing location
 	res, err := db.UpdateLocation("example1.com.", Location{Name: "b", Enabled: true})
-	Expect(err).To(BeNil())
+	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 
 	// non-existing zone
@@ -400,7 +410,7 @@ func TestDeleteLocation(t *testing.T) {
 
 	// non-existing location
 	res, err := db.DeleteLocation("example1.com.", "b")
-	Expect(err).To(BeNil())
+	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 
 	// non-existing zone
@@ -571,7 +581,7 @@ func TestUpdateRecordSet(t *testing.T) {
 
 	// non-existing type
 	res, err := db.UpdateRecordSet("example.com.", "www", RecordSet{Type: "aaaa", Value: `{"ttl": 400, "records":[{"ip":"::1"}]}`, Enabled: false})
-	Expect(err).To(BeNil())
+	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 
 	// invalid type
@@ -608,7 +618,7 @@ func TestDeleteRecordSet(t *testing.T) {
 
 	// non-existing
 	res, err := db.DeleteRecordSet("example.com.", "www", "a")
-	Expect(err).To(BeNil())
+	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 
 	// invalid location

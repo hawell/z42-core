@@ -54,7 +54,14 @@ func (db *DataBase) DeleteUser(name string) (int64, error) {
 	if err != nil {
 		return 0, parseError(err)
 	}
-	return res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, ErrNotFound
+	}
+	return rows, err
 }
 
 func (db *DataBase) getZoneOwner(zone string) (int64, error) {
@@ -133,7 +140,14 @@ func (db *DataBase) UpdateZone(z Zone) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, ErrNotFound
+	}
+	return rows, err
 }
 
 func (db *DataBase) DeleteZone(zone string) (int64, error) {
@@ -141,7 +155,14 @@ func (db *DataBase) DeleteZone(zone string) (int64, error) {
 	if err != nil {
 		return 0, parseError(err)
 	}
-	return res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, ErrNotFound
+	}
+	return rows, err
 }
 
 func (db *DataBase) AddLocation(zone string, l Location) (int64, error) {
@@ -211,7 +232,14 @@ func (db *DataBase) UpdateLocation(zone string, l Location) (int64, error) {
 	if err != nil {
 		return 0, parseError(err)
 	}
-	return res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, ErrNotFound
+	}
+	return rows, err
 }
 
 func (db *DataBase) DeleteLocation(zone string, location string) (int64, error) {
@@ -226,7 +254,14 @@ func (db *DataBase) DeleteLocation(zone string, location string) (int64, error) 
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, ErrNotFound
+	}
+	return rows, err
 }
 
 func (db *DataBase) AddRecordSet(zone string, location string, r RecordSet) (int64, error) {
@@ -301,7 +336,14 @@ func (db *DataBase) UpdateRecordSet(zone string, location string, r RecordSet) (
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, ErrNotFound
+	}
+	return rows, err
 }
 
 func (db *DataBase) DeleteRecordSet(zone string, location string, rtype string) (int64, error) {
@@ -319,7 +361,14 @@ func (db *DataBase) DeleteRecordSet(zone string, location string, rtype string) 
 	if err != nil {
 		return 0, err
 	}
-	return res.RowsAffected()
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, ErrNotFound
+	}
+	return rows, err
 }
 
 func parseError(err error) error {
