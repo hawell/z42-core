@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS `z42`.`RecordSet` (
                                                  `Location_Id` INT NOT NULL,
                                                  PRIMARY KEY (`Id`),
                                                  INDEX `fk_RecordSet_Location1_idx` (`Location_Id` ASC) VISIBLE,
-                                                 UNIQUE INDEX `Type_UNIQUE` (`Type` ASC) VISIBLE,
+                                                 UNIQUE INDEX `Type_Location_Unique` (`Type` ASC, `Location_Id` ASC) VISIBLE,
                                                  CONSTRAINT `fk_RecordSet_Location`
                                                      FOREIGN KEY (`Location_Id`)
                                                          REFERENCES `z42`.`Location` (`Id`)
