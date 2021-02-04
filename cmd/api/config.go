@@ -1,19 +1,24 @@
 package main
 
 import (
+	"github.com/hawell/z42/internal/api/server"
 	jsoniter "github.com/json-iterator/go"
 	"log"
 	"os"
 )
 
 type Config struct {
-	DBConnectionString string `json:"db_connection_string"`
-	BindAddress string `json:"bind_address"`
+	DBConnectionString string   `json:"db_connection_string"`
+	ServerConfig *server.Config `json:"server"`
 }
 
 var apiDefaultConfig = &Config{
 	DBConnectionString: "root:root@tcp(127.0.0.1:3306)/z42",
-	BindAddress:        "localhost:8080",
+	ServerConfig:       &server.Config{
+		BindAddress:  "localhost:8080",
+		ReadTimeout:  10,
+		WriteTimeout: 10,
+	},
 }
 
 func LoadConfig(path string) (*Config, error) {

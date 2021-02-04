@@ -25,3 +25,5 @@ type RecordSet struct {
 	Value string `json:"value"`
 	Enabled bool `json:"enabled"`
 }
+
+var SupportedTypes = []string{"a", "aaaa", "cname", "txt", "ns", "mx", "srv", "caa", "ptr", "tlsa", "ds", "aname"}

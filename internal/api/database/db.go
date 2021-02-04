@@ -116,7 +116,7 @@ func (db *DataBase) GetZones(user string, start int, count int, q string) ([]str
 		return nil, err
 	}
 	defer rows.Close()
-	var res []string
+	res := []string{}
 	for rows.Next() {
 		var zone string
 		err := rows.Scan(&zone)
@@ -136,18 +136,15 @@ func (db *DataBase) GetZone(zone string) (Zone, error) {
 }
 
 func (db *DataBase) UpdateZone(z Zone) (int64, error) {
+	_, err := db.GetZone(z.Name)
+	if err != nil {
+		return 0, err
+	}
 	res, err := db.db.Exec("UPDATE Zone SET Dnssec = ?, CNameFlattening = ?, Enabled = ? WHERE Name = ?", z.Dnssec, z.CNameFlattening, z.Enabled, z.Name)
 	if err != nil {
 		return 0, err
 	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	if rows == 0 {
-		return 0, ErrNotFound
-	}
-	return rows, err
+	return res.RowsAffected()
 }
 
 func (db *DataBase) DeleteZone(zone string) (int64, error) {
@@ -194,7 +191,7 @@ func (db *DataBase) GetLocations(zone string, start int, count int, q string) ([
 		return nil, err
 	}
 	defer rows.Close()
-	var res []string
+	res := []string{}
 	for rows.Next() {
 		var location string
 		err := rows.Scan(&location)
@@ -220,37 +217,31 @@ func (db *DataBase) GetLocation(zone string, location string) (Location, error) 
 	return l, parseError(err)
 }
 
+func (db *DataBase) locationExists(zone string, location string) (bool, error) {
+	res := db.db.QueryRow("select count(*) from Zone left join Location L on Zone.Id = L.Zone_Id where Zone.Name = ? and L.Name = ?", zone, location)
+	var count int64
+	err := res.Scan(&count)
+	return count>0, err
+}
+
 func (db *DataBase) UpdateLocation(zone string, l Location) (int64, error) {
-	z, err := db.GetZone(zone)
+	storedLocation, err := db.GetLocation(zone, l.Name)
 	if err != nil {
-		if err == ErrNotFound {
-			return 0, ErrInvalid
-		}
 		return 0, err
 	}
-	res, err := db.db.Exec("UPDATE Location SET Enabled = ? WHERE Zone_Id = ? AND Name = ?", l.Enabled, z.Id, l.Name)
+	res, err := db.db.Exec("UPDATE Location SET Enabled = ? WHERE Id = ?", l.Enabled, storedLocation.Id)
 	if err != nil {
 		return 0, parseError(err)
 	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return 0, err
-	}
-	if rows == 0 {
-		return 0, ErrNotFound
-	}
-	return rows, err
+	return res.RowsAffected()
 }
 
 func (db *DataBase) DeleteLocation(zone string, location string) (int64, error) {
-	z, err := db.GetZone(zone)
+	storedLocation, err := db.GetLocation(zone, location)
 	if err != nil {
-		if err == ErrNotFound {
-			return 0, ErrInvalid
-		}
 		return 0, err
 	}
-	res, err := db.db.Exec("DELETE FROM Location WHERE Zone_Id = ? AND Name = ?", z.Id, location)
+	res, err := db.db.Exec("DELETE FROM Location WHERE Id = ?", storedLocation.Id)
 	if err != nil {
 		return 0, err
 	}
@@ -292,7 +283,7 @@ func (db *DataBase) GetRecordSets(zone string, location string) ([]string, error
 		return nil, err
 	}
 	defer rows.Close()
-	var res []string
+	res := []string{}
 	for rows.Next() {
 		var rset string
 		err := rows.Scan(&rset)
@@ -305,9 +296,6 @@ func (db *DataBase) GetRecordSets(zone string, location string) ([]string, error
 }
 
 func (db *DataBase) GetRecordSet(zone string, location string, rtype string) (RecordSet, error) {
-	if !isRecordSetType(rtype) {
-		return RecordSet{}, ErrInvalid
-	}
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		if err == ErrNotFound {
@@ -322,42 +310,23 @@ func (db *DataBase) GetRecordSet(zone string, location string, rtype string) (Re
 }
 
 func (db *DataBase) UpdateRecordSet(zone string, location string, r RecordSet) (int64, error) {
-	if !isRecordSetType(r.Type) {
-		return 0, ErrInvalid
-	}
-	l, err := db.GetLocation(zone , location)
-	if err != nil {
-		if err == ErrNotFound {
-			return 0, ErrInvalid
-		}
-		return 0, err
-	}
-	res, err := db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Location_Id = ? AND Type = ?", r.Value, r.Enabled, l.Id, r.Type)
+	storedRecordSet, err := db.GetRecordSet(zone , location, r.Type)
 	if err != nil {
 		return 0, err
 	}
-	rows, err := res.RowsAffected()
+	res, err := db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Id = ?", r.Value, r.Enabled, storedRecordSet.Id)
 	if err != nil {
 		return 0, err
 	}
-	if rows == 0 {
-		return 0, ErrNotFound
-	}
-	return rows, err
+	return res.RowsAffected()
 }
 
 func (db *DataBase) DeleteRecordSet(zone string, location string, rtype string) (int64, error) {
-	if !isRecordSetType(rtype) {
-		return 0, ErrInvalid
-	}
-	l, err := db.GetLocation(zone, location)
+	storedRecordSet, err := db.GetRecordSet(zone , location, rtype)
 	if err != nil {
-		if err == ErrNotFound {
-			return 0, ErrInvalid
-		}
 		return 0, err
 	}
-	res, err := db.db.Exec("DELETE FROM RecordSet WHERE Location_Id = ? AND Type = ?", l.Id, rtype)
+	res, err := db.db.Exec("DELETE FROM RecordSet WHERE Id = ?", storedRecordSet.Id)
 	if err != nil {
 		return 0, err
 	}
@@ -383,14 +352,4 @@ func parseError(err error) error {
 		return ErrNotFound
 	}
 	return err
-}
-
-func isRecordSetType(rtype string) bool {
-	types := []string{"a", "aaaa", "cname", "txt", "ns", "mx", "srv", "caa", "ptr", "tlsa", "ds", "aname"}
-	for _, t := range types {
-		if rtype == t {
-			return true
-		}
-	}
-	return false
 }

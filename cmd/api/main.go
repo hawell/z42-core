@@ -3,21 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/hawell/z42/internal/api"
 	"github.com/hawell/z42/internal/api/database"
+	"github.com/hawell/z42/internal/api/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"net/http"
-	"time"
 )
-
-func DBMiddleware(db *database.DataBase) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Set("database", db)
-		c.Next()
-	}
-}
 
 func main() {
 	configPtr := flag.String("c", "config.json", "path to config file")
@@ -58,57 +48,7 @@ func main() {
 		panic(err)
 	}
 
-	router := gin.Default()
-
-	s := &http.Server{
-		Addr:           config.BindAddress,
-		Handler:        router,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-
-	router.Use(DBMiddleware(db))
-
-	zones := router.Group("/zones")
-	{
-		zones.GET("", api.GetZones)
-		zones.POST("", api.AddZone)
-
-		zone := zones.Group("/:zone")
-		{
-			zone.GET("", api.GetZone)
-			zone.PUT("", api.UpdateZone)
-			zone.DELETE("", api.DeleteZone)
-
-			locations := zone.Group("/locations")
-			{
-				locations.GET("", api.GetLocations)
-				locations.POST("", api.AddLocation)
-
-				location := locations.Group("/:location")
-				{
-					location.GET("", api.GetLocation)
-					location.PUT("", api.UpdateLocation)
-					location.DELETE("", api.DeleteLocation)
-
-					rrsets := location.Group("/rrsets")
-					{
-						rrsets.GET("", api.GetRecordSets)
-						rrsets.POST("", api.AddRecordSet)
-
-						rrset := rrsets.Group("/:rtype")
-						{
-							rrset.GET("", api.GetRecordSet)
-							rrset.PUT("", api.UpdateRecordSet)
-							rrset.DELETE("", api.DeleteRecordSet)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	err = s.ListenAndServe()
+	s := server.NewServer(config.ServerConfig, db)
+	err = s.ListenAndServer()
 	fmt.Println(err)
 }

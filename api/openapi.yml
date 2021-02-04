@@ -379,11 +379,11 @@ components:
             type: string
 
     401:
-      description: 'unauthorized'
+      description: 'not authorized'
       content:
         text/plain:
           schema:
-            title: 'unauthorized'
+            title: 'not authorized'
             type: string
 
     404:
@@ -418,7 +418,7 @@ components:
           type: boolean
         cname_flattening:
           type: boolean
-      example: '{"name": "example.com.", "id": "1234", "enabled": true, "dnssec":true, "cname_flattening": false}'
+      example: '{"name": "example.com.", "enabled": true, "dnssec":true, "cname_flattening": false}'
 
     locations:
       title: locations
@@ -433,9 +433,11 @@ components:
       title: location
       type: object
       properties:
+        name:
+          type: string
         enabled:
           type: boolean
-      example: '{"enabled": true}'
+      example: '{"name": "www", "enabled": true}'
 
     rrsets:
       title: rrsets
@@ -449,19 +451,25 @@ components:
     rrset:
       title: rrset
       type: object
-      anyOf:
-        - $ref: '#/components/schemas/a'
-        - $ref: '#/components/schemas/aaaa'
-        - $ref: '#/components/schemas/cname'
-        - $ref: '#/components/schemas/txt'
-        - $ref: '#/components/schemas/ns'
-        - $ref: '#/components/schemas/mx'
-        - $ref: '#/components/schemas/srv'
-        - $ref: '#/components/schemas/caa'
-        - $ref: '#/components/schemas/ptr'
-        - $ref: '#/components/schemas/tlsa'
-        - $ref: '#/components/schemas/ds'
-        - $ref: '#/components/schemas/aname'
+      properties:
+        type:
+          $ref: '#/components/schemas/rtype'
+        value:
+          anyOf:
+            - $ref: '#/components/schemas/a'
+            - $ref: '#/components/schemas/aaaa'
+            - $ref: '#/components/schemas/cname'
+            - $ref: '#/components/schemas/txt'
+            - $ref: '#/components/schemas/ns'
+            - $ref: '#/components/schemas/mx'
+            - $ref: '#/components/schemas/srv'
+            - $ref: '#/components/schemas/caa'
+            - $ref: '#/components/schemas/ptr'
+            - $ref: '#/components/schemas/tlsa'
+            - $ref: '#/components/schemas/ds'
+            - $ref: '#/components/schemas/aname'
+        enabled:
+          type: boolean
 
     rtype:
       type: string

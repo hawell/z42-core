@@ -1,4 +1,4 @@
-package api
+package server
 
 import (
 	"github.com/gin-gonic/gin"
@@ -37,7 +37,7 @@ func GetZones(c *gin.Context) {
 	zones, err := db.GetZones(user, start, count, q)
 	if err != nil {
 		zap.L().Error("DataBase.GetZones()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, zones)
@@ -65,7 +65,7 @@ func AddZone(c *gin.Context) {
 	_, err := db.AddZone(user, z)
 	if err != nil {
 		zap.L().Error("DataBase.AddZone()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 
@@ -88,7 +88,7 @@ func GetZone(c *gin.Context) {
 	z, err := db.GetZone(zone)
 	if err != nil {
 		zap.L().Error("DataBase.GetZone()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 
@@ -122,7 +122,7 @@ func UpdateZone(c *gin.Context) {
 	_, err := db.UpdateZone(z)
 	if err != nil {
 		zap.L().Error("DataBase.UpdateZone()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -143,7 +143,7 @@ func DeleteZone(c *gin.Context) {
 	_, err := db.DeleteZone(zone)
 	if err != nil {
 		zap.L().Error("DataBase.DeleteZone()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -178,7 +178,7 @@ func GetLocations(c *gin.Context) {
 	locations, err := db.GetLocations(zone, start, count, q)
 	if err != nil {
 		zap.L().Error("DataBase.GetLocations()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, locations)
@@ -206,7 +206,7 @@ func AddLocation(c *gin.Context) {
 	_, err = db.AddLocation(zone, l)
 	if err != nil {
 		zap.L().Error("DataBase.AddLocation()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -232,7 +232,7 @@ func GetLocation(c *gin.Context) {
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.GetLocation()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, &l)
@@ -270,7 +270,7 @@ func UpdateLocation(c *gin.Context) {
 	_, err := db.UpdateLocation(zone, l)
 	if err != nil {
 		zap.L().Error("DataBase.UpdateLocation()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -296,7 +296,7 @@ func DeleteLocation(c *gin.Context) {
 	_, err := db.DeleteLocation(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.DeleteLocation()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -322,7 +322,7 @@ func GetRecordSets(c *gin.Context) {
 	rrsets, err := db.GetRecordSets(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.GetRecordSets()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, rrsets)
@@ -354,7 +354,7 @@ func AddRecordSet(c *gin.Context) {
 	_, err = db.AddRecordSet(zone, location, rr)
 	if err != nil {
 		zap.L().Error("DataBase.AddRecordSet()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -378,14 +378,14 @@ func GetRecordSet(c *gin.Context) {
 		return
 	}
 	rtype := c.Param("rtype")
-	if rtype == "" {
-		c.String(http.StatusBadRequest, "rtype missing")
+	if !rtypeValid(rtype) {
+		c.String(http.StatusBadRequest, "rtype invalid")
 		return
 	}
 	r, err := db.GetRecordSet(zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.GetRecordSet()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, &r)
@@ -408,8 +408,8 @@ func UpdateRecordSet(c *gin.Context) {
 		return
 	}
 	rtype := c.Param("rtype")
-	if rtype == "" {
-		c.String(http.StatusBadRequest, "rtype missing")
+	if !rtypeValid(rtype) {
+		c.String(http.StatusBadRequest, "invalid rtype")
 		return
 	}
 
@@ -427,7 +427,7 @@ func UpdateRecordSet(c *gin.Context) {
 	_, err := db.UpdateRecordSet(zone, location, r)
 	if err != nil {
 		zap.L().Error("DataBase.UpdateRecordSet()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -452,14 +452,14 @@ func DeleteRecordSet(c *gin.Context) {
 		return
 	}
 	rtype := c.Param("rtype")
-	if rtype == "" {
-		c.String(http.StatusBadRequest, "rtype missing")
+	if !rtypeValid(rtype) {
+		c.String(http.StatusBadRequest, "invalid rtype")
 		return
 	}
 	_, err := db.DeleteRecordSet(zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.DeleteRecordSet()", zap.Error(err))
-		c.String(http.StatusInternalServerError, "internal error")
+		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -476,4 +476,29 @@ func extractDataBase(c *gin.Context) *database.DataBase {
 
 func extractUser(c *gin.Context) string {
 	return c.Query("user")
+}
+
+func rtypeValid(rtype string) bool {
+	if rtype == "" {
+		return false
+	}
+	for _, t := range database.SupportedTypes {
+		if rtype == t {
+			return true
+		}
+	}
+	return false
+}
+
+func statusFromError(err error) (int, string) {
+	switch err {
+	case database.ErrInvalid:
+		return http.StatusForbidden, "invalid request"
+	case database.ErrDuplicateEntry:
+		return http.StatusConflict, "duplicate entry"
+	case database.ErrNotFound:
+		return http.StatusNotFound, "entry not found"
+	default:
+		return http.StatusInternalServerError, "internal error"
+	}
 }

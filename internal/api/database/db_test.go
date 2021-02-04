@@ -5,7 +5,10 @@ import (
 	"testing"
 )
 
-var connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
+var (
+	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
+	db *DataBase
+)
 
 func TestConnect(t *testing.T) {
 	RegisterTestingT(t)
@@ -17,9 +20,7 @@ func TestConnect(t *testing.T) {
 
 func TestUser(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 
 	// add
@@ -54,9 +55,7 @@ func TestUser(t *testing.T) {
 
 func  TestAddZone(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -86,9 +85,7 @@ func  TestAddZone(t *testing.T) {
 
 func TestGetZones(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -155,9 +152,7 @@ func TestGetZones(t *testing.T) {
 
 func TestGetZone(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -180,9 +175,7 @@ func TestGetZone(t *testing.T) {
 
 func TestUpdateZone(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -209,9 +202,7 @@ func TestUpdateZone(t *testing.T) {
 
 func TestDeleteZone(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -232,9 +223,7 @@ func TestDeleteZone(t *testing.T) {
 
 func TestAddLocation(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -262,9 +251,7 @@ func TestAddLocation(t *testing.T) {
 
 func TestGetLocations(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -332,9 +319,7 @@ func TestGetLocations(t *testing.T) {
 
 func TestGetLocation(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -360,9 +345,7 @@ func TestGetLocation(t *testing.T) {
 
 func TestUpdateLocation(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -391,9 +374,7 @@ func TestUpdateLocation(t *testing.T) {
 
 func TestDeleteLocation(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -420,9 +401,7 @@ func TestDeleteLocation(t *testing.T) {
 
 func TestAddRecordSet(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -482,9 +461,7 @@ func TestAddRecordSet(t *testing.T) {
 
 func TestGetRecordSets(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -518,9 +495,7 @@ func TestGetRecordSets(t *testing.T) {
 
 func TestGetRecordSet(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -557,9 +532,7 @@ func TestGetRecordSet(t *testing.T) {
 
 func TestUpdateRecordSet(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -599,9 +572,7 @@ func TestUpdateRecordSet(t *testing.T) {
 
 func TestDeleteRecordSet(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Name: "user1"})
 	Expect(err).To(BeNil())
@@ -632,9 +603,7 @@ func TestDeleteRecordSet(t *testing.T) {
 
 func TestCascadeDelete(t *testing.T) {
 	RegisterTestingT(t)
-	db, err := Connect(connectionStr)
-	Expect(err).To(BeNil())
-	err = db.Clear()
+	err := db.Clear()
 	Expect(err).To(BeNil())
 
 	_, err = db.AddUser(User{ Name: "admin"})
@@ -659,4 +628,10 @@ func TestCascadeDelete(t *testing.T) {
 	recordSets, err := db.GetRecordSets("example.com.", "www")
 	Expect(err).To(Equal(ErrInvalid))
 	Expect(len(recordSets)).To(Equal(0))
+}
+
+func TestMain(m *testing.M) {
+	db, _ = Connect(connectionStr)
+	m.Run()
+	_ = db.Close()
 }

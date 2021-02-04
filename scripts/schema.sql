@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS `z42`.`Location` (
                                                 `Zone_Id` INT NOT NULL,
                                                 PRIMARY KEY (`Id`),
                                                 INDEX `fk_Location_Zone1_idx` (`Zone_Id` ASC) VISIBLE,
-                                                UNIQUE INDEX `Name_UNIQUE` (`Name` ASC) VISIBLE,
+                                                UNIQUE INDEX `Location_Zone_Unique` (`Zone_Id` ASC, `Name` ASC) VISIBLE,
                                                 CONSTRAINT `fk_Location_Zone`
                                                     FOREIGN KEY (`Zone_Id`)
                                                         REFERENCES `z42`.`Zone` (`Id`)
