@@ -21,9 +21,10 @@ DROP TABLE IF EXISTS `z42`.`User` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`User` (
                                             `Id` INT NOT NULL AUTO_INCREMENT,
-                                            `Name` VARCHAR(45) NOT NULL,
+                                            `Email` VARCHAR(100) NOT NULL,
+                                            `Password` VARCHAR(600) NOT NULL,
                                             PRIMARY KEY (`Id`),
-                                            UNIQUE INDEX `Name_UNIQUE` (`Name` ASC) VISIBLE)
+                                            UNIQUE INDEX `Email_UNIQUE` (`Email` ASC) VISIBLE)
     ENGINE = InnoDB;
 
 

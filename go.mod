@@ -3,6 +3,7 @@ module github.com/hawell/z42
 go 1.15
 
 require (
+	github.com/appleboy/gin-jwt/v2 v2.6.4
 	github.com/coredns/coredns v1.8.0
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/gin-gonic/gin v1.6.3

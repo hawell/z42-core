@@ -35,7 +35,7 @@ func (db *DataBase) Clear() error {
 }
 
 func (db *DataBase) AddUser(u User) (int64, error) {
-	res, err := db.db.Exec("INSERT INTO User(Name) VALUES (?)", u.Name)
+	res, err := db.db.Exec("INSERT INTO User(Email, Password) VALUES (?, ?)", u.Email, u.Password)
 	if err != nil {
 		return 0, parseError(err)
 	}
@@ -43,14 +43,14 @@ func (db *DataBase) AddUser(u User) (int64, error) {
 }
 
 func (db *DataBase) GetUser(name string) (User, error) {
-	res := db.db.QueryRow("SELECT Id, Name FROM User WHERE Name = ?", name)
+	res := db.db.QueryRow("SELECT Id, Email, Password FROM User WHERE Email = ?", name)
 	var u User
-	err := res.Scan(&u.Id, &u.Name)
+	err := res.Scan(&u.Id, &u.Email, &u.Password)
 	return u, parseError(err)
 }
 
 func (db *DataBase) DeleteUser(name string) (int64, error) {
-	res, err := db.db.Exec("DELETE FROM User WHERE Name = ?", name)
+	res, err := db.db.Exec("DELETE FROM User WHERE Email = ?", name)
 	if err != nil {
 		return 0, parseError(err)
 	}

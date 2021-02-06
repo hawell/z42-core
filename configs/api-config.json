@@ -1,4 +1,6 @@
 {
   "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
-  "bind_address": "localhost:8080"
+  "server": {
+    "bind_address": "localhost:8080"
+  }
 }

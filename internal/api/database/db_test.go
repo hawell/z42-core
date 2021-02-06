@@ -24,20 +24,20 @@ func TestUser(t *testing.T) {
 	Expect(err).To(BeNil())
 
 	// add
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 
 	// get
 	u, err := db.GetUser("user1")
 	Expect(err).To(BeNil())
-	Expect(u.Name).To(Equal("user1"))
+	Expect(u.Email).To(Equal("user1"))
 
 	// get non-existing user
 	u, err = db.GetUser("user2")
 	Expect(err).To(Equal(ErrNotFound))
 
 	// duplicate
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(Equal(ErrDuplicateEntry))
 
 	// delete
@@ -57,7 +57,7 @@ func  TestAddZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 
 	// add zone for user
@@ -73,7 +73,7 @@ func  TestAddZone(t *testing.T) {
 	Expect(err).To(Equal(ErrDuplicateEntry))
 
 	// add zone for another user
-	_, err = db.AddUser(User{Name: "user2"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user2", Zone{Name: "example4.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -87,11 +87,11 @@ func TestGetZones(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user2"})
+	_, err = db.AddUser(User{Email: "user2", Password: "user2"})
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user3"})
+	_, err = db.AddUser(User{Email: "user3", Password: "user3"})
 	Expect(err).To(BeNil())
 
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
@@ -154,7 +154,7 @@ func TestGetZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: true, CNameFlattening: true, Enabled: true})
@@ -177,7 +177,7 @@ func TestUpdateZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: true, CNameFlattening: true, Enabled: true})
@@ -204,7 +204,7 @@ func TestDeleteZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: true, CNameFlattening: true, Enabled: true})
@@ -225,7 +225,7 @@ func TestAddLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -253,7 +253,7 @@ func TestGetLocations(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -321,7 +321,7 @@ func TestGetLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -347,7 +347,7 @@ func TestUpdateLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -376,7 +376,7 @@ func TestDeleteLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{Name: "example1.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -403,7 +403,7 @@ func TestAddRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -463,7 +463,7 @@ func TestGetRecordSets(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -497,7 +497,7 @@ func TestGetRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -534,7 +534,7 @@ func TestUpdateRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -574,7 +574,7 @@ func TestDeleteRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
-	_, err = db.AddUser(User{Name: "user1"})
+	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
@@ -606,7 +606,7 @@ func TestCascadeDelete(t *testing.T) {
 	err := db.Clear()
 	Expect(err).To(BeNil())
 
-	_, err = db.AddUser(User{ Name: "admin"})
+	_, err = db.AddUser(User{Email: "admin", Password: "admin"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("admin", Zone{Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())

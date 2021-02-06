@@ -7,8 +7,8 @@ ALTER TABLE Zone AUTO_INCREMENT = 1;
 ALTER TABLE Location AUTO_INCREMENT = 1;
 ALTER TABLE RecordSet AUTO_INCREMENT = 1;
 
-INSERT INTO User(Name) VALUES ('user1');
-SELECT Id INTO @user1 FROM User WHERE Name = 'user1';
+INSERT INTO User(Email, Password) VALUES ('user1', 'user1');
+SELECT Id INTO @user1 FROM User WHERE Email = 'user1';
 
 INSERT INTO Zone(Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES ('zone1.com.', false, false, true, @user1);
 SELECT Id INTO @zone1 FROM Zone WHERE Name = 'zone1.com.';

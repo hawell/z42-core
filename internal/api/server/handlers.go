@@ -475,7 +475,8 @@ func extractDataBase(c *gin.Context) *database.DataBase {
 }
 
 func extractUser(c *gin.Context) string {
-	return c.Query("user")
+	user, _ := c.Get(identityKey)
+	return user.(*database.User).Email
 }
 
 func rtypeValid(rtype string) bool {
