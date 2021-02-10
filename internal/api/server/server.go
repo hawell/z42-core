@@ -77,8 +77,7 @@ func NewServer(config *Config, db *database.DataBase) *Server {
 				return nil, jwt.ErrFailedAuthentication
 			}
 
-			zap.L().Error("", zap.String("login", password), zap.String("db", user.Password))
-			if user.Password != password {
+			if !database.CheckPasswordHash(password, user.Password) {
 				zap.L().Error("password mismatch")
 				return nil, jwt.ErrFailedAuthentication
 			}

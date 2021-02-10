@@ -35,7 +35,11 @@ func (db *DataBase) Clear() error {
 }
 
 func (db *DataBase) AddUser(u User) (int64, error) {
-	res, err := db.db.Exec("INSERT INTO User(Email, Password) VALUES (?, ?)", u.Email, u.Password)
+	hash, err := HashPassword(u.Password)
+	if err != nil {
+		return 0, err
+	}
+	res, err := db.db.Exec("INSERT INTO User(Email, Password) VALUES (?, ?)", u.Email, hash)
 	if err != nil {
 		return 0, parseError(err)
 	}
