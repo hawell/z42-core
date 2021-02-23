@@ -73,7 +73,7 @@ func  TestAddZone(t *testing.T) {
 	Expect(err).To(Equal(ErrDuplicateEntry))
 
 	// add zone for another user
-	_, err = db.AddUser(User{Email: "user1", Password: "user1"})
+	_, err = db.AddUser(User{Email: "user2", Password: "user2"})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone("user2", Zone{Name: "example4.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())

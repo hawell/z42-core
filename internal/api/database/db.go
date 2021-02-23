@@ -260,6 +260,9 @@ func (db *DataBase) DeleteLocation(zone string, location string) (int64, error) 
 }
 
 func (db *DataBase) AddRecordSet(zone string, location string, r RecordSet) (int64, error) {
+	if !rtypeValid(r.Type) {
+		return 0, ErrInvalid
+	}
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		if err == ErrNotFound {
@@ -300,6 +303,9 @@ func (db *DataBase) GetRecordSets(zone string, location string) ([]string, error
 }
 
 func (db *DataBase) GetRecordSet(zone string, location string, rtype string) (RecordSet, error) {
+	if !rtypeValid(rtype) {
+		return RecordSet{}, ErrInvalid
+	}
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		if err == ErrNotFound {
@@ -314,6 +320,9 @@ func (db *DataBase) GetRecordSet(zone string, location string, rtype string) (Re
 }
 
 func (db *DataBase) UpdateRecordSet(zone string, location string, r RecordSet) (int64, error) {
+	if !rtypeValid(r.Type) {
+		return 0, ErrInvalid
+	}
 	storedRecordSet, err := db.GetRecordSet(zone , location, r.Type)
 	if err != nil {
 		return 0, err
@@ -326,6 +335,9 @@ func (db *DataBase) UpdateRecordSet(zone string, location string, r RecordSet) (
 }
 
 func (db *DataBase) DeleteRecordSet(zone string, location string, rtype string) (int64, error) {
+	if !rtypeValid(rtype) {
+		return 0, ErrInvalid
+	}
 	storedRecordSet, err := db.GetRecordSet(zone , location, rtype)
 	if err != nil {
 		return 0, err
@@ -357,3 +369,16 @@ func parseError(err error) error {
 	}
 	return err
 }
+
+func rtypeValid(rtype string) bool {
+	if rtype == "" {
+		return false
+	}
+	for _, t := range SupportedTypes {
+		if rtype == t {
+			return true
+		}
+	}
+	return false
+}
+

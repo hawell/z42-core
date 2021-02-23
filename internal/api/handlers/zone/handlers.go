@@ -1,20 +1,64 @@
-package server
+package zone
 
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
+	"github.com/hawell/z42/internal/api/handlers"
 	"go.uber.org/zap"
 	"net/http"
 	"strconv"
 )
 
-func GetZones(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
+type storage interface {
+	AddZone(user string, z database.Zone) (int64, error)
+	GetZones(user string, start int, count int, q string) ([]string, error)
+	GetZone(zone string) (database.Zone, error)
+	UpdateZone(z database.Zone) (int64, error)
+	DeleteZone(zone string) (int64, error)
+	AddLocation(zone string, l database.Location) (int64, error)
+	GetLocations(zone string, start int, count int, q string) ([]string, error)
+	GetLocation(zone string, location string) (database.Location, error)
+	UpdateLocation(zone string, l database.Location) (int64, error)
+	DeleteLocation(zone string, location string) (int64, error)
+	AddRecordSet(zone string, location string, r database.RecordSet) (int64, error)
+	GetRecordSets(zone string, location string) ([]string, error)
+	GetRecordSet(zone string, location string, rtype string) (database.RecordSet, error)
+	UpdateRecordSet(zone string, location string, r database.RecordSet) (int64, error)
+	DeleteRecordSet(zone string, location string, rtype string) (int64, error)
+}
 
+type Handler struct {
+	db storage
+}
+
+func New(db storage) *Handler {
+	return &Handler{db: db}
+}
+
+func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
+	group.GET("", h.getZones)
+	group.POST("", h.addZone)
+
+	group.GET("/:zone", h.getZone)
+	group.PUT("/:zone", h.updateZone)
+	group.DELETE("/:zone", h.deleteZone)
+
+	group.GET("/:zone/locations", h.getLocations)
+	group.POST("/:zone/locations", h.addLocation)
+
+	group.GET("/:zone/locations/:location", h.getLocation)
+	group.PUT("/:zone/locations/:location", h.updateLocation)
+	group.DELETE("/:zone/locations/:location", h.deleteLocation)
+
+	group.GET("/:zone/locations/:location/rrsets", h.getRecordSets)
+	group.POST("/:zone/locations/:location/rrsets", h.addRecordSet)
+
+	group.GET("/:zone/locations/:location/rrsets/:rtype", h.getRecordSet)
+	group.PUT("/:zone/locations/:location/rrsets/:rtype", h.updateRecordSet)
+	group.DELETE("/:zone/locations/:location/rrsets/:rtype", h.deleteRecordSet)
+}
+
+func (h *Handler) getZones(c *gin.Context) {
 	user := extractUser(c)
 	if user == "" {
 		c.String(http.StatusBadRequest, "user missing")
@@ -34,22 +78,16 @@ func GetZones(c *gin.Context) {
 		return
 	}
 	q := c.DefaultQuery("q", "")
-	zones, err := db.GetZones(user, start, count, q)
+	zones, err := h.db.GetZones(user, start, count, q)
 	if err != nil {
-		zap.L().Error("DataBase.GetZones()", zap.Error(err))
+		zap.L().Error("DataBase.getZones()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, zones)
 }
 
-func AddZone(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) addZone(c *gin.Context) {
 	user := extractUser(c)
 	if user == "" {
 		c.String(http.StatusBadRequest, "user missing")
@@ -62,9 +100,9 @@ func AddZone(c *gin.Context) {
 		c.String(http.StatusBadRequest, "invalid input format")
 		return
 	}
-	_, err := db.AddZone(user, z)
+	_, err := h.db.AddZone(user, z)
 	if err != nil {
-		zap.L().Error("DataBase.AddZone()", zap.Error(err))
+		zap.L().Error("DataBase.addZone()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
@@ -72,22 +110,16 @@ func AddZone(c *gin.Context) {
 	c.String(http.StatusNoContent, "successful")
 }
 
-func GetZone(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) getZone(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
 		return
 	}
 
-	z, err := db.GetZone(zone)
+	z, err := h.db.GetZone(zone)
 	if err != nil {
-		zap.L().Error("DataBase.GetZone()", zap.Error(err))
+		zap.L().Error("DataBase.getZone()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
@@ -95,13 +127,7 @@ func GetZone(c *gin.Context) {
 	c.JSON(http.StatusOK, &z)
 }
 
-func UpdateZone(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) updateZone(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -119,43 +145,31 @@ func UpdateZone(c *gin.Context) {
 		return
 	}
 	z.Name = zone
-	_, err := db.UpdateZone(z)
+	_, err := h.db.UpdateZone(z)
 	if err != nil {
-		zap.L().Error("DataBase.UpdateZone()", zap.Error(err))
+		zap.L().Error("DataBase.updateZone()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
 }
 
-func DeleteZone(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) deleteZone(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
 		return
 	}
-	_, err := db.DeleteZone(zone)
+	_, err := h.db.DeleteZone(zone)
 	if err != nil {
-		zap.L().Error("DataBase.DeleteZone()", zap.Error(err))
+		zap.L().Error("DataBase.deleteZone()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
 }
 
-func GetLocations(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) getLocations(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -175,22 +189,16 @@ func GetLocations(c *gin.Context) {
 		return
 	}
 	q := c.DefaultQuery("q", "")
-	locations, err := db.GetLocations(zone, start, count, q)
+	locations, err := h.db.GetLocations(zone, start, count, q)
 	if err != nil {
-		zap.L().Error("DataBase.GetLocations()", zap.Error(err))
+		zap.L().Error("DataBase.getLocations()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, locations)
 }
 
-func AddLocation(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) addLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -203,22 +211,16 @@ func AddLocation(c *gin.Context) {
 		c.String(http.StatusBadRequest, "invalid input format")
 		return
 	}
-	_, err = db.AddLocation(zone, l)
+	_, err = h.db.AddLocation(zone, l)
 	if err != nil {
-		zap.L().Error("DataBase.AddLocation()", zap.Error(err))
+		zap.L().Error("DataBase.addLocation()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
 }
 
-func GetLocation(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) getLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -229,22 +231,16 @@ func GetLocation(c *gin.Context) {
 		c.String(http.StatusBadRequest, "location missing")
 		return
 	}
-	l, err := db.GetLocation(zone, location)
+	l, err := h.db.GetLocation(zone, location)
 	if err != nil {
-		zap.L().Error("DataBase.GetLocation()", zap.Error(err))
+		zap.L().Error("DataBase.getLocation()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, &l)
 }
 
-func UpdateLocation(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) updateLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -267,22 +263,16 @@ func UpdateLocation(c *gin.Context) {
 		return
 	}
 	l.Name = location
-	_, err := db.UpdateLocation(zone, l)
+	_, err := h.db.UpdateLocation(zone, l)
 	if err != nil {
-		zap.L().Error("DataBase.UpdateLocation()", zap.Error(err))
+		zap.L().Error("DataBase.updateLocation()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
 }
 
-func DeleteLocation(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) deleteLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -293,22 +283,16 @@ func DeleteLocation(c *gin.Context) {
 		c.String(http.StatusBadRequest, "location missing")
 		return
 	}
-	_, err := db.DeleteLocation(zone, location)
+	_, err := h.db.DeleteLocation(zone, location)
 	if err != nil {
-		zap.L().Error("DataBase.DeleteLocation()", zap.Error(err))
+		zap.L().Error("DataBase.deleteLocation()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
 }
 
-func GetRecordSets(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) getRecordSets(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -319,22 +303,16 @@ func GetRecordSets(c *gin.Context) {
 		c.String(http.StatusBadRequest, "location missing")
 		return
 	}
-	rrsets, err := db.GetRecordSets(zone, location)
+	rrsets, err := h.db.GetRecordSets(zone, location)
 	if err != nil {
-		zap.L().Error("DataBase.GetRecordSets()", zap.Error(err))
+		zap.L().Error("DataBase.getRecordSets()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, rrsets)
 }
 
-func AddRecordSet(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) addRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -351,22 +329,16 @@ func AddRecordSet(c *gin.Context) {
 		c.String(http.StatusBadRequest, "invalid input format")
 		return
 	}
-	_, err = db.AddRecordSet(zone, location, rr)
+	_, err = h.db.AddRecordSet(zone, location, rr)
 	if err != nil {
-		zap.L().Error("DataBase.AddRecordSet()", zap.Error(err))
+		zap.L().Error("DataBase.addRecordSet()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
 }
 
-func GetRecordSet(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) getRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -378,25 +350,16 @@ func GetRecordSet(c *gin.Context) {
 		return
 	}
 	rtype := c.Param("rtype")
-	if !rtypeValid(rtype) {
-		c.String(http.StatusBadRequest, "rtype invalid")
-		return
-	}
-	r, err := db.GetRecordSet(zone, location, rtype)
+	r, err := h.db.GetRecordSet(zone, location, rtype)
 	if err != nil {
-		zap.L().Error("DataBase.GetRecordSet()", zap.Error(err))
+		zap.L().Error("DataBase.getRecordSet()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, &r)
 }
 
-func UpdateRecordSet(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
+func (h *Handler) updateRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -408,11 +371,6 @@ func UpdateRecordSet(c *gin.Context) {
 		return
 	}
 	rtype := c.Param("rtype")
-	if !rtypeValid(rtype) {
-		c.String(http.StatusBadRequest, "invalid rtype")
-		return
-	}
-
 	var r database.RecordSet
 	if err := c.ShouldBindJSON(&r); err != nil {
 		zap.L().Error("cannot bind form-data to RecordSet", zap.Error(err))
@@ -424,9 +382,9 @@ func UpdateRecordSet(c *gin.Context) {
 		return
 	}
 	r.Type = rtype
-	_, err := db.UpdateRecordSet(zone, location, r)
+	_, err := h.db.UpdateRecordSet(zone, location, r)
 	if err != nil {
-		zap.L().Error("DataBase.UpdateRecordSet()", zap.Error(err))
+		zap.L().Error("DataBase.updateRecordSet()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
@@ -434,13 +392,7 @@ func UpdateRecordSet(c *gin.Context) {
 
 }
 
-func DeleteRecordSet(c *gin.Context) {
-	db := extractDataBase(c)
-	if db == nil {
-		c.String(http.StatusInternalServerError, "internal error")
-		return
-	}
-
+func (h *Handler) deleteRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
 		c.String(http.StatusBadRequest, "zone missing")
@@ -452,43 +404,18 @@ func DeleteRecordSet(c *gin.Context) {
 		return
 	}
 	rtype := c.Param("rtype")
-	if !rtypeValid(rtype) {
-		c.String(http.StatusBadRequest, "invalid rtype")
-		return
-	}
-	_, err := db.DeleteRecordSet(zone, location, rtype)
+	_, err := h.db.DeleteRecordSet(zone, location, rtype)
 	if err != nil {
-		zap.L().Error("DataBase.DeleteRecordSet()", zap.Error(err))
+		zap.L().Error("DataBase.deleteRecordSet()", zap.Error(err))
 		c.String(statusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
 }
 
-func extractDataBase(c *gin.Context) *database.DataBase {
-	db, ok := c.MustGet("database").(*database.DataBase)
-	if !ok {
-		zap.L().Error("no database connection")
-		return nil
-	}
-	return db
-}
-
 func extractUser(c *gin.Context) string {
-	user, _ := c.Get(identityKey)
+	user, _ := c.Get(handlers.IdentityKey)
 	return user.(*database.User).Email
-}
-
-func rtypeValid(rtype string) bool {
-	if rtype == "" {
-		return false
-	}
-	for _, t := range database.SupportedTypes {
-		if rtype == t {
-			return true
-		}
-	}
-	return false
 }
 
 func statusFromError(err error) (int, string) {

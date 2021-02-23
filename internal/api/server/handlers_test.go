@@ -398,7 +398,7 @@ func TestGetRecordSet(t *testing.T) {
 
 	// invalid record type
 	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www/rrsets/adsd", "")
-	Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// non-existing location
 	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www2/rrsets/a", "")
@@ -477,24 +477,40 @@ func TestDeleteRecordSet(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	db, _ = database.Connect(connectionStr)
+	var err error
+	db, err = database.Connect(connectionStr)
+	if err != nil {
+		panic(err)
+	}
 	s := NewServer(&serverConfig, db)
 	go func() {
 		_ = s.ListenAndServer()
 	}()
-	_ = db.Clear()
+	err = db.Clear()
+	if err != nil {
+		panic(err)
+	}
 	addUser("user1")
-	token, _ = login("user1", "user1")
+	token, err = login("user1", "user1")
+	if err != nil {
+		panic(err)
+	}
 	m.Run()
-	_ = s.Shutdown()
-	_ = db.Close()
+	err = s.Shutdown()
+	if err != nil {
+		panic(err)
+	}
+	err = db.Close()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func generateURL(path string) string {
 	return "http://" + serverConfig.BindAddress + path
 }
 func login(user string, password string) (string, error) {
-	url := generateURL("/login")
+	url := generateURL("/auth/login")
 	body := strings.NewReader(fmt.Sprintf(`{"email":"%s", "password": "%s"}`, user, password))
 	req, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
