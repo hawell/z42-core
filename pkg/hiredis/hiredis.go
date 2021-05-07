@@ -526,3 +526,76 @@ func (redis *Redis) Ping() error {
 	}
 	return nil
 }
+
+type StreamItem struct {
+	ID string
+	Key string
+	Value string
+}
+
+func (redis *Redis) XAdd(stream string, kv StreamItem) (string, error) {
+	conn := redis.pool.Get()
+	if conn == nil {
+		return "", noConnectionError
+	}
+	defer conn.Close()
+
+	if kv.ID == "" {
+		kv.ID = "*"
+	}
+	reply, err := conn.Do("XADD", redis.config.Prefix+stream+redis.config.Suffix, kv.ID, kv.Key, kv.Value)
+	if err != nil {
+		return "", err
+	}
+	val, err := redisCon.String(reply, nil)
+	if err != nil {
+		return "", err
+	}
+	return val, nil
+}
+
+func (redis *Redis) XRead(streamID string, lastID string) ([]StreamItem, error) {
+	conn := redis.pool.Get()
+	if conn == nil {
+		return nil, noConnectionError
+	}
+	defer conn.Close()
+
+	if lastID == "" {
+		lastID = "$"
+	}
+
+	reply, err := conn.Do("XREAD", "BLOCK", "0", "STREAMS", redis.config.Prefix+streamID+redis.config.Suffix, lastID)
+	if err != nil {
+		return nil, err
+	}
+	streams, err := redisCon.Values(reply, nil)
+	if err != nil {
+		return nil, err
+	}
+	stream, err := redisCon.Values(streams[0], nil)
+	if err != nil {
+		return nil, err
+	}
+	var res []StreamItem
+	values, err := redisCon.Values(stream[1], nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range values {
+		item, err := redisCon.Values(value, nil)
+		if err != nil {
+			return nil, err
+		}
+		id, err := redisCon.String(item[0], nil)
+		if err != nil {
+			return nil, err
+		}
+		kv, err := redisCon.Strings(item[1], nil)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, StreamItem{id, kv[0], kv[1]})
+	}
+	return res, nil
+}

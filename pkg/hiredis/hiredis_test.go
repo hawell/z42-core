@@ -252,3 +252,48 @@ func TestUnixSocket(t *testing.T) {
 	g.Expect(err).To(BeNil())
 	g.Expect(v).To(Equal("hello"))
 }
+
+func TestStream(t *testing.T) {
+	g := NewGomegaWithT(t)
+	cfg := Config{
+		Suffix:  "_redistest",
+		Prefix:  "redistest_",
+		Address: "redis:6379",
+		Net:     "tcp",
+		DB:      0,
+	}
+	r := NewRedis(&cfg)
+	err := r.Del("*")
+	g.Expect(err).To(BeNil())
+
+	streamName := "stream1"
+	items := []StreamItem{
+		{"", "key1", "value1"},
+		{"", "key2", "value2"},
+		{"", "key3", "value3"},
+		{"", "key4", "value4"},
+	}
+	go func() {
+		for i := range items {
+			_, err := r.XAdd(streamName, items[i])
+			g.Expect(err).To(BeNil())
+		}
+	}()
+
+	var (
+		res []StreamItem
+		lastID string = "0"
+	)
+	for i := 0; i < len(items); {
+		kv, err := r.XRead(streamName, lastID)
+		g.Expect(err).To(BeNil())
+		res = append(res, kv...)
+		i += len(kv)
+		lastID = kv[len(kv)-1].ID
+	}
+	g.Expect(len(res)).To(Equal(len(items)))
+	for i, item := range items {
+		g.Expect(res[i].Key).To(Equal(item.Key))
+		g.Expect(res[i].Value).To(Equal(item.Value))
+	}
+}
