@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/server"
+	"github.com/hawell/z42/pkg/hiredis"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -48,7 +49,9 @@ func main() {
 		panic(err)
 	}
 
-	s := server.NewServer(config.ServerConfig, db)
+	redis := hiredis.NewRedis(config.RedisConfig)
+
+	s := server.NewServer(config.ServerConfig, db, redis)
 	err = s.ListenAndServer()
 	fmt.Println(err)
 }

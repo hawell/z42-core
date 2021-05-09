@@ -194,6 +194,7 @@ func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestH
 				if rrsig == nil {
 					continue
 				}
+				// FIXME: should it be set[0].Header().Rrtype?
 				if tc.Qtype == dns.TypeDNSKEY {
 					err := rrsig.Verify(ksk.(*dns.DNSKEY), set)
 					g.Expect(err).To(BeNil())

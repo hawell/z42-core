@@ -5,7 +5,35 @@ import (
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
+	"math/rand"
+	"time"
 )
+
+var src = rand.NewSource(time.Now().UnixNano())
+const (
+	letterBytes   = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+)
+
+func randomString(n int) string {
+	b := make([]byte, n)
+	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
+	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	return string(b)
+}
 
 var (
 	ErrDuplicateEntry = errors.New("duplicate entry")
@@ -39,17 +67,57 @@ func (db *DataBase) AddUser(u User) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("INSERT INTO User(Email, Password) VALUES (?, ?)", u.Email, hash)
+	res, err := db.db.Exec("INSERT INTO User(Email, Password, Status) VALUES (?, ?, ?)", u.Email, hash, u.Status)
 	if err != nil {
 		return 0, parseError(err)
 	}
 	return res.LastInsertId()
 }
 
+func (db *DataBase) AddVerification(user string, verificationType string) (string, error) {
+	u, err := db.GetUser(user)
+	if err != nil {
+		if err == ErrNotFound {
+			return "", ErrInvalid
+		}
+		return "", err
+	}
+	code := randomString(50)
+	_, err = db.db.Exec("INSERT INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, verificationType, u.Id)
+	if err != nil {
+		return "", err
+	}
+	return code, nil
+}
+
+func (db *DataBase) Verify(code string) error {
+	res := db.db.QueryRow("select U.Id, V.Type from Verification V left join User U on U.Id = V.User_Id WHERE Code = ?", code)
+	var (
+		userId string
+		verificationType string
+	)
+	if err := res.Scan(&userId, &verificationType); err != nil {
+		return parseError(err)
+	}
+	switch verificationType {
+	case VerificationTypeSignup:
+		if _, err := db.db.Exec("UPDATE User SET Status = ? WHERE Id = ?", UserStatusActive, userId); err != nil {
+			return parseError(err)
+		}
+		if _, err := db.db.Exec("DELETE FROM Verification WHERE Code = ?", code); err != nil {
+			return parseError(err)
+	}
+	default:
+		return errors.New("unknown verification type")
+	}
+
+	return nil
+}
+
 func (db *DataBase) GetUser(name string) (User, error) {
-	res := db.db.QueryRow("SELECT Id, Email, Password FROM User WHERE Email = ?", name)
+	res := db.db.QueryRow("SELECT Id, Email, Password, Status FROM User WHERE Email = ?", name)
 	var u User
-	err := res.Scan(&u.Id, &u.Email, &u.Password)
+	err := res.Scan(&u.Id, &u.Email, &u.Password, &u.Status)
 	return u, parseError(err)
 }
 

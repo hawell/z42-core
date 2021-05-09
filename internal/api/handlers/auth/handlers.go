@@ -5,17 +5,23 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
+	"github.com/hawell/z42/pkg/hiredis"
 	"go.uber.org/zap"
+	"net/http"
 	"time"
 )
 
 type storage interface {
+	AddUser(u database.User) (int64, error)
 	GetUser(name string) (database.User, error)
+	AddVerification(user string, verificationType string) (string, error)
+	Verify(code string) error
 }
 
 type Handler struct {
 	jwtMiddleWare *jwt.GinJWTMiddleware
 	db storage
+	redis *hiredis.Redis
 }
 
 type loginCredentials struct {
@@ -27,9 +33,10 @@ const (
 	emailKey = "email"
 )
 
-func New(db storage) *Handler {
-	handler := Handler{
+func New(db storage, redis *hiredis.Redis) *Handler {
+	handler := &Handler{
 		db: db,
+		redis: redis,
 	}
 	jwtMiddleware, err := jwt.New(&jwt.GinJWTMiddleware{
 		Realm:       "z42 zone",
@@ -38,16 +45,21 @@ func New(db storage) *Handler {
 		MaxRefresh:  time.Hour,
 		IdentityKey: handlers.IdentityKey,
 		Authenticator: func(c *gin.Context) (interface{}, error) {
-			var loginVals loginCredentials
-			if err := c.ShouldBind(&loginVals); err != nil {
+			var loginValues loginCredentials
+			if err := c.ShouldBind(&loginValues); err != nil {
 				return "", jwt.ErrMissingLoginValues
 			}
-			email := loginVals.Email
-			password := loginVals.Password
+			email := loginValues.Email
+			password := loginValues.Password
 
 			user, err := handler.db.GetUser(email)
 			if err != nil {
 				zap.L().Error("user not found")
+				return nil, jwt.ErrFailedAuthentication
+			}
+
+			if user.Status != database.UserStatusActive {
+				zap.L().Error("user not active")
 				return nil, jwt.ErrFailedAuthentication
 			}
 
@@ -82,11 +94,13 @@ func New(db storage) *Handler {
 	if err != nil {
 		zap.L().Fatal("jwt error", zap.Error(err))
 	}
-
-	return &Handler{jwtMiddleWare: jwtMiddleware}
+	handler.jwtMiddleWare = jwtMiddleware
+	return handler
 }
 
 func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
+	group.POST("/signup", h.signup)
+	group.POST("/verify", h.verify)
 	group.POST("/login", h.jwtMiddleWare.LoginHandler)
 	group.POST("/logout", h.jwtMiddleWare.LogoutHandler)
 	group.GET("/refresh_token", h.MiddlewareFunc(), h.jwtMiddleWare.RefreshHandler)
@@ -96,3 +110,49 @@ func (h *Handler) MiddlewareFunc() gin.HandlerFunc {
 	return h.jwtMiddleWare.MiddlewareFunc()
 }
 
+func (h *Handler) signup(c *gin.Context) {
+	var u database.User
+	err := c.ShouldBindJSON(&u)
+	if err != nil {
+		c.String(http.StatusBadRequest, "invalid input format")
+		return
+	}
+	u.Status = database.UserStatusPending
+	_, err = h.db.AddUser(u)
+	if err != nil {
+		zap.L().Error("DataBase.addUser()", zap.Error(err))
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+	code, err := h.db.AddVerification(u.Email, database.VerificationTypeSignup)
+	if err != nil {
+		zap.L().Error("add verification code failed", zap.Error(err))
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+	// TODO : refactor to function
+	_, err = h.redis.XAdd("email_verification", hiredis.StreamItem{Key: u.Email, Value: code})
+	if err != nil {
+		zap.L().Error("send verification code failed", zap.Error(err))
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.String(http.StatusCreated, "successful")
+}
+
+func (h *Handler) verify(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.String(http.StatusBadRequest, "code missing")
+		return
+	}
+	err := h.db.Verify(code)
+	if err != nil {
+		zap.L().Error("verification failed", zap.Error(err))
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.String(http.StatusNoContent, "successful")
+}

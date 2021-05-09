@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
+	"github.com/hawell/z42/pkg/hiredis"
 	"go.uber.org/zap"
 	"net/http"
 	"strconv"
@@ -29,10 +30,14 @@ type storage interface {
 
 type Handler struct {
 	db storage
+	redis *hiredis.Redis
 }
 
-func New(db storage) *Handler {
-	return &Handler{db: db}
+func New(db storage, redis *hiredis.Redis) *Handler {
+	return &Handler{
+		db: db,
+		redis: redis,
+	}
 }
 
 func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {

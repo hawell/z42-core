@@ -6,6 +6,7 @@ import (
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers/auth"
 	"github.com/hawell/z42/internal/api/handlers/zone"
+	"github.com/hawell/z42/pkg/hiredis"
 	"net/http"
 	"time"
 )
@@ -22,7 +23,7 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(config *Config, db *database.DataBase) *Server {
+func NewServer(config *Config, db *database.DataBase, redis *hiredis.Redis) *Server {
 	router := gin.Default()
 
 	s := &http.Server{
@@ -34,12 +35,12 @@ func NewServer(config *Config, db *database.DataBase) *Server {
 	}
 
 	authGroup := router.Group("/auth")
-	authHandler := auth.New(db)
+	authHandler := auth.New(db, redis)
 	authHandler.RegisterHandlers(authGroup)
 
 	zoneGroup := router.Group("/zones")
 	zoneGroup.Use(authHandler.MiddlewareFunc())
-	zoneHandler := zone.New(db)
+	zoneHandler := zone.New(db, redis)
 	zoneHandler.RegisterHandlers(zoneGroup)
 
 	return &Server{

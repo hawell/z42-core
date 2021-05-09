@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/hawell/z42/internal/api/server"
+	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	"log"
 	"os"
@@ -10,6 +11,7 @@ import (
 type Config struct {
 	DBConnectionString string   `json:"db_connection_string"`
 	ServerConfig *server.Config `json:"server"`
+	RedisConfig *hiredis.Config `json:"redis"`
 }
 
 var apiDefaultConfig = &Config{
@@ -18,6 +20,23 @@ var apiDefaultConfig = &Config{
 		BindAddress:  "localhost:8080",
 		ReadTimeout:  10,
 		WriteTimeout: 10,
+	},
+	RedisConfig: &hiredis.Config{
+		Address:    "127.0.0.1:6379",
+		Net:        "tcp",
+		DB:         0,
+		Password:   "",
+		Prefix:     "z42_",
+		Suffix:     "_z42",
+		Connection: hiredis.ConnectionConfig{
+			MaxIdleConnections:   10,
+			MaxActiveConnections: 10,
+			ConnectTimeout:       500,
+			ReadTimeout:          500,
+			IdleKeepAlive:        30,
+			MaxKeepAlive:         0,
+			WaitForConnection:    false,
+		},
 	},
 }
 

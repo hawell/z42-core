@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/z42/internal/api/database"
+	"github.com/hawell/z42/pkg/hiredis"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"net/http"
@@ -18,8 +19,26 @@ var (
 		ReadTimeout:  10,
 		WriteTimeout: 10,
 	}
+	redisConfig = hiredis.Config{
+		Address:    "127.0.0.1:6379",
+		Net:        "tcp",
+		DB:         0,
+		Password:   "",
+		Prefix:     "test_",
+		Suffix:     "_test",
+		Connection: hiredis.ConnectionConfig{
+			MaxIdleConnections:   10,
+			MaxActiveConnections: 10,
+			ConnectTimeout:       500,
+			ReadTimeout:          500,
+			IdleKeepAlive:        30,
+			MaxKeepAlive:         0,
+			WaitForConnection:    false,
+		},
+	}
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
 	db *database.DataBase
+	redis *hiredis.Redis
 	token string
 	client http.Client
 )
@@ -476,13 +495,48 @@ func TestDeleteRecordSet(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 }
 
+func TestSignupAndVerify(t *testing.T) {
+	initialize(t)
+	redis.Del("email_verification")
+
+	// add new user
+	body := `{"email": "user1@example.com", "password": "password"}`
+	path := "/auth/signup"
+	resp := execRequest(http.MethodPost, path, body)
+	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+	// check new user status is pending
+	user, err := db.GetUser("user1@example.com")
+	Expect(err).To(BeNil())
+	Expect(user.Email).To(Equal("user1@example.com"))
+	Expect(user.Status).To(Equal(database.UserStatusPending))
+
+	// get verification code
+	item, err := redis.XRead("email_verification", "0")
+	Expect(err).To(BeNil())
+	Expect(len(item)).To(Equal(1))
+	code := item[0].Value
+
+	// verify user
+	path = "/auth/verify?code=" + code
+	resp = execRequest(http.MethodPost, path, "")
+	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+
+	// check user status is active
+	user, err = db.GetUser("user1@example.com")
+	Expect(err).To(BeNil())
+	Expect(user.Email).To(Equal("user1@example.com"))
+	Expect(user.Status).To(Equal(database.UserStatusActive))
+}
+
 func TestMain(m *testing.M) {
 	var err error
 	db, err = database.Connect(connectionStr)
 	if err != nil {
 		panic(err)
 	}
-	s := NewServer(&serverConfig, db)
+	redis = hiredis.NewRedis(&redisConfig)
+	s := NewServer(&serverConfig, db, redis)
 	go func() {
 		_ = s.ListenAndServer()
 	}()
@@ -509,6 +563,7 @@ func TestMain(m *testing.M) {
 func generateURL(path string) string {
 	return "http://" + serverConfig.BindAddress + path
 }
+
 func login(user string, password string) (string, error) {
 	url := generateURL("/auth/login")
 	body := strings.NewReader(fmt.Sprintf(`{"email":"%s", "password": "%s"}`, user, password))
@@ -548,7 +603,7 @@ func initialize(t *testing.T) {
 }
 
 func addUser(name string) {
-	_, err := db.AddUser(database.User{Email: name, Password: name})
+	_, err := db.AddUser(database.User{Email: name, Password: name, Status: database.UserStatusActive})
 	if err != nil {
 		panic(err)
 	}

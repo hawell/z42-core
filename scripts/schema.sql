@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS `z42`.`User` (
                                             `Id` INT NOT NULL AUTO_INCREMENT,
                                             `Email` VARCHAR(100) NOT NULL,
                                             `Password` VARCHAR(600) NOT NULL,
+                                            `Status` ENUM('active', 'disabled', 'pending') NOT NULL,
                                             PRIMARY KEY (`Id`),
                                             UNIQUE INDEX `Email_UNIQUE` (`Email` ASC) VISIBLE)
     ENGINE = InnoDB;
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS `z42`.`Location` (
                                                 `Enabled` TINYINT NOT NULL,
                                                 `Zone_Id` INT NOT NULL,
                                                 PRIMARY KEY (`Id`),
-                                                INDEX `fk_Location_Zone1_idx` (`Zone_Id` ASC) VISIBLE,
+                                                INDEX `fk_Location_Zone_idx` (`Zone_Id` ASC) VISIBLE,
                                                 UNIQUE INDEX `Location_Zone_Unique` (`Zone_Id` ASC, `Name` ASC) VISIBLE,
                                                 CONSTRAINT `fk_Location_Zone`
                                                     FOREIGN KEY (`Zone_Id`)
@@ -84,13 +85,33 @@ CREATE TABLE IF NOT EXISTS `z42`.`RecordSet` (
                                                  `Enabled` TINYINT NOT NULL,
                                                  `Location_Id` INT NOT NULL,
                                                  PRIMARY KEY (`Id`),
-                                                 INDEX `fk_RecordSet_Location1_idx` (`Location_Id` ASC) VISIBLE,
+                                                 INDEX `fk_RecordSet_Location_idx` (`Location_Id` ASC) VISIBLE,
                                                  UNIQUE INDEX `Type_Location_Unique` (`Type` ASC, `Location_Id` ASC) VISIBLE,
                                                  CONSTRAINT `fk_RecordSet_Location`
                                                      FOREIGN KEY (`Location_Id`)
                                                          REFERENCES `z42`.`Location` (`Id`)
                                                          ON DELETE CASCADE
                                                          ON UPDATE NO ACTION)
+    ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `z42`.`Verification`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `z42`.`Verification` ;
+
+CREATE TABLE IF NOT EXISTS `z42`.`Verification` (
+                                                    `Code` VARCHAR(100) NOT NULL,
+                                                    `Type` ENUM('signup') NULL,
+                                                    `User_Id` INT NOT NULL,
+                                                    PRIMARY KEY (`Code`),
+                                                    UNIQUE INDEX `Code_UNIQUE` (`Code` ASC) VISIBLE,
+                                                    INDEX `fk_Verification_User_idx` (`User_Id` ASC) VISIBLE,
+                                                    CONSTRAINT `fk_Verification_User1`
+                                                        FOREIGN KEY (`User_Id`)
+                                                            REFERENCES `z42`.`User` (`Id`)
+                                                            ON DELETE CASCADE
+                                                            ON UPDATE NO ACTION)
     ENGINE = InnoDB;
 
 
