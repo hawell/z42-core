@@ -86,7 +86,7 @@ func (h *Handler) getZones(c *gin.Context) {
 	zones, err := h.db.GetZones(user, start, count, q)
 	if err != nil {
 		zap.L().Error("DataBase.getZones()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, zones)
@@ -108,11 +108,11 @@ func (h *Handler) addZone(c *gin.Context) {
 	_, err := h.db.AddZone(user, z)
 	if err != nil {
 		zap.L().Error("DataBase.addZone()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 
-	c.String(http.StatusNoContent, "successful")
+	c.String(http.StatusCreated, "successful")
 }
 
 func (h *Handler) getZone(c *gin.Context) {
@@ -125,7 +125,7 @@ func (h *Handler) getZone(c *gin.Context) {
 	z, err := h.db.GetZone(zone)
 	if err != nil {
 		zap.L().Error("DataBase.getZone()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *Handler) updateZone(c *gin.Context) {
 	_, err := h.db.UpdateZone(z)
 	if err != nil {
 		zap.L().Error("DataBase.updateZone()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -168,7 +168,7 @@ func (h *Handler) deleteZone(c *gin.Context) {
 	_, err := h.db.DeleteZone(zone)
 	if err != nil {
 		zap.L().Error("DataBase.deleteZone()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -197,7 +197,7 @@ func (h *Handler) getLocations(c *gin.Context) {
 	locations, err := h.db.GetLocations(zone, start, count, q)
 	if err != nil {
 		zap.L().Error("DataBase.getLocations()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, locations)
@@ -219,10 +219,10 @@ func (h *Handler) addLocation(c *gin.Context) {
 	_, err = h.db.AddLocation(zone, l)
 	if err != nil {
 		zap.L().Error("DataBase.addLocation()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	c.String(http.StatusCreated, "successful")
 }
 
 func (h *Handler) getLocation(c *gin.Context) {
@@ -239,7 +239,7 @@ func (h *Handler) getLocation(c *gin.Context) {
 	l, err := h.db.GetLocation(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.getLocation()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, &l)
@@ -271,7 +271,7 @@ func (h *Handler) updateLocation(c *gin.Context) {
 	_, err := h.db.UpdateLocation(zone, l)
 	if err != nil {
 		zap.L().Error("DataBase.updateLocation()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -291,7 +291,7 @@ func (h *Handler) deleteLocation(c *gin.Context) {
 	_, err := h.db.DeleteLocation(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.deleteLocation()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -311,7 +311,7 @@ func (h *Handler) getRecordSets(c *gin.Context) {
 	rrsets, err := h.db.GetRecordSets(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSets()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, rrsets)
@@ -337,10 +337,10 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 	_, err = h.db.AddRecordSet(zone, location, rr)
 	if err != nil {
 		zap.L().Error("DataBase.addRecordSet()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	c.String(http.StatusCreated, "successful")
 }
 
 func (h *Handler) getRecordSet(c *gin.Context) {
@@ -358,7 +358,7 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 	r, err := h.db.GetRecordSet(zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSet()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.JSON(http.StatusOK, &r)
@@ -390,7 +390,7 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 	_, err := h.db.UpdateRecordSet(zone, location, r)
 	if err != nil {
 		zap.L().Error("DataBase.updateRecordSet()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -412,7 +412,7 @@ func (h *Handler) deleteRecordSet(c *gin.Context) {
 	_, err := h.db.DeleteRecordSet(zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.deleteRecordSet()", zap.Error(err))
-		c.String(statusFromError(err))
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	c.String(http.StatusNoContent, "successful")
@@ -421,17 +421,4 @@ func (h *Handler) deleteRecordSet(c *gin.Context) {
 func extractUser(c *gin.Context) string {
 	user, _ := c.Get(handlers.IdentityKey)
 	return user.(*database.User).Email
-}
-
-func statusFromError(err error) (int, string) {
-	switch err {
-	case database.ErrInvalid:
-		return http.StatusForbidden, "invalid request"
-	case database.ErrDuplicateEntry:
-		return http.StatusConflict, "duplicate entry"
-	case database.ErrNotFound:
-		return http.StatusNotFound, "entry not found"
-	default:
-		return http.StatusInternalServerError, "internal error"
-	}
 }

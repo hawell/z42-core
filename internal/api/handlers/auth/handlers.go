@@ -121,7 +121,7 @@ func (h *Handler) signup(c *gin.Context) {
 	_, err = h.db.AddUser(u)
 	if err != nil {
 		zap.L().Error("DataBase.addUser()", zap.Error(err))
-		c.String(http.StatusInternalServerError, err.Error())
+		c.String(handlers.StatusFromError(err))
 		return
 	}
 	code, err := h.db.AddVerification(u.Email, database.VerificationTypeSignup)

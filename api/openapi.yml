@@ -51,19 +51,14 @@ paths:
         description: 'new zone data'
         $ref: '#/components/requestBodies/zone'
       responses:
-        204:
-          $ref: '#/components/responses/204'
+        201:
+          $ref: '#/components/responses/201'
         400:
           $ref: '#/components/responses/400'
         401:
           $ref: '#/components/responses/401'
         409:
-          description: 'already exists'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/zone'
-
+          $ref: '#/components/responses/409'
 
   /zones/{zone}:
     parameters:
@@ -164,19 +159,14 @@ paths:
         description: 'new location data'
         $ref: '#/components/requestBodies/location'
       responses:
-        204:
-          $ref: '#/components/responses/204'
+        201:
+          $ref: '#/components/responses/201
         400:
           $ref: '#/components/responses/400'
         401:
           $ref: '#/components/responses/401'
         409:
-          description: 'already exists'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/location'
-
+          $ref: '#/components/responses/409'
 
   /zones/{zone}/locations/{location}:
     parameters:
@@ -266,18 +256,14 @@ paths:
         required: true
         $ref: '#/components/requestBodies/rrset'
       responses:
-        204:
-          $ref: '#/components/responses/204'
+        201:
+          $ref: '#/components/responses/201'
         400:
           $ref: '#/components/responses/400'
         401:
           $ref: '#/components/responses/401'
         409:
-          description: 'already exists'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/rrset'
+          $ref: '#/components/responses/409'
 
   /zones/{zone}/locations/{location}/rrsets/{rtype}:
     parameters:
@@ -338,6 +324,74 @@ paths:
         404:
           $ref: '#/components/responses/404'
 
+  /auth/signup:
+    post:
+      summary: 'create a new user'
+      requestBody:
+        required: true
+        description: 'new user data'
+        $ref: '#/components/requestBodies/user'
+      responses:
+        201:
+          $ref: '#/components/responses/201'
+        400:
+          $ref: '#/components/responses/400'
+        409:
+          $ref: '#/components/responses/409'
+
+  /auth/verify:
+    post:
+      summary: 'verify a request'
+      parameters:
+        - name: code
+          in: query
+          description: 'verification code'
+          required: true
+          schema:
+            type: string
+      responses:
+        204:
+          $ref: '#/components/responses/204'
+        400:
+          $ref: '#/components/responses/400'
+
+  /auth/login:
+    post:
+      summary: 'create a new user'
+      requestBody:
+        required: true
+        description: 'new user data'
+        $ref: '#/components/requestBodies/user'
+      responses:
+        200:
+          description: 'successful'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/auth'
+        401:
+          $ref: '#/components/responses/401'
+
+  /auth/logout:
+    post:
+      summary: 'logout user'
+      responses:
+        200:
+          $ref: '#/components/responses/200'
+
+  /auth/refresh_token:
+    get:
+      summary: 'refresh auth token'
+      responses:
+        200:
+          description: 'successful'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/auth'
+        401:
+          $ref: '#/components/responses/401'
+
 components:
   securitySchemes:
     app_id:
@@ -353,12 +407,14 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/zone'
+
     location:
       description: 'location'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/location'
+
     rrset:
       description: 'rrset'
       content:
@@ -367,6 +423,9 @@ components:
             $ref: '#/components/schemas/rrset'
 
   responses:
+    201:
+      description: 'successful'
+
     204:
       description: 'successful'
 
@@ -394,7 +453,37 @@ components:
             title: 'not found'
             type: string
 
+    409:
+      description: 'already exists'
+      content:
+        text/plain:
+          schema:
+            title: 'not found'
+            type: string
+
   schemas:
+    user:
+      title: user
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      example: '{"email":"user1@example.com", "password": "pwd123"}'
+
+    auth:
+      title: auth response
+      type: object
+      properties:
+        code:
+          type: integer
+        token:
+          type: string
+        expire:
+          type: string
+      example: '{"code": 200, "token":"abcdefg123", "expire":"2006-01-02T15:04:05Z07:00"}'
+
     zones:
       title: zones
       type: array
