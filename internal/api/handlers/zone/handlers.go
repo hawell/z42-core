@@ -1,6 +1,7 @@
 package zone
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
@@ -66,27 +67,27 @@ func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 func (h *Handler) getZones(c *gin.Context) {
 	user := extractUser(c)
 	if user == "" {
-		c.String(http.StatusBadRequest, "user missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
 	startStr := c.DefaultQuery("start", "0")
 	start, err := strconv.Atoi(startStr)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid parameter: start -> %s", startStr)
+		handlers.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("invalid parameter: start -> %s", startStr))
 		return
 	}
 	countStr := c.DefaultQuery("count", "100")
 	count, err := strconv.Atoi(countStr)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid parameter: count -> %s", countStr)
+		handlers.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("invalid parameter: count -> %s", countStr))
 		return
 	}
 	q := c.DefaultQuery("q", "")
 	zones, err := h.db.GetZones(user, start, count, q)
 	if err != nil {
 		zap.L().Error("DataBase.getZones()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	c.JSON(http.StatusOK, zones)
@@ -95,37 +96,37 @@ func (h *Handler) getZones(c *gin.Context) {
 func (h *Handler) addZone(c *gin.Context) {
 	user := extractUser(c)
 	if user == "" {
-		c.String(http.StatusBadRequest, "user missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
 	var z database.Zone
 	if err := c.ShouldBindJSON(&z); err != nil {
 		zap.L().Error("cannot bind form-data to Zone", zap.Error(err))
-		c.String(http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
 	_, err := h.db.AddZone(user, z)
 	if err != nil {
 		zap.L().Error("DataBase.addZone()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 
-	c.String(http.StatusCreated, "successful")
+	handlers.SuccessResponse(c, http.StatusCreated, "successful")
 }
 
 func (h *Handler) getZone(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 
 	z, err := h.db.GetZone(zone)
 	if err != nil {
 		zap.L().Error("DataBase.getZone()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 
@@ -135,69 +136,69 @@ func (h *Handler) getZone(c *gin.Context) {
 func (h *Handler) updateZone(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 
 	var z database.Zone
 	if err := c.ShouldBindJSON(&z); err != nil {
 		zap.L().Error("cannot bind form-data to Zone", zap.Error(err))
-		c.String(http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
 	if z.Name != "" && z.Name != zone {
-		c.String(http.StatusBadRequest, "zone mismatch")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone mismatch")
 		return
 	}
 	z.Name = zone
 	_, err := h.db.UpdateZone(z)
 	if err != nil {
 		zap.L().Error("DataBase.updateZone()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
 }
 
 func (h *Handler) deleteZone(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	_, err := h.db.DeleteZone(zone)
 	if err != nil {
 		zap.L().Error("DataBase.deleteZone()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
 }
 
 func (h *Handler) getLocations(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 
 	startStr := c.DefaultQuery("start", "0")
 	start, err := strconv.Atoi(startStr)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid parameter: start -> %s", startStr)
+		handlers.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("invalid parameter: start -> %s", startStr))
 		return
 	}
 	countStr := c.DefaultQuery("count", "100")
 	count, err := strconv.Atoi(countStr)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid parameter: count -> %s", countStr)
+		handlers.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("invalid parameter: count -> %s", countStr))
 		return
 	}
 	q := c.DefaultQuery("q", "")
 	locations, err := h.db.GetLocations(zone, start, count, q)
 	if err != nil {
 		zap.L().Error("DataBase.getLocations()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	c.JSON(http.StatusOK, locations)
@@ -206,40 +207,40 @@ func (h *Handler) getLocations(c *gin.Context) {
 func (h *Handler) addLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 
 	var l database.Location
 	err := c.ShouldBindJSON(&l)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
 	_, err = h.db.AddLocation(zone, l)
 	if err != nil {
 		zap.L().Error("DataBase.addLocation()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusCreated, "successful")
+	handlers.SuccessResponse(c, http.StatusCreated, "successful")
 }
 
 func (h *Handler) getLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 	l, err := h.db.GetLocation(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.getLocation()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	c.JSON(http.StatusOK, &l)
@@ -248,70 +249,70 @@ func (h *Handler) getLocation(c *gin.Context) {
 func (h *Handler) updateLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 
 	var l database.Location
 	if err := c.ShouldBindJSON(&l); err != nil {
 		zap.L().Error("cannot bind form-data to Location", zap.Error(err))
-		c.String(http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
 	if l.Name != "" && l.Name != location {
-		c.String(http.StatusBadRequest, "location mismatch")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location mismatch")
 		return
 	}
 	l.Name = location
 	_, err := h.db.UpdateLocation(zone, l)
 	if err != nil {
 		zap.L().Error("DataBase.updateLocation()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
 }
 
 func (h *Handler) deleteLocation(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 	_, err := h.db.DeleteLocation(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.deleteLocation()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
 }
 
 func (h *Handler) getRecordSets(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 	rrsets, err := h.db.GetRecordSets(zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSets()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	c.JSON(http.StatusOK, rrsets)
@@ -320,45 +321,45 @@ func (h *Handler) getRecordSets(c *gin.Context) {
 func (h *Handler) addRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 	var rr database.RecordSet
 	err := c.ShouldBindJSON(&rr)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
 	_, err = h.db.AddRecordSet(zone, location, rr)
 	if err != nil {
 		zap.L().Error("DataBase.addRecordSet()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusCreated, "successful")
+	handlers.SuccessResponse(c, http.StatusCreated, "successful")
 }
 
 func (h *Handler) getRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 	rtype := c.Param("rtype")
 	r, err := h.db.GetRecordSet(zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSet()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	c.JSON(http.StatusOK, &r)
@@ -367,55 +368,55 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 func (h *Handler) updateRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 	rtype := c.Param("rtype")
 	var r database.RecordSet
 	if err := c.ShouldBindJSON(&r); err != nil {
 		zap.L().Error("cannot bind form-data to RecordSet", zap.Error(err))
-		c.String(http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
 	if r.Type != "" && r.Type != rtype {
-		c.String(http.StatusBadRequest, "type mismatch")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "type mismatch")
 		return
 	}
 	r.Type = rtype
 	_, err := h.db.UpdateRecordSet(zone, location, r)
 	if err != nil {
 		zap.L().Error("DataBase.updateRecordSet()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
 
 }
 
 func (h *Handler) deleteRecordSet(c *gin.Context) {
 	zone := c.Param("zone")
 	if zone == "" {
-		c.String(http.StatusBadRequest, "zone missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 	location := c.Param("location")
 	if location == "" {
-		c.String(http.StatusBadRequest, "location missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
 	rtype := c.Param("rtype")
 	_, err := h.db.DeleteRecordSet(zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.deleteRecordSet()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.String(http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
 }
 
 func extractUser(c *gin.Context) string {

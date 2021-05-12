@@ -85,6 +85,26 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 				Email: claims[emailKey].(string),
 			}
 		},
+		LoginResponse: func(c *gin.Context, code int, token string, expire time.Time) {
+			c.JSON(http.StatusOK, gin.H{
+				"code":   http.StatusOK,
+				"token":  token,
+				"expire": expire.Format(time.RFC3339),
+			})
+		},
+		LogoutResponse: func(c *gin.Context, code int) {
+			handlers.SuccessResponse(c, code, "logout successful")
+		},
+		RefreshResponse: func(c *gin.Context, code int, token string, expire time.Time) {
+			c.JSON(http.StatusOK, gin.H{
+				"code":   http.StatusOK,
+				"token":  token,
+				"expire": expire.Format(time.RFC3339),
+			})
+		},
+		Unauthorized: func(c *gin.Context, code int, message string) {
+			handlers.ErrorResponse(c, code, message)
+		},
 		TokenLookup: "header: Authorization, query: token, cookie: jwt",
 		TokenHeadName: "Bearer",
 		SendCookie: true,
@@ -114,45 +134,45 @@ func (h *Handler) signup(c *gin.Context) {
 	var u database.User
 	err := c.ShouldBindJSON(&u)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
 	u.Status = database.UserStatusPending
 	_, err = h.db.AddUser(u)
 	if err != nil {
 		zap.L().Error("DataBase.addUser()", zap.Error(err))
-		c.String(handlers.StatusFromError(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	code, err := h.db.AddVerification(u.Email, database.VerificationTypeSignup)
 	if err != nil {
 		zap.L().Error("add verification code failed", zap.Error(err))
-		c.String(http.StatusInternalServerError, err.Error())
+		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	// TODO : refactor to function
 	_, err = h.redis.XAdd("email_verification", hiredis.StreamItem{Key: u.Email, Value: code})
 	if err != nil {
 		zap.L().Error("send verification code failed", zap.Error(err))
-		c.String(http.StatusInternalServerError, err.Error())
+		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.String(http.StatusCreated, "successful")
+	handlers.SuccessResponse(c, http.StatusCreated, "successful")
 }
 
 func (h *Handler) verify(c *gin.Context) {
 	code := c.Query("code")
 	if code == "" {
-		c.String(http.StatusBadRequest, "code missing")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "code missing")
 		return
 	}
 	err := h.db.Verify(code)
 	if err != nil {
 		zap.L().Error("verification failed", zap.Error(err))
-		c.String(http.StatusInternalServerError, err.Error())
+		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	c.String(http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
 }

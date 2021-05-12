@@ -1,4 +1,4 @@
-openapi: '3.0.6'
+openapi: '3.1.0'
 
 info:
   title: 'Zone42 API'
@@ -42,7 +42,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/zones'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
 
     post:
       summary: 'create a new zone'
@@ -52,13 +52,13 @@ paths:
         $ref: '#/components/requestBodies/zone'
       responses:
         201:
-          $ref: '#/components/responses/201'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         409:
-          $ref: '#/components/responses/409'
+          $ref: '#/components/responses/error_response'
 
   /zones/{zone}:
     parameters:
@@ -77,11 +77,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/zone'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
 
     put:
       summary: 'updated zone data'
@@ -91,24 +91,24 @@ paths:
         $ref: '#/components/requestBodies/zone'
       responses:
         204:
-          $ref: '#/components/responses/204'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
 
     delete:
       responses:
         204:
-          $ref: '#/components/responses/204'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
 
   /zones/{zone}/locations:
     parameters:
@@ -146,11 +146,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/locations'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
 
     post:
       summary: 'create a new location in zone'
@@ -160,13 +160,13 @@ paths:
         $ref: '#/components/requestBodies/location'
       responses:
         201:
-          $ref: '#/components/responses/201
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         409:
-          $ref: '#/components/responses/409'
+          $ref: '#/components/responses/error_response'
 
   /zones/{zone}/locations/{location}:
     parameters:
@@ -190,11 +190,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/location'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
     put:
       summary: 'update a location in zone'
       requestBody:
@@ -203,24 +203,24 @@ paths:
         $ref: '#/components/requestBodies/location'
       responses:
         204:
-          $ref: '#/components/responses/204'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
     delete:
       summary: 'remove a location from zone'
       responses:
         204:
-          $ref: '#/components/responses/204'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
 
   /zones/{zone}/locations/{location}/rrsets:
     parameters:
@@ -244,11 +244,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/rrsets'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
     post:
       summary: 'create a new rrset in location'
       requestBody:
@@ -257,13 +257,13 @@ paths:
         $ref: '#/components/requestBodies/rrset'
       responses:
         201:
-          $ref: '#/components/responses/201'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         409:
-          $ref: '#/components/responses/409'
+          $ref: '#/components/responses/error_response'
 
   /zones/{zone}/locations/{location}/rrsets/{rtype}:
     parameters:
@@ -292,11 +292,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/rrset'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
     put:
       summary: 'update a rrset in location'
       requestBody:
@@ -305,24 +305,24 @@ paths:
         $ref: '#/components/requestBodies/rrset'
       responses:
         204:
-          $ref: '#/components/responses/204'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
     delete:
       summary: 'remove a rrset from location'
       responses:
         204:
-          $ref: '#/components/responses/204'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
         404:
-          $ref: '#/components/responses/404'
+          $ref: '#/components/responses/error_response'
 
   /auth/signup:
     post:
@@ -333,11 +333,11 @@ paths:
         $ref: '#/components/requestBodies/user'
       responses:
         201:
-          $ref: '#/components/responses/201'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
         409:
-          $ref: '#/components/responses/409'
+          $ref: '#/components/responses/error_response'
 
   /auth/verify:
     post:
@@ -351,9 +351,9 @@ paths:
             type: string
       responses:
         204:
-          $ref: '#/components/responses/204'
+          $ref: '#/components/responses/success_response'
         400:
-          $ref: '#/components/responses/400'
+          $ref: '#/components/responses/error_response'
 
   /auth/login:
     post:
@@ -370,14 +370,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/auth'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
 
   /auth/logout:
     post:
       summary: 'logout user'
       responses:
         200:
-          $ref: '#/components/responses/200'
+          $ref: '#/components/responses/success_response'
 
   /auth/refresh_token:
     get:
@@ -390,7 +390,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/auth'
         401:
-          $ref: '#/components/responses/401'
+          $ref: '#/components/responses/error_response'
 
 components:
   securitySchemes:
@@ -423,43 +423,31 @@ components:
             $ref: '#/components/schemas/rrset'
 
   responses:
-    201:
-      description: 'successful'
-
-    204:
-      description: 'successful'
-
-    400:
-      description: 'bad request'
+    error_response:
+      description: 'error response'
       content:
-        text/plain:
+        application/json:
           schema:
-            title: 'bad request'
-            type: string
+            title: error response
+            type: object
+            properties:
+              code:
+                type: integer
+              message:
+                type: string
 
-    401:
-      description: 'not authorized'
+    success_response:
+      description: 'successful response'
       content:
-        text/plain:
+        application/json:
           schema:
-            title: 'not authorized'
-            type: string
-
-    404:
-      description: 'not found'
-      content:
-        text/plain:
-          schema:
-            title: 'not found'
-            type: string
-
-    409:
-      description: 'already exists'
-      content:
-        text/plain:
-          schema:
-            title: 'not found'
-            type: string
+            title: successful response
+            type: object
+            properties:
+              code:
+                type: integer
+              message:
+                type: string
 
   schemas:
     user:
