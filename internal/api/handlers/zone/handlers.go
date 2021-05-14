@@ -28,13 +28,13 @@ type storage interface {
 }
 
 type Handler struct {
-	db storage
+	db    storage
 	redis *hiredis.Redis
 }
 
 func New(db storage, redis *hiredis.Redis) *Handler {
 	return &Handler{
-		db: db,
+		db:    db,
 		redis: redis,
 	}
 }

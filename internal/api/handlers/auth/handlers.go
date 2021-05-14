@@ -20,8 +20,8 @@ type storage interface {
 
 type Handler struct {
 	jwtMiddleWare *jwt.GinJWTMiddleware
-	db storage
-	redis *hiredis.Redis
+	db            storage
+	redis         *hiredis.Redis
 }
 
 const (
@@ -30,7 +30,7 @@ const (
 
 func New(db storage, redis *hiredis.Redis) *Handler {
 	handler := &Handler{
-		db: db,
+		db:    db,
 		redis: redis,
 	}
 	jwtMiddleware, err := jwt.New(&jwt.GinJWTMiddleware{
@@ -68,7 +68,7 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 			if v, ok := data.(*handlers.IdentityData); ok {
 				return jwt.MapClaims{
 					handlers.IdentityKey: v.Id,
-					emailKey:    v.Email,
+					emailKey:             v.Email,
 				}
 			}
 			return jwt.MapClaims{}
@@ -76,7 +76,7 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 		IdentityHandler: func(c *gin.Context) interface{} {
 			claims := jwt.ExtractClaims(c)
 			return &handlers.IdentityData{
-				Id: int64(claims[handlers.IdentityKey].(float64)),
+				Id:    int64(claims[handlers.IdentityKey].(float64)),
 				Email: claims[emailKey].(string),
 			}
 		},
@@ -100,10 +100,10 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 		Unauthorized: func(c *gin.Context, code int, message string) {
 			handlers.ErrorResponse(c, code, message)
 		},
-		TokenLookup: "header: Authorization, query: token, cookie: jwt",
+		TokenLookup:   "header: Authorization, query: token, cookie: jwt",
 		TokenHeadName: "Bearer",
-		SendCookie: true,
-		TimeFunc: time.Now,
+		SendCookie:    true,
+		TimeFunc:      time.Now,
 	})
 
 	if err != nil {

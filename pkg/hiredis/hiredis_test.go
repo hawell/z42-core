@@ -281,7 +281,7 @@ func TestStream(t *testing.T) {
 	}()
 
 	var (
-		res []StreamItem
+		res    []StreamItem
 		lastID string = "0"
 	)
 	for i := 0; i < len(items); {

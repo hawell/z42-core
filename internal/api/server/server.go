@@ -12,14 +12,14 @@ import (
 )
 
 type Config struct {
-	BindAddress string `json:"bind_address,default:localhost:8080"`
-	ReadTimeout int `json:"read_timeout,default:10"`
-	WriteTimeout int `json:"write_timeout,default:10"`
+	BindAddress  string `json:"bind_address,default:localhost:8080"`
+	ReadTimeout  int    `json:"read_timeout,default:10"`
+	WriteTimeout int    `json:"write_timeout,default:10"`
 }
 
 type Server struct {
-	config *Config
-	router *gin.Engine
+	config     *Config
+	router     *gin.Engine
 	httpServer *http.Server
 }
 

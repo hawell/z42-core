@@ -7,7 +7,7 @@ import (
 
 var (
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
-	db *DataBase
+	db            *DataBase
 )
 
 func TestConnect(t *testing.T) {
@@ -54,7 +54,7 @@ func TestUser(t *testing.T) {
 	Expect(res).To(Equal(int64(0)))
 }
 
-func  TestAddZone(t *testing.T) {
+func TestAddZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear()
 	Expect(err).To(BeNil())
@@ -406,7 +406,7 @@ func TestAddRecordSet(t *testing.T) {
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Email: "user1", Password: "user1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
+	_, err = db.AddZone("user1", Zone{Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
 	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 	Expect(err).To(BeNil())
@@ -432,7 +432,7 @@ func TestAddRecordSet(t *testing.T) {
 	Expect(err).To(Equal(ErrInvalid))
 
 	// add recordset to location
-	rrs := [][]string {
+	rrs := [][]string{
 		{"a", `{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`},
 		{"aaaa", `{"ttl": 300, "records": [{"ip": "::1"}]}`},
 		{"aname", `{"location": "aname.example.com."}`},
@@ -466,7 +466,7 @@ func TestGetRecordSets(t *testing.T) {
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Email: "user1", Password: "user1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
+	_, err = db.AddZone("user1", Zone{Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
 	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 	Expect(err).To(BeNil())
@@ -500,7 +500,7 @@ func TestGetRecordSet(t *testing.T) {
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Email: "user1", Password: "user1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
+	_, err = db.AddZone("user1", Zone{Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
 	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 	Expect(err).To(BeNil())
@@ -537,7 +537,7 @@ func TestUpdateRecordSet(t *testing.T) {
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Email: "user1", Password: "user1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
+	_, err = db.AddZone("user1", Zone{Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
 	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 	Expect(err).To(BeNil())
@@ -577,7 +577,7 @@ func TestDeleteRecordSet(t *testing.T) {
 	Expect(err).To(BeNil())
 	_, err = db.AddUser(User{Email: "user1", Password: "user1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
-	_, err = db.AddZone("user1", Zone{ Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
+	_, err = db.AddZone("user1", Zone{Name: "example.com.", Dnssec: false, CNameFlattening: false, Enabled: true})
 	Expect(err).To(BeNil())
 	_, err = db.AddLocation("example.com.", Location{Name: "www", Enabled: true})
 	Expect(err).To(BeNil())

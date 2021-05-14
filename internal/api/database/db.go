@@ -10,6 +10,7 @@ import (
 )
 
 var src = rand.NewSource(time.Now().UnixNano())
+
 const (
 	letterBytes   = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits = 6                    // 6 bits to represent a letter index
@@ -37,8 +38,8 @@ func randomString(n int) string {
 
 var (
 	ErrDuplicateEntry = errors.New("duplicate entry")
-	ErrNotFound = errors.New("not found")
-	ErrInvalid = errors.New("invalid operation")
+	ErrNotFound       = errors.New("not found")
+	ErrInvalid        = errors.New("invalid operation")
 )
 
 type DataBase struct {
@@ -93,7 +94,7 @@ func (db *DataBase) AddVerification(user string, verificationType string) (strin
 func (db *DataBase) Verify(code string) error {
 	res := db.db.QueryRow("select U.Id, V.Type from Verification V left join User U on U.Id = V.User_Id WHERE Code = ?", code)
 	var (
-		userId string
+		userId           string
 		verificationType string
 	)
 	if err := res.Scan(&userId, &verificationType); err != nil {
@@ -106,7 +107,7 @@ func (db *DataBase) Verify(code string) error {
 		}
 		if _, err := db.db.Exec("DELETE FROM Verification WHERE Code = ?", code); err != nil {
 			return parseError(err)
-	}
+		}
 	default:
 		return errors.New("unknown verification type")
 	}
@@ -293,7 +294,7 @@ func (db *DataBase) locationExists(zone string, location string) (bool, error) {
 	res := db.db.QueryRow("select count(*) from Zone left join Location L on Zone.Id = L.Zone_Id where Zone.Name = ? and L.Name = ?", zone, location)
 	var count int64
 	err := res.Scan(&count)
-	return count>0, err
+	return count > 0, err
 }
 
 func (db *DataBase) UpdateLocation(zone string, l Location) (int64, error) {
@@ -391,7 +392,7 @@ func (db *DataBase) UpdateRecordSet(zone string, location string, r RecordSet) (
 	if !rtypeValid(r.Type) {
 		return 0, ErrInvalid
 	}
-	storedRecordSet, err := db.GetRecordSet(zone , location, r.Type)
+	storedRecordSet, err := db.GetRecordSet(zone, location, r.Type)
 	if err != nil {
 		return 0, err
 	}
@@ -406,7 +407,7 @@ func (db *DataBase) DeleteRecordSet(zone string, location string, rtype string) 
 	if !rtypeValid(rtype) {
 		return 0, ErrInvalid
 	}
-	storedRecordSet, err := db.GetRecordSet(zone , location, rtype)
+	storedRecordSet, err := db.GetRecordSet(zone, location, rtype)
 	if err != nil {
 		return 0, err
 	}
@@ -449,4 +450,3 @@ func rtypeValid(rtype string) bool {
 	}
 	return false
 }
-

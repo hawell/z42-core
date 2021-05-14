@@ -528,8 +528,8 @@ func (redis *Redis) Ping() error {
 }
 
 type StreamItem struct {
-	ID string
-	Key string
+	ID    string
+	Key   string
 	Value string
 }
 

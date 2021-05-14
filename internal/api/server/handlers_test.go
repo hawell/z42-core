@@ -20,12 +20,12 @@ var (
 		WriteTimeout: 10,
 	}
 	redisConfig = hiredis.Config{
-		Address:    "127.0.0.1:6379",
-		Net:        "tcp",
-		DB:         0,
-		Password:   "",
-		Prefix:     "test_",
-		Suffix:     "_test",
+		Address:  "127.0.0.1:6379",
+		Net:      "tcp",
+		DB:       0,
+		Password: "",
+		Prefix:   "test_",
+		Suffix:   "_test",
 		Connection: hiredis.ConnectionConfig{
 			MaxIdleConnections:   10,
 			MaxActiveConnections: 10,
@@ -37,10 +37,10 @@ var (
 		},
 	}
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
-	db *database.DataBase
-	redis *hiredis.Redis
-	token string
-	client http.Client
+	db            *database.DataBase
+	redis         *hiredis.Redis
+	token         string
+	client        http.Client
 )
 
 func TestAddZone(t *testing.T) {
@@ -636,7 +636,7 @@ func execRequest(method string, path string, body string) *http.Response {
 	req, err := http.NewRequest(method, url, reqBody)
 	Expect(err).To(BeNil())
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer " + token)
+	req.Header.Add("Authorization", "Bearer "+token)
 	resp, err := client.Do(req)
 	Expect(err).To(BeNil())
 	return resp
