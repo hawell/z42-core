@@ -24,11 +24,6 @@ type Handler struct {
 	redis *hiredis.Redis
 }
 
-type loginCredentials struct {
-	Email string `form:"email" json:"email" binding:"required"`
-	Password string `form:"password" json:"password" binding:"required"`
-}
-
 const (
 	emailKey = "email"
 )
@@ -67,10 +62,10 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 				zap.L().Error("password mismatch")
 				return nil, jwt.ErrFailedAuthentication
 			}
-			return &user, nil
+			return &handlers.IdentityData{Id: user.Id, Email: user.Email}, nil
 		},
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
-			if v, ok := data.(*database.User); ok {
+			if v, ok := data.(*handlers.IdentityData); ok {
 				return jwt.MapClaims{
 					handlers.IdentityKey: v.Id,
 					emailKey:    v.Email,
@@ -80,26 +75,26 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 		},
 		IdentityHandler: func(c *gin.Context) interface{} {
 			claims := jwt.ExtractClaims(c)
-			return &database.User{
+			return &handlers.IdentityData{
 				Id: int64(claims[handlers.IdentityKey].(float64)),
 				Email: claims[emailKey].(string),
 			}
 		},
 		LoginResponse: func(c *gin.Context, code int, token string, expire time.Time) {
-			c.JSON(http.StatusOK, gin.H{
-				"code":   http.StatusOK,
-				"token":  token,
-				"expire": expire.Format(time.RFC3339),
+			c.JSON(http.StatusOK, &authenticationToken{
+				Code:   http.StatusOK,
+				Token:  token,
+				Expire: expire.Format(time.RFC3339),
 			})
 		},
 		LogoutResponse: func(c *gin.Context, code int) {
 			handlers.SuccessResponse(c, code, "logout successful")
 		},
 		RefreshResponse: func(c *gin.Context, code int, token string, expire time.Time) {
-			c.JSON(http.StatusOK, gin.H{
-				"code":   http.StatusOK,
-				"token":  token,
-				"expire": expire.Format(time.RFC3339),
+			c.JSON(http.StatusOK, &authenticationToken{
+				Code:   http.StatusOK,
+				Token:  token,
+				Expire: expire.Format(time.RFC3339),
 			})
 		},
 		Unauthorized: func(c *gin.Context, code int, message string) {
@@ -131,14 +126,18 @@ func (h *Handler) MiddlewareFunc() gin.HandlerFunc {
 }
 
 func (h *Handler) signup(c *gin.Context) {
-	var u database.User
+	var u newUser
 	err := c.ShouldBindJSON(&u)
 	if err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
-	u.Status = database.UserStatusPending
-	_, err = h.db.AddUser(u)
+	model := database.User{
+		Email:    u.Email,
+		Password: u.Password,
+		Status:   database.UserStatusPending,
+	}
+	_, err = h.db.AddUser(model)
 	if err != nil {
 		zap.L().Error("DataBase.addUser()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -162,12 +161,13 @@ func (h *Handler) signup(c *gin.Context) {
 }
 
 func (h *Handler) verify(c *gin.Context) {
-	code := c.Query("code")
-	if code == "" {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "code missing")
+	var v verification
+	err := c.ShouldBindQuery(&v)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid code")
 		return
 	}
-	err := h.db.Verify(code)
+	err = h.db.Verify(v.Code)
 	if err != nil {
 		zap.L().Error("verification failed", zap.Error(err))
 		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())

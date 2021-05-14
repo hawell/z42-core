@@ -1,10 +1,10 @@
 package database
 
 type User struct {
-	Id int64 `json:"-"`
-	Email string `json:"email"`
-	Password string `json:"password"`
-	Status string `json:"-"`
+	Id int64
+	Email string
+	Password string
+	Status string
 }
 
 const (
@@ -13,34 +13,29 @@ const (
 	UserStatusPending = "pending"
 )
 
-type Verification struct {
-	Code string `json:"code"`
-	Type string `json:"type"`
-}
-
 const (
 	VerificationTypeSignup = "signup"
 )
 
 type Zone struct {
-	Id int64 `json:"-"`
-	Name string `json:"name"`
-	Enabled bool `json:"enabled"`
-	Dnssec bool `json:"dnssec"`
-	CNameFlattening bool `json:"cname_flattening"`
+	Id int64
+	Name string
+	Enabled bool
+	Dnssec bool
+	CNameFlattening bool
 }
 
 type Location struct {
-	Id int64 `json:"-"`
-	Name string `json:"name"`
-	Enabled bool `json:"enabled"`
+	Id int64
+	Name string
+	Enabled bool
 }
 
 type RecordSet struct {
-	Id int64 `json:"-"`
-	Type string `json:"type"`
-	Value string `json:"value"`
-	Enabled bool `json:"enabled"`
+	Id int64
+	Type string
+	Value string
+	Enabled bool
 }
 
 var SupportedTypes = []string{"a", "aaaa", "cname", "txt", "ns", "mx", "srv", "caa", "ptr", "tlsa", "ds", "aname"}

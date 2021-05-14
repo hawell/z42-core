@@ -8,6 +8,11 @@ import (
 
 const IdentityKey = "identity"
 
+type IdentityData struct {
+    Id int64
+    Email string
+}
+
 func StatusFromError(c *gin.Context, err error) (*gin.Context, int, string) {
     switch err {
     case database.ErrInvalid:
