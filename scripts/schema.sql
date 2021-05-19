@@ -20,7 +20,7 @@ USE `z42` ;
 DROP TABLE IF EXISTS `z42`.`User` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`User` (
-                                            `Id` INT NOT NULL AUTO_INCREMENT,
+                                            `Id` CHAR(36) NOT NULL,
                                             `Email` VARCHAR(100) NOT NULL,
                                             `Password` VARCHAR(600) NOT NULL,
                                             `Status` ENUM('active', 'disabled', 'pending') NOT NULL,
@@ -35,15 +35,15 @@ CREATE TABLE IF NOT EXISTS `z42`.`User` (
 DROP TABLE IF EXISTS `z42`.`Zone` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`Zone` (
-                                            `Id` INT NOT NULL AUTO_INCREMENT,
+                                            `Id` CHAR(36) NOT NULL,
                                             `Name` VARCHAR(45) NOT NULL,
                                             `CNameFlattening` TINYINT NOT NULL,
                                             `Dnssec` TINYINT NOT NULL,
                                             `Enabled` TINYINT NOT NULL,
-                                            `User_Id` INT NOT NULL,
+                                            `User_Id` CHAR(36) NOT NULL,
                                             PRIMARY KEY (`Id`),
-                                            INDEX `fk_Zone_User_idx` (`User_Id` ASC) VISIBLE,
                                             UNIQUE INDEX `Name_UNIQUE` (`Name` ASC) VISIBLE,
+                                            INDEX `fk_Zone_User_idx` (`User_Id` ASC) VISIBLE,
                                             CONSTRAINT `fk_Zone_User`
                                                 FOREIGN KEY (`User_Id`)
                                                     REFERENCES `z42`.`User` (`Id`)
@@ -58,13 +58,13 @@ CREATE TABLE IF NOT EXISTS `z42`.`Zone` (
 DROP TABLE IF EXISTS `z42`.`Location` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`Location` (
-                                                `Id` INT NOT NULL AUTO_INCREMENT,
+                                                `Id` CHAR(36) NOT NULL,
                                                 `Name` VARCHAR(45) NOT NULL,
                                                 `Enabled` TINYINT NOT NULL,
-                                                `Zone_Id` INT NOT NULL,
+                                                `Zone_Id` CHAR(36) NOT NULL,
                                                 PRIMARY KEY (`Id`),
                                                 INDEX `fk_Location_Zone_idx` (`Zone_Id` ASC) VISIBLE,
-                                                UNIQUE INDEX `Location_Zone_Unique` (`Zone_Id` ASC, `Name` ASC) VISIBLE,
+                                                UNIQUE INDEX `Zone_Location_UNIQUE` (`Zone_Id` ASC, `Name` ASC) VISIBLE,
                                                 CONSTRAINT `fk_Location_Zone`
                                                     FOREIGN KEY (`Zone_Id`)
                                                         REFERENCES `z42`.`Zone` (`Id`)
@@ -79,14 +79,14 @@ CREATE TABLE IF NOT EXISTS `z42`.`Location` (
 DROP TABLE IF EXISTS `z42`.`RecordSet` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`RecordSet` (
-                                                 `Id` INT NOT NULL AUTO_INCREMENT,
+                                                 `Id` CHAR(36) NOT NULL,
                                                  `Type` ENUM('a', 'aaaa', 'cname', 'txt', 'ns', 'mx', 'srv', 'caa', 'ptr', 'tlsa', 'ds', 'aname') NOT NULL,
                                                  `Value` JSON NULL,
                                                  `Enabled` TINYINT NOT NULL,
-                                                 `Location_Id` INT NOT NULL,
+                                                 `Location_Id` CHAR(36) NOT NULL,
                                                  PRIMARY KEY (`Id`),
+                                                 UNIQUE INDEX `Location_Type_UNIQUE` (`Type` ASC, `Location_Id` ASC) VISIBLE,
                                                  INDEX `fk_RecordSet_Location_idx` (`Location_Id` ASC) VISIBLE,
-                                                 UNIQUE INDEX `Type_Location_Unique` (`Type` ASC, `Location_Id` ASC) VISIBLE,
                                                  CONSTRAINT `fk_RecordSet_Location`
                                                      FOREIGN KEY (`Location_Id`)
                                                          REFERENCES `z42`.`Location` (`Id`)
@@ -103,11 +103,10 @@ DROP TABLE IF EXISTS `z42`.`Verification` ;
 CREATE TABLE IF NOT EXISTS `z42`.`Verification` (
                                                     `Code` VARCHAR(100) NOT NULL,
                                                     `Type` ENUM('signup') NULL,
-                                                    `User_Id` INT NOT NULL,
-                                                    PRIMARY KEY (`Code`),
+                                                    `User_Id` CHAR(36) NOT NULL,
                                                     UNIQUE INDEX `Code_UNIQUE` (`Code` ASC) VISIBLE,
                                                     INDEX `fk_Verification_User_idx` (`User_Id` ASC) VISIBLE,
-                                                    CONSTRAINT `fk_Verification_User1`
+                                                    CONSTRAINT `fk_Verification_User`
                                                         FOREIGN KEY (`User_Id`)
                                                             REFERENCES `z42`.`User` (`Id`)
                                                             ON DELETE CASCADE

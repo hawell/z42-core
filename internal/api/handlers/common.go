@@ -9,7 +9,7 @@ import (
 const IdentityKey = "identity"
 
 type IdentityData struct {
-	Id    int64
+	Id    database.ObjectId
 	Email string
 }
 

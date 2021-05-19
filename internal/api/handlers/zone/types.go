@@ -1,56 +1,58 @@
 package zone
 
-type listRequest struct {
+type ListRequest struct {
 	Start int    `form:"start,default=0"`
 	Count int    `form:"count,default=100"`
 	Q     string `form:"q,default="`
 }
 
-type newZoneRequest struct {
+type ListResponse []string
+
+type NewZoneRequest struct {
 	Name            string `json:"name" binding:"required"`
 	Enabled         bool   `json:"enabled,default:true"`
 	Dnssec          bool   `json:"dnssec,default:false"`
 	CNameFlattening bool   `json:"cname_flattening,default:false"`
 }
 
-type getZoneResponse struct {
+type GetZoneResponse struct {
 	Name            string `json:"name"`
 	Enabled         bool   `json:"enabled"`
 	Dnssec          bool   `json:"dnssec"`
 	CNameFlattening bool   `json:"cname_flattening"`
 }
 
-type updateZoneRequest struct {
+type UpdateZoneRequest struct {
 	Enabled         bool `json:"enabled,default:true"`
 	Dnssec          bool `json:"dnssec,default:false"`
 	CNameFlattening bool `json:"cname_flattening,default:false"`
 }
 
-type newLocationRequest struct {
+type NewLocationRequest struct {
 	Name    string `json:"name" binding:"required"`
 	Enabled bool   `json:"enabled,default:true"`
 }
 
-type getLocationResponse struct {
+type GetLocationResponse struct {
 	Enabled bool `json:"enabled"`
 }
 
-type updateLocationRequest struct {
+type UpdateLocationRequest struct {
 	Enabled bool `json:"enabled,default=true"`
 }
 
-type newRecordSetRequest struct {
+type NewRecordSetRequest struct {
 	Type    string `json:"type" binding:"required"`
 	Value   string `json:"value" binding:"required"`
 	Enabled bool   `json:"enabled,default=true"`
 }
 
-type getRecordSetResponse struct {
-	Value   string `json:"type"`
+type GetRecordSetResponse struct {
+	Value   string `json:"value"`
 	Enabled bool   `json:"enabled"`
 }
 
-type updateRecordSetRequest struct {
-	Value   string `json:"type" binding:"required"`
+type UpdateRecordSetRequest struct {
+	Value   string `json:"value" binding:"required"`
 	Enabled bool   `json:"enabled,,default=true"`
 }

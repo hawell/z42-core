@@ -63,20 +63,21 @@ func (db *DataBase) Clear() error {
 	return err
 }
 
-func (db *DataBase) AddUser(u User) (int64, error) {
+func (db *DataBase) AddUser(u User) (ObjectId, error) {
 	hash, err := HashPassword(u.Password)
 	if err != nil {
-		return 0, err
+		return emptyObjectId, err
 	}
-	res, err := db.db.Exec("INSERT INTO User(Email, Password, Status) VALUES (?, ?, ?)", u.Email, hash, u.Status)
+	id := NewObjectId()
+	_, err = db.db.Exec("INSERT INTO User(Id, Email, Password, Status) VALUES (?, ?, ?, ?)", id, u.Email, hash, u.Status)
 	if err != nil {
-		return 0, parseError(err)
+		return emptyObjectId, parseError(err)
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
-func (db *DataBase) AddVerification(user string, verificationType string) (string, error) {
-	u, err := db.GetUser(user)
+func (db *DataBase) AddVerification(name string, verificationType string) (string, error) {
+	u, err := db.GetUser(name)
 	if err != nil {
 		if err == ErrNotFound {
 			return "", ErrInvalid
@@ -94,7 +95,7 @@ func (db *DataBase) AddVerification(user string, verificationType string) (strin
 func (db *DataBase) Verify(code string) error {
 	res := db.db.QueryRow("select U.Id, V.Type from Verification V left join User U on U.Id = V.User_Id WHERE Code = ?", code)
 	var (
-		userId           string
+		userId           ObjectId
 		verificationType string
 	)
 	if err := res.Scan(&userId, &verificationType); err != nil {
@@ -137,42 +138,43 @@ func (db *DataBase) DeleteUser(name string) (int64, error) {
 	return rows, err
 }
 
-func (db *DataBase) getZoneOwner(zone string) (int64, error) {
+func (db *DataBase) getZoneOwner(zone string) (ObjectId, error) {
 	res := db.db.QueryRow("SELECT User_Id FROM Zone WHERE Name = ?", zone)
-	var userId int64
+	var userId ObjectId
 	err := res.Scan(&userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
+			return emptyObjectId, nil
 		}
-		return -1, err
+		return emptyObjectId, err
 	}
 	return userId, nil
 }
 
-func (db *DataBase) AddZone(user string, z Zone) (int64, error) {
+func (db *DataBase) AddZone(user string, z Zone) (ObjectId, error) {
 	u, err := db.GetUser(user)
 	if err != nil {
 		if err == ErrNotFound {
-			return 0, ErrInvalid
+			return emptyObjectId, ErrInvalid
 		}
-		return 0, err
+		return emptyObjectId, err
 	}
 	owner, err := db.getZoneOwner(z.Name)
 	if err != nil {
-		return 0, err
+		return emptyObjectId, err
 	}
-	if owner == 0 {
-		res, err := db.db.Exec("INSERT INTO Zone(Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?)", z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, u.Id)
+	if owner == emptyObjectId {
+		id := NewObjectId()
+		_, err := db.db.Exec("INSERT INTO Zone(Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", id, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, u.Id)
 		if err != nil {
-			return 0, parseError(err)
+			return emptyObjectId, parseError(err)
 		}
-		return res.LastInsertId()
+		return id, nil
 	}
 	if owner == u.Id {
-		return 0, ErrDuplicateEntry
+		return emptyObjectId, ErrDuplicateEntry
 	}
-	return 0, ErrInvalid
+	return emptyObjectId, ErrInvalid
 }
 
 func (db *DataBase) GetZones(user string, start int, count int, q string) ([]string, error) {
@@ -235,19 +237,20 @@ func (db *DataBase) DeleteZone(zone string) (int64, error) {
 	return rows, err
 }
 
-func (db *DataBase) AddLocation(zone string, l Location) (int64, error) {
+func (db *DataBase) AddLocation(zone string, l Location) (ObjectId, error) {
 	z, err := db.GetZone(zone)
 	if err != nil {
 		if err == ErrNotFound {
-			return 0, ErrInvalid
+			return emptyObjectId, ErrInvalid
 		}
-		return 0, err
+		return emptyObjectId, err
 	}
-	res, err := db.db.Exec("INSERT INTO Location(Name, Enabled, Zone_Id) VALUES (?, ?, ?)", l.Name, l.Enabled, z.Id)
+	id := NewObjectId()
+	_, err = db.db.Exec("INSERT INTO Location(Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", id, l.Name, l.Enabled, z.Id)
 	if err != nil {
-		return 0, parseError(err)
+		return emptyObjectId, parseError(err)
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 func (db *DataBase) GetLocations(zone string, start int, count int, q string) ([]string, error) {
@@ -328,22 +331,23 @@ func (db *DataBase) DeleteLocation(zone string, location string) (int64, error) 
 	return rows, err
 }
 
-func (db *DataBase) AddRecordSet(zone string, location string, r RecordSet) (int64, error) {
+func (db *DataBase) AddRecordSet(zone string, location string, r RecordSet) (ObjectId, error) {
 	if !rtypeValid(r.Type) {
-		return 0, ErrInvalid
+		return emptyObjectId, ErrInvalid
 	}
 	l, err := db.GetLocation(zone, location)
 	if err != nil {
 		if err == ErrNotFound {
-			return 0, ErrInvalid
+			return emptyObjectId, ErrInvalid
 		}
-		return 0, err
+		return emptyObjectId, err
 	}
-	res, err := db.db.Exec("INSERT INTO RecordSet(Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?)", l.Id, r.Type, r.Value, r.Enabled)
+	id := NewObjectId()
+	_, err = db.db.Exec("INSERT INTO RecordSet(Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", id, l.Id, r.Type, r.Value, r.Enabled)
 	if err != nil {
-		return 0, parseError(err)
+		return emptyObjectId, parseError(err)
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 func (db *DataBase) GetRecordSets(zone string, location string) ([]string, error) {

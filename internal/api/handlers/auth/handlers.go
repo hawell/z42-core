@@ -12,7 +12,7 @@ import (
 )
 
 type storage interface {
-	AddUser(u database.User) (int64, error)
+	AddUser(u database.User) (database.ObjectId, error)
 	GetUser(name string) (database.User, error)
 	AddVerification(user string, verificationType string) (string, error)
 	Verify(code string) error
@@ -76,7 +76,7 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 		IdentityHandler: func(c *gin.Context) interface{} {
 			claims := jwt.ExtractClaims(c)
 			return &handlers.IdentityData{
-				Id:    int64(claims[handlers.IdentityKey].(float64)),
+				Id:    database.ObjectId(claims[handlers.IdentityKey].(string)),
 				Email: claims[emailKey].(string),
 			}
 		},
@@ -126,7 +126,7 @@ func (h *Handler) MiddlewareFunc() gin.HandlerFunc {
 }
 
 func (h *Handler) signup(c *gin.Context) {
-	var u newUser
+	var u NewUser
 	err := c.ShouldBindJSON(&u)
 	if err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")

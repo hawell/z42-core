@@ -10,17 +10,17 @@ import (
 )
 
 type storage interface {
-	AddZone(user string, z database.Zone) (int64, error)
+	AddZone(user string, z database.Zone) (database.ObjectId, error)
 	GetZones(user string, start int, count int, q string) ([]string, error)
 	GetZone(zone string) (database.Zone, error)
 	UpdateZone(z database.Zone) (int64, error)
 	DeleteZone(zone string) (int64, error)
-	AddLocation(zone string, l database.Location) (int64, error)
+	AddLocation(zone string, l database.Location) (database.ObjectId, error)
 	GetLocations(zone string, start int, count int, q string) ([]string, error)
 	GetLocation(zone string, location string) (database.Location, error)
 	UpdateLocation(zone string, l database.Location) (int64, error)
 	DeleteLocation(zone string, location string) (int64, error)
-	AddRecordSet(zone string, location string, r database.RecordSet) (int64, error)
+	AddRecordSet(zone string, location string, r database.RecordSet) (database.ObjectId, error)
 	GetRecordSets(zone string, location string) ([]string, error)
 	GetRecordSet(zone string, location string, rtype string) (database.RecordSet, error)
 	UpdateRecordSet(zone string, location string, r database.RecordSet) (int64, error)
@@ -69,7 +69,7 @@ func (h *Handler) getZones(c *gin.Context) {
 		return
 	}
 
-	var req listRequest
+	var req ListRequest
 	err := c.ShouldBindQuery(&req)
 	if err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
@@ -91,7 +91,7 @@ func (h *Handler) addZone(c *gin.Context) {
 		return
 	}
 
-	var z newZoneRequest
+	var z NewZoneRequest
 	if err := c.ShouldBindJSON(&z); err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -126,7 +126,7 @@ func (h *Handler) getZone(c *gin.Context) {
 		return
 	}
 
-	resp := getZoneResponse{
+	resp := GetZoneResponse{
 		Name:            z.Name,
 		Enabled:         z.Enabled,
 		Dnssec:          z.Dnssec,
@@ -143,7 +143,7 @@ func (h *Handler) updateZone(c *gin.Context) {
 		return
 	}
 
-	var req updateZoneRequest
+	var req UpdateZoneRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -185,7 +185,7 @@ func (h *Handler) getLocations(c *gin.Context) {
 		return
 	}
 
-	var req listRequest
+	var req ListRequest
 	err := c.ShouldBindQuery(&req)
 	if err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
@@ -207,7 +207,7 @@ func (h *Handler) addLocation(c *gin.Context) {
 		return
 	}
 
-	var req newLocationRequest
+	var req NewLocationRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
@@ -243,7 +243,7 @@ func (h *Handler) getLocation(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	resp := getLocationResponse{
+	resp := GetLocationResponse{
 		Enabled: l.Enabled,
 	}
 	c.JSON(http.StatusOK, &resp)
@@ -261,7 +261,7 @@ func (h *Handler) updateLocation(c *gin.Context) {
 		return
 	}
 
-	var req updateLocationRequest
+	var req UpdateLocationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
@@ -330,7 +330,7 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	var req newRecordSetRequest
+	var req NewRecordSetRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
@@ -372,7 +372,7 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	resp := getRecordSetResponse{
+	resp := GetRecordSetResponse{
 		Value:   r.Value,
 		Enabled: r.Enabled,
 	}
@@ -395,7 +395,7 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "rtype missing")
 		return
 	}
-	var req updateRecordSetRequest
+	var req UpdateRecordSetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return

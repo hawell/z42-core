@@ -1,7 +1,17 @@
 package database
 
+import "github.com/google/uuid"
+
+type ObjectId string
+
+const emptyObjectId ObjectId = ""
+
+func NewObjectId() ObjectId {
+	return ObjectId(uuid.New().String())
+}
+
 type User struct {
-	Id       int64
+	Id       ObjectId
 	Email    string
 	Password string
 	Status   string
@@ -18,7 +28,7 @@ const (
 )
 
 type Zone struct {
-	Id              int64
+	Id              ObjectId
 	Name            string
 	Enabled         bool
 	Dnssec          bool
@@ -26,13 +36,13 @@ type Zone struct {
 }
 
 type Location struct {
-	Id      int64
+	Id      ObjectId
 	Name    string
 	Enabled bool
 }
 
 type RecordSet struct {
-	Id      int64
+	Id      ObjectId
 	Type    string
 	Value   string
 	Enabled bool
