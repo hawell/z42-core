@@ -4,7 +4,7 @@ import "github.com/google/uuid"
 
 type ObjectId string
 
-const emptyObjectId ObjectId = ""
+const EmptyObjectId ObjectId = ""
 
 func NewObjectId() ObjectId {
 	return ObjectId(uuid.New().String())

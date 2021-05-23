@@ -21,6 +21,8 @@ func StatusFromError(c *gin.Context, err error) (*gin.Context, int, string) {
 		return c, http.StatusConflict, "duplicate entry"
 	case database.ErrNotFound:
 		return c, http.StatusNotFound, "entry not found"
+	case database.ErrUnauthorized:
+		return c, http.StatusUnauthorized, "authorization failed"
 	default:
 		return c, http.StatusInternalServerError, "internal error"
 	}

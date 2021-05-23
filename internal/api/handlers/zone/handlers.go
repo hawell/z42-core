@@ -12,19 +12,19 @@ import (
 type storage interface {
 	AddZone(user string, z database.Zone) (database.ObjectId, error)
 	GetZones(user string, start int, count int, q string) ([]string, error)
-	GetZone(zone string) (database.Zone, error)
-	UpdateZone(z database.Zone) (int64, error)
-	DeleteZone(zone string) (int64, error)
-	AddLocation(zone string, l database.Location) (database.ObjectId, error)
-	GetLocations(zone string, start int, count int, q string) ([]string, error)
-	GetLocation(zone string, location string) (database.Location, error)
-	UpdateLocation(zone string, l database.Location) (int64, error)
-	DeleteLocation(zone string, location string) (int64, error)
-	AddRecordSet(zone string, location string, r database.RecordSet) (database.ObjectId, error)
-	GetRecordSets(zone string, location string) ([]string, error)
-	GetRecordSet(zone string, location string, rtype string) (database.RecordSet, error)
-	UpdateRecordSet(zone string, location string, r database.RecordSet) (int64, error)
-	DeleteRecordSet(zone string, location string, rtype string) (int64, error)
+	GetZone(user string, zone string) (database.Zone, error)
+	UpdateZone(user string, z database.Zone) (int64, error)
+	DeleteZone(user string, zone string) (int64, error)
+	AddLocation(user string, zone string, l database.Location) (database.ObjectId, error)
+	GetLocations(user string, zone string, start int, count int, q string) ([]string, error)
+	GetLocation(user string, zone string, location string) (database.Location, error)
+	UpdateLocation(user string, zone string, l database.Location) (int64, error)
+	DeleteLocation(user string, zone string, location string) (int64, error)
+	AddRecordSet(user string, zone string, location string, r database.RecordSet) (database.ObjectId, error)
+	GetRecordSets(user string, zone string, location string) ([]string, error)
+	GetRecordSet(user string, zone string, location string, rtype string) (database.RecordSet, error)
+	UpdateRecordSet(user string, zone string, location string, r database.RecordSet) (int64, error)
+	DeleteRecordSet(user string, zone string, location string, rtype string) (int64, error)
 }
 
 type Handler struct {
@@ -113,13 +113,19 @@ func (h *Handler) addZone(c *gin.Context) {
 }
 
 func (h *Handler) getZone(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 
-	z, err := h.db.GetZone(zone)
+	z, err := h.db.GetZone(user, zone)
 	if err != nil {
 		zap.L().Error("DataBase.getZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -137,6 +143,12 @@ func (h *Handler) getZone(c *gin.Context) {
 }
 
 func (h *Handler) updateZone(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -154,7 +166,7 @@ func (h *Handler) updateZone(c *gin.Context) {
 		Dnssec:          req.Dnssec,
 		CNameFlattening: req.CNameFlattening,
 	}
-	_, err := h.db.UpdateZone(z)
+	_, err := h.db.UpdateZone(user, z)
 	if err != nil {
 		zap.L().Error("DataBase.updateZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -164,12 +176,18 @@ func (h *Handler) updateZone(c *gin.Context) {
 }
 
 func (h *Handler) deleteZone(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	_, err := h.db.DeleteZone(zone)
+	_, err := h.db.DeleteZone(user, zone)
 	if err != nil {
 		zap.L().Error("DataBase.deleteZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -179,6 +197,12 @@ func (h *Handler) deleteZone(c *gin.Context) {
 }
 
 func (h *Handler) getLocations(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -191,7 +215,7 @@ func (h *Handler) getLocations(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	locations, err := h.db.GetLocations(zone, req.Start, req.Count, req.Q)
+	locations, err := h.db.GetLocations(user, zone, req.Start, req.Count, req.Q)
 	if err != nil {
 		zap.L().Error("DataBase.getLocations()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -201,6 +225,12 @@ func (h *Handler) getLocations(c *gin.Context) {
 }
 
 func (h *Handler) addLocation(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -217,7 +247,7 @@ func (h *Handler) addLocation(c *gin.Context) {
 		Name:    req.Name,
 		Enabled: req.Enabled,
 	}
-	_, err = h.db.AddLocation(zone, model)
+	_, err = h.db.AddLocation(user, zone, model)
 	if err != nil {
 		zap.L().Error("DataBase.addLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -227,6 +257,12 @@ func (h *Handler) addLocation(c *gin.Context) {
 }
 
 func (h *Handler) getLocation(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -237,7 +273,7 @@ func (h *Handler) getLocation(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	l, err := h.db.GetLocation(zone, location)
+	l, err := h.db.GetLocation(user, zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.getLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -250,6 +286,12 @@ func (h *Handler) getLocation(c *gin.Context) {
 }
 
 func (h *Handler) updateLocation(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -270,7 +312,7 @@ func (h *Handler) updateLocation(c *gin.Context) {
 		Name:    location,
 		Enabled: req.Enabled,
 	}
-	_, err := h.db.UpdateLocation(zone, model)
+	_, err := h.db.UpdateLocation(user, zone, model)
 	if err != nil {
 		zap.L().Error("DataBase.updateLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -280,6 +322,12 @@ func (h *Handler) updateLocation(c *gin.Context) {
 }
 
 func (h *Handler) deleteLocation(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -290,7 +338,7 @@ func (h *Handler) deleteLocation(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	_, err := h.db.DeleteLocation(zone, location)
+	_, err := h.db.DeleteLocation(user, zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.deleteLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -300,6 +348,12 @@ func (h *Handler) deleteLocation(c *gin.Context) {
 }
 
 func (h *Handler) getRecordSets(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -310,7 +364,7 @@ func (h *Handler) getRecordSets(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	rrsets, err := h.db.GetRecordSets(zone, location)
+	rrsets, err := h.db.GetRecordSets(user, zone, location)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSets()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -320,6 +374,12 @@ func (h *Handler) getRecordSets(c *gin.Context) {
 }
 
 func (h *Handler) addRecordSet(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -341,7 +401,7 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 		Value:   req.Value,
 		Enabled: req.Enabled,
 	}
-	_, err = h.db.AddRecordSet(zone, location, model)
+	_, err = h.db.AddRecordSet(user, zone, location, model)
 	if err != nil {
 		zap.L().Error("DataBase.addRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -351,6 +411,12 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 }
 
 func (h *Handler) getRecordSet(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -366,7 +432,7 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "rtype missing")
 		return
 	}
-	r, err := h.db.GetRecordSet(zone, location, rtype)
+	r, err := h.db.GetRecordSet(user, zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -380,6 +446,12 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 }
 
 func (h *Handler) updateRecordSet(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -405,7 +477,7 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 		Value:   req.Value,
 		Enabled: req.Enabled,
 	}
-	_, err := h.db.UpdateRecordSet(zone, location, model)
+	_, err := h.db.UpdateRecordSet(user, zone, location, model)
 	if err != nil {
 		zap.L().Error("DataBase.updateRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -416,6 +488,12 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 }
 
 func (h *Handler) deleteRecordSet(c *gin.Context) {
+	user := extractUser(c)
+	if user == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
+		return
+	}
+
 	zone := c.Param("zone")
 	if zone == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
@@ -431,7 +509,7 @@ func (h *Handler) deleteRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "rtype missing")
 		return
 	}
-	_, err := h.db.DeleteRecordSet(zone, location, rtype)
+	_, err := h.db.DeleteRecordSet(user, zone, location, rtype)
 	if err != nil {
 		zap.L().Error("DataBase.deleteRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))

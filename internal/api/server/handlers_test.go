@@ -40,7 +40,7 @@ var (
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
 	db            *database.DataBase
 	redis         *hiredis.Redis
-	token         string
+	tokens        map[string]string
 	client        http.Client
 )
 
@@ -50,16 +50,16 @@ func TestAddZone(t *testing.T) {
 	path := "/zones"
 
 	// add zone
-	resp := execRequest(http.MethodPost, path, body)
+	resp := execRequest("user1", http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 	// duplicate
-	resp = execRequest(http.MethodPost, path, body)
+	resp = execRequest("user1", http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusConflict))
 
 	// bad request
 	body = `"name"="example.com.", "enabled"=true, "dnssec"=true, "cname_flattening"=false`
-	resp = execRequest(http.MethodPost, path, body)
+	resp = execRequest("user1", http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 }
 
@@ -70,7 +70,7 @@ func TestGetZones(t *testing.T) {
 	addZone("user1", "zone3.com.")
 
 	// get zones
-	resp := execRequest(http.MethodGet, "/zones", "")
+	resp := execRequest("user1", http.MethodGet, "/zones", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -80,34 +80,28 @@ func TestGetZones(t *testing.T) {
 	Expect(items).To(ContainElements("zone1.com.","zone2.com.","zone3.com."))
 
 	// limit results
-	resp = execRequest(http.MethodGet, "/zones?start=1&count=1", "")
+	resp = execRequest("user1", http.MethodGet, "/zones?start=1&count=1", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`["zone2.com."]`)))
 
 	// with q
-	resp = execRequest(http.MethodGet, "/zones?q=2", "")
+	resp = execRequest("user1", http.MethodGet, "/zones?q=2", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`["zone2.com."]`)))
 
 	// empty results
-	resp = execRequest(http.MethodGet, "/zones?q=asdas", "")
+	resp = execRequest("user1", http.MethodGet, "/zones?q=asdas", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`[]`)))
 
 	// user with no zone
-	_, err = db.DeleteZone("zone1.com.")
-	Expect(err).To(BeNil())
-	_, err = db.DeleteZone("zone2.com.")
-	Expect(err).To(BeNil())
-	_, err = db.DeleteZone("zone3.com.")
-	Expect(err).To(BeNil())
-	resp = execRequest(http.MethodGet, "/zones", "")
+	resp = execRequest("user2", http.MethodGet, "/zones", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -119,7 +113,7 @@ func TestGetZone(t *testing.T) {
 	addZone("user1", "zone1.com.")
 
 	// get zone
-	resp := execRequest(http.MethodGet, "/zones/zone1.com.", "")
+	resp := execRequest("user1", http.MethodGet, "/zones/zone1.com.", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -129,8 +123,12 @@ func TestGetZone(t *testing.T) {
 	Expect(z.Name).To(Equal("zone1.com."))
 
 	// non-existing zone
-	resp = execRequest(http.MethodGet, "/zones/zone2.com.", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone2.com.", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+
+	// unauthorized
+	resp = execRequest("user2", http.MethodGet, "/zones/zone1.com.", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
 }
 
 func TestUpdateZone(t *testing.T) {
@@ -138,9 +136,9 @@ func TestUpdateZone(t *testing.T) {
 	addZone("user1", "zone1.com.")
 
 	// update zone
-	resp := execRequest(http.MethodPut, "/zones/zone1.com.", `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
+	resp := execRequest("user1", http.MethodPut, "/zones/zone1.com.", `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
-	resp = execRequest(http.MethodGet, "/zones/zone1.com.", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com.", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	respBody, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -152,20 +150,28 @@ func TestUpdateZone(t *testing.T) {
 	Expect(z.Dnssec).To(BeTrue())
 
 	// non-existing zone
-	resp = execRequest(http.MethodPut, "/zones/zone2.com.", `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
+	resp = execRequest("user1", http.MethodPut, "/zones/zone2.com.", `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+
+	// unauthorized
+	resp = execRequest("user2", http.MethodPut, "/zones/zone1.com.", `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
 }
 
 func TestDeleteZone(t *testing.T) {
 	initialize(t)
 	addZone("user1", "zone1.com.")
 
+	// unauthorized
+	resp := execRequest("user2", http.MethodDelete, "/zones/zone1.com.", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// delete zone
-	resp := execRequest(http.MethodDelete, "/zones/zone1.com.", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone1.com.", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 
 	// delete non-existing zone
-	resp = execRequest(http.MethodDelete, "/zones/zone1.com.", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone1.com.", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 }
 
@@ -173,20 +179,24 @@ func TestAddLocation(t *testing.T) {
 	initialize(t)
 	addZone("user1", "zone1.com.")
 
-	// add zone
-	resp := execRequest(http.MethodPost, "/zones/zone1.com./locations", `{"name": "www", "enabled": true}`)
+	// unauthorized
+	resp := execRequest("user2", http.MethodPost, "/zones/zone1.com./locations", `{"name": "www", "enabled": true}`)
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
+	// add location
+	resp = execRequest("user1", http.MethodPost, "/zones/zone1.com./locations", `{"name": "www", "enabled": true}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 	// duplicate
-	resp = execRequest(http.MethodPost, "/zones/zone1.com./locations", `{"name": "www", "enabled": true}`)
+	resp = execRequest("user1", http.MethodPost, "/zones/zone1.com./locations", `{"name": "www", "enabled": true}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusConflict))
 
 	// non-existing zone
-	resp = execRequest(http.MethodPost, "/zones/zone2.com./locations", `{"name": "www", "enabled": true}`)
+	resp = execRequest("user1", http.MethodPost, "/zones/zone2.com./locations", `{"name": "www", "enabled": true}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// bad request
-	resp = execRequest(http.MethodPost, "/zones/zone1.com./locations", `name: "www", enabled: true`)
+	resp = execRequest("user1", http.MethodPost, "/zones/zone1.com./locations", `name: "www", enabled: true`)
 	Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 }
 
@@ -203,14 +213,18 @@ func TestGetLocations(t *testing.T) {
 	addLocation("zone2.com.", "www6")
 
 	// get locations
-	resp := execRequest(http.MethodGet, "/zones/zone1.com./locations", "")
+	resp := execRequest("user1", http.MethodGet, "/zones/zone1.com./locations", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`["www1","www2","www3"]`)))
 
+	// unauthorized
+	resp = execRequest("user2", http.MethodGet, "/zones/zone1.com./locations", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// another zone
-	resp = execRequest(http.MethodGet, "/zones/zone2.com./locations", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone2.com./locations", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -220,32 +234,32 @@ func TestGetLocations(t *testing.T) {
 	Expect(items).To(ContainElements("www4","www5","www6"))
 
 	// zone with no location
-	resp = execRequest(http.MethodGet, "/zones/zone3.com./locations", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone3.com./locations", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`[]`)))
 
 	// non-existing zone
-	resp = execRequest(http.MethodGet, "/zones/zone4.com./locations", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone4.com./locations", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// limit results
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations?start=1&count=1", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations?start=1&count=1", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`["www2"]`)))
 
 	// with q
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations?q=2", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations?q=2", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`["www2"]`)))
 
 	// empty results
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations?q=asdasd", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations?q=asdasd", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -258,7 +272,7 @@ func TestGetLocation(t *testing.T) {
 	addLocation("zone1.com.", "www")
 
 	// get location
-	resp := execRequest(http.MethodGet, "/zones/zone1.com./locations/www", "")
+	resp := execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -266,12 +280,16 @@ func TestGetLocation(t *testing.T) {
 	err = json.Unmarshal(body, &l)
 	Expect(err).To(BeNil())
 
+	// unauthorized
+	resp = execRequest("user2", http.MethodGet, "/zones/zone1.com./locations/www", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// non-existing location
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www2", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www2", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 	// non-existing zone
-	resp = execRequest(http.MethodGet, "/zones/zone2.com./locations/www", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone2.com./locations/www", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 }
 
@@ -281,9 +299,9 @@ func TestUpdateLocation(t *testing.T) {
 	addLocation("zone1.com.", "www")
 
 	// update location
-	resp := execRequest(http.MethodPut, "/zones/zone1.com./locations/www", `{"enabled": false}`)
+	resp := execRequest("user1", http.MethodPut, "/zones/zone1.com./locations/www", `{"enabled": false}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	respBody, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -292,12 +310,16 @@ func TestUpdateLocation(t *testing.T) {
 	Expect(err).To(BeNil())
 	Expect(l.Enabled).To(BeFalse())
 
+	// unauthorized
+	resp = execRequest("user2", http.MethodPut, "/zones/zone1.com./locations/www", `{"enabled": false}`)
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// non-existing zone
-	resp = execRequest(http.MethodPut, "/zones/zone2.com./locations/www", `{"enabled": false}`)
+	resp = execRequest("user1", http.MethodPut, "/zones/zone2.com./locations/www", `{"enabled": false}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// non-existing location
-	resp = execRequest(http.MethodPut, "/zones/zone1.com./locations/www2", `{"enabled": false}`)
+	resp = execRequest("user1", http.MethodPut, "/zones/zone1.com./locations/www2", `{"enabled": false}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 }
 
@@ -306,16 +328,20 @@ func TestDeleteLocation(t *testing.T) {
 	addZone("user1", "zone1.com.")
 	addLocation("zone1.com.", "www")
 
+	// unauthorized
+	resp := execRequest("user2", http.MethodDelete, "/zones/zone1.com./locations/www", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// delete location
-	resp := execRequest(http.MethodDelete, "/zones/zone1.com./locations/www", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone1.com./locations/www", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 
 	// delete non-existing location
-	resp = execRequest(http.MethodDelete, "/zones/zone1.com./locations/www2", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone1.com./locations/www2", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 	// delete non-existing zone
-	resp = execRequest(http.MethodDelete, "/zones/zone2.com./locations/www", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone2.com./locations/www", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 }
 
@@ -326,25 +352,29 @@ func TestAddRecordSet(t *testing.T) {
 	path := "/zones/zone1.com./locations/www/rrsets"
 	body := `{"type": "a", "enabled": true, "value": "{\"ttl\": 300, \"records\": [{\"ip\": \"1.2.3.4\"}]}"}`
 
+	// unauthorized
+	resp := execRequest("user2", http.MethodPost, path, body)
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// add record set
-	resp := execRequest(http.MethodPost, path, body)
+	resp = execRequest("user1", http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 	// duplicate
-	resp = execRequest(http.MethodPost, path, body)
+	resp = execRequest("user1", http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusConflict))
 
 	// non-existing location
-	resp = execRequest(http.MethodPost, "/zones/zone1.com./locations/www2/rrsets", body)
+	resp = execRequest("user1", http.MethodPost, "/zones/zone1.com./locations/www2/rrsets", body)
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// non-existing zone
-	resp = execRequest(http.MethodPost, "/zones/zone2.com./locations/www/rrsets", body)
+	resp = execRequest("user1", http.MethodPost, "/zones/zone2.com./locations/www/rrsets", body)
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// bad request
 	body = `ttl: 300, records: {"ip": "1.2.3.4"}`
-	resp = execRequest(http.MethodPost, path, body)
+	resp = execRequest("user1", http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 }
 
@@ -362,7 +392,7 @@ func TestGetRecordSets(t *testing.T) {
 	addZone("user1", "zone3.com.")
 
 	// get record sets
-	resp := execRequest(http.MethodGet, "/zones/zone1.com./locations/www/rrsets", "")
+	resp := execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www/rrsets", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -372,7 +402,7 @@ func TestGetRecordSets(t *testing.T) {
 	Expect(items).To(ContainElements("a","aaaa"))
 
 	// another zone
-	resp = execRequest(http.MethodGet, "/zones/zone2.com./locations/www/rrsets", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone2.com./locations/www/rrsets", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -381,18 +411,22 @@ func TestGetRecordSets(t *testing.T) {
 	Expect(items).To(ContainElements("aname","cname"))
 
 	// location with no record sets
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www2/rrsets", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www2/rrsets", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	Expect(body).To(Equal([]byte(`[]`)))
 
 	// non-existing location
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www3/rrsets", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www3/rrsets", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
+	// unauthorized
+	resp = execRequest("user2", http.MethodGet, "/zones/zone1.com./locations/www/rrsets", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// non-existing zone
-	resp = execRequest(http.MethodGet, "/zones/zone4.com./locations/www/rrsets", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone4.com./locations/www/rrsets", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 }
 
@@ -403,7 +437,7 @@ func TestGetRecordSet(t *testing.T) {
 	addRecordSet("zone1.com.", "www", "a", `{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`)
 
 	// get record set
-	resp := execRequest(http.MethodGet, "/zones/zone1.com./locations/www/rrsets/a", "")
+	resp := execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www/rrsets/a", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -412,20 +446,24 @@ func TestGetRecordSet(t *testing.T) {
 	Expect(err).To(BeNil())
 	Expect(r.Value).To(Equal(`{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`))
 
+	// unauthorized
+	resp = execRequest("user2", http.MethodGet, "/zones/zone1.com./locations/www/rrsets/a", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// non-existing record set
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www/rrsets/aaaa", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www/rrsets/aaaa", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 	// invalid record type
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www/rrsets/adsd", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www/rrsets/adsd", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// non-existing location
-	resp = execRequest(http.MethodGet, "/zones/zone1.com./locations/www2/rrsets/a", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone1.com./locations/www2/rrsets/a", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// non-existing zone
-	resp = execRequest(http.MethodGet, "/zones/zone2.com./locations/www/rrsets/a", "")
+	resp = execRequest("user1", http.MethodGet, "/zones/zone2.com./locations/www/rrsets/a", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 }
 
@@ -437,10 +475,14 @@ func TestUpdateRecordSet(t *testing.T) {
 	path := "/zones/zone1.com./locations/www/rrsets/a"
 	body := `{"enabled": true, "value": "{\"ttl\": 400, \"records\": [{\"ip\": \"1.2.3.5\"}]}"}`
 
+	// unauthorized
+	resp := execRequest("user2", http.MethodPut, path, body)
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// update record set
-	resp := execRequest(http.MethodPut, path, body)
+	resp = execRequest("user1", http.MethodPut, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
-	resp = execRequest(http.MethodGet, path, "")
+	resp = execRequest("user1", http.MethodGet, path, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	respBody, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
@@ -451,18 +493,18 @@ func TestUpdateRecordSet(t *testing.T) {
 
 	// non-existing zone
 	path = "/zones/zone2.com./locations/www/rrsets/a"
-	resp = execRequest(http.MethodPut, path, body)
+	resp = execRequest("user1", http.MethodPut, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// non-existing location
 	path = "/zones/zone1.com./locations/www2/rrsets/a"
-	resp = execRequest(http.MethodPut, path, body)
+	resp = execRequest("user1", http.MethodPut, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// non-existing record set
 	path = "/zones/zone1.com./locations/www/rrsets/aaaa"
 	body = `{"enabled": true, "value": "{\"ttl\": 400, \"records\": [{\"ip\": \"::1\"}]}"}`
-	resp = execRequest(http.MethodPut, path, body)
+	resp = execRequest("user1", http.MethodPut, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 }
 
@@ -472,20 +514,24 @@ func TestDeleteRecordSet(t *testing.T) {
 	addLocation("zone1.com.", "www")
 	addRecordSet("zone1.com.", "www", "a", `{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`)
 
+	// unauthorized
+	resp := execRequest("user2", http.MethodDelete, "/zones/zone1.com./locations/www/rrsets/a", "")
+	Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+
 	// delete record set
-	resp := execRequest(http.MethodDelete, "/zones/zone1.com./locations/www/rrsets/a", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone1.com./locations/www/rrsets/a", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 
 	// delete non-existing record set
-	resp = execRequest(http.MethodDelete, "/zones/zone1.com./locations/www/rrsets/a", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone1.com./locations/www/rrsets/a", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 	// delete non-existing zone
-	resp = execRequest(http.MethodDelete, "/zones/zone2.com./locations/www/rrsets/a", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone2.com./locations/www/rrsets/a", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 
 	// delete non-existing location
-	resp = execRequest(http.MethodDelete, "/zones/zone1.com./locations/www2/rrsets/a", "")
+	resp = execRequest("user1", http.MethodDelete, "/zones/zone1.com./locations/www2/rrsets/a", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 }
 
@@ -497,7 +543,7 @@ func TestSignupAndVerify(t *testing.T) {
 	// add new user
 	body := `{"email": "user1@example.com", "password": "password"}`
 	path := "/auth/signup"
-	resp := execRequest(http.MethodPost, path, body)
+	resp := execRequest("user1", http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 	// check new user status is pending
@@ -514,7 +560,7 @@ func TestSignupAndVerify(t *testing.T) {
 
 	// verify user
 	path = "/auth/verify?code=" + code
-	resp = execRequest(http.MethodPost, path, "")
+	resp = execRequest("user1", http.MethodPost, path, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 
 	// check user status is active
@@ -539,10 +585,14 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	addUser("user1")
-	token, err = login("user1", "user1")
-	if err != nil {
-		panic(err)
+	tokens = make(map[string]string)
+	for _, user := range []string{"user1", "user2", "user3"} {
+		addUser(user)
+		token, err := login(user, user)
+		if err != nil {
+			panic(err)
+		}
+		tokens[user] = token
 	}
 	m.Run()
 	err = s.Shutdown()
@@ -612,26 +662,26 @@ func addZone(user string, zone string) {
 }
 
 func addLocation(zone string, location string) {
-	_, err := db.AddLocation(zone, database.Location{Name: location})
+	_, err := db.AddLocation("user1", zone, database.Location{Name: location})
 	if err != nil {
 		panic(err)
 	}
 }
 
 func addRecordSet(zone string, location string, rtype string, recordset string) {
-	_, err := db.AddRecordSet(zone, location, database.RecordSet{Type: rtype, Value: recordset})
+	_, err := db.AddRecordSet("user1", zone, location, database.RecordSet{Type: rtype, Value: recordset})
 	if err != nil {
 		panic(err)
 	}
 }
 
-func execRequest(method string, path string, body string) *http.Response {
+func execRequest(user string, method string, path string, body string) *http.Response {
 	url := generateURL(path)
 	reqBody := strings.NewReader(body)
 	req, err := http.NewRequest(method, url, reqBody)
 	Expect(err).To(BeNil())
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Authorization", "Bearer "+tokens[user])
 	resp, err := client.Do(req)
 	Expect(err).To(BeNil())
 	return resp
