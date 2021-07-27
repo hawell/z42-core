@@ -28,16 +28,33 @@ func StatusFromError(c *gin.Context, err error) (*gin.Context, int, string) {
 	}
 }
 
+type Response struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
 func ErrorResponse(c *gin.Context, code int, message string) {
-	c.JSON(code, gin.H{
-		"code":    code,
-		"message": message,
+	c.JSON(code, Response{
+		Code:    code,
+		Message: message,
 	})
 }
 
-func SuccessResponse(c *gin.Context, code int, message string) {
-	c.JSON(code, gin.H{
-		"code":    code,
-		"message": message,
+func SuccessResponse(c *gin.Context, code int, message string, data interface{}) {
+	c.JSON(code, Response{
+		Code:    code,
+		Message: message,
+		Data:    data,
+	})
+}
+
+func SuccessfulOperationResponse(c *gin.Context, code int, message string, name string) {
+	c.JSON(code, Response{
+		Code:    code,
+		Message: message,
+		Data: map[string]string{
+			"name": name,
+		},
 	})
 }

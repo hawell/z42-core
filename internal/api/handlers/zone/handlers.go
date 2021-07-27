@@ -4,27 +4,30 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
+	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
+	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
+	"log"
 	"net/http"
 )
 
 type storage interface {
-	AddZone(user string, z database.Zone) (database.ObjectId, error)
-	GetZones(user string, start int, count int, q string) ([]string, error)
-	GetZone(user string, zone string) (database.Zone, error)
-	UpdateZone(user string, z database.Zone) (int64, error)
-	DeleteZone(user string, zone string) (int64, error)
-	AddLocation(user string, zone string, l database.Location) (database.ObjectId, error)
-	GetLocations(user string, zone string, start int, count int, q string) ([]string, error)
-	GetLocation(user string, zone string, location string) (database.Location, error)
-	UpdateLocation(user string, zone string, l database.Location) (int64, error)
-	DeleteLocation(user string, zone string, location string) (int64, error)
-	AddRecordSet(user string, zone string, location string, r database.RecordSet) (database.ObjectId, error)
-	GetRecordSets(user string, zone string, location string) ([]string, error)
-	GetRecordSet(user string, zone string, location string, rtype string) (database.RecordSet, error)
-	UpdateRecordSet(user string, zone string, location string, r database.RecordSet) (int64, error)
-	DeleteRecordSet(user string, zone string, location string, rtype string) (int64, error)
+	AddZone(userId database.ObjectId, z database.NewZone, soa types.SOA_RRSet, ns types.NS_RRSet) (database.ObjectId, error)
+	GetZones(userId database.ObjectId, start int, count int, q string) (database.List, error)
+	GetZone(userId database.ObjectId, zoneName string) (database.Zone, error)
+	UpdateZone(userId database.ObjectId, zoneName string, z database.ZoneUpdate) (int64, error)
+	DeleteZone(userId database.ObjectId, zoneName string) (int64, error)
+	AddLocation(userId database.ObjectId, zoneName string, l database.NewLocation) (database.ObjectId, error)
+	GetLocations(userId database.ObjectId, zoneName string, start int, count int, q string) (database.List, error)
+	GetLocation(userId database.ObjectId, zoneName string, location string) (database.Location, error)
+	UpdateLocation(userId database.ObjectId, zoneName string, location string, l database.LocationUpdate) (int64, error)
+	DeleteLocation(userId database.ObjectId, zoneName string, location string) (int64, error)
+	AddRecordSet(userId database.ObjectId, zoneName string, location string, r database.NewRecordSet) (database.ObjectId, error)
+	GetRecordSets(userId database.ObjectId, zoneName string, location string) (database.List, error)
+	GetRecordSet(userId database.ObjectId, zoneName string, location string, recordType string) (database.RecordSet, error)
+	UpdateRecordSet(userId database.ObjectId, zoneName string, location string, recordType string, r database.RecordSetUpdate) (int64, error)
+	DeleteRecordSet(userId database.ObjectId, zoneName string, location string, recordType string) (int64, error)
 }
 
 type Handler struct {
@@ -39,32 +42,39 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 	}
 }
 
+const (
+	zoneNameKey   = "zone_name"
+	locationKey   = "location"
+	recordTypeKey = "record_type"
+)
+
 func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 	group.GET("", h.getZones)
 	group.POST("", h.addZone)
 
-	group.GET("/:zone", h.getZone)
-	group.PUT("/:zone", h.updateZone)
-	group.DELETE("/:zone", h.deleteZone)
+	group.GET("/:zone_name", h.getZone)
+	group.PUT("/:zone_name", h.updateZone)
+	group.DELETE("/:zone_name", h.deleteZone)
 
-	group.GET("/:zone/locations", h.getLocations)
-	group.POST("/:zone/locations", h.addLocation)
+	group.GET("/:zone_name/locations", h.getLocations)
+	group.POST("/:zone_name/locations", h.addLocation)
 
-	group.GET("/:zone/locations/:location", h.getLocation)
-	group.PUT("/:zone/locations/:location", h.updateLocation)
-	group.DELETE("/:zone/locations/:location", h.deleteLocation)
+	group.GET("/:zone_name/locations/:location", h.getLocation)
+	group.PUT("/:zone_name/locations/:location", h.updateLocation)
+	group.DELETE("/:zone_name/locations/:location", h.deleteLocation)
 
-	group.GET("/:zone/locations/:location/rrsets", h.getRecordSets)
-	group.POST("/:zone/locations/:location/rrsets", h.addRecordSet)
+	group.GET("/:zone_name/locations/:location/rrsets", h.getRecordSets)
+	group.POST("/:zone_name/locations/:location/rrsets", h.addRecordSet)
 
-	group.GET("/:zone/locations/:location/rrsets/:rtype", h.getRecordSet)
-	group.PUT("/:zone/locations/:location/rrsets/:rtype", h.updateRecordSet)
-	group.DELETE("/:zone/locations/:location/rrsets/:rtype", h.deleteRecordSet)
+	group.GET("/:zone_name/locations/:location/rrsets/:record_type", h.getRecordSet)
+	group.PUT("/:zone_name/locations/:location/rrsets/:record_type", h.updateRecordSet)
+	group.DELETE("/:zone_name/locations/:location/rrsets/:record_type", h.deleteRecordSet)
 }
 
 func (h *Handler) getZones(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	log.Println(c.Request.URL.String())
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
@@ -75,18 +85,18 @@ func (h *Handler) getZones(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	zones, err := h.db.GetZones(user, req.Start, req.Count, req.Q)
+	zones, err := h.db.GetZones(userId, req.Start, req.Count, req.Q)
 	if err != nil {
 		zap.L().Error("DataBase.getZones()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.JSON(http.StatusOK, zones)
+	handlers.SuccessResponse(c, http.StatusOK, "successful", zones)
 }
 
 func (h *Handler) addZone(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
@@ -96,39 +106,54 @@ func (h *Handler) addZone(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	model := database.Zone{
+	model := database.NewZone{
 		Name:            z.Name,
 		Enabled:         z.Enabled,
 		Dnssec:          z.Dnssec,
 		CNameFlattening: z.CNameFlattening,
 	}
-	_, err := h.db.AddZone(user, model)
+	_, err := h.db.AddZone(userId, model, z.SOA, z.NS)
 	if err != nil {
 		zap.L().Error("DataBase.addZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 
-	handlers.SuccessResponse(c, http.StatusCreated, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusCreated, "created", z.Name)
 }
 
 func (h *Handler) getZone(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
 
-	z, err := h.db.GetZone(user, zone)
+	z, err := h.db.GetZone(userId, zoneName)
 	if err != nil {
-		zap.L().Error("DataBase.getZone()", zap.Error(err))
+		zap.L().Error("DataBase.GetZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+
+	r, err := h.db.GetRecordSet(userId, zoneName, "@", "soa")
+	if err != nil {
+		zap.L().Error("DataBase.GetRecordSet()", zap.Error(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	var soa types.SOA_RRSet
+	err = jsoniter.Unmarshal([]byte(r.Value), &soa)
+	if err != nil {
+		message := "cannot unmarshal soa record"
+		zap.L().Error(message, zap.Error(err))
+		handlers.ErrorResponse(c, http.StatusInternalServerError, message)
 		return
 	}
 
@@ -137,20 +162,21 @@ func (h *Handler) getZone(c *gin.Context) {
 		Enabled:         z.Enabled,
 		Dnssec:          z.Dnssec,
 		CNameFlattening: z.CNameFlattening,
+		SOA: soa,
 	}
 
-	c.JSON(http.StatusOK, &resp)
+	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
 }
 
 func (h *Handler) updateZone(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
@@ -160,51 +186,58 @@ func (h *Handler) updateZone(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	z := database.Zone{
-		Name:            zone,
+	// TODO: set soa.serial
+	soa, err := jsoniter.Marshal(req.SOA)
+	if err != nil {
+		zap.L().Error("cannot marshal back to json", zap.Error(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	z := database.ZoneUpdate{
 		Enabled:         req.Enabled,
 		Dnssec:          req.Dnssec,
 		CNameFlattening: req.CNameFlattening,
+		SOA: string(soa),
 	}
-	_, err := h.db.UpdateZone(user, z)
+	_, err = h.db.UpdateZone(userId, zoneName, z)
 	if err != nil {
 		zap.L().Error("DataBase.updateZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", zoneName)
 }
 
 func (h *Handler) deleteZone(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	_, err := h.db.DeleteZone(user, zone)
+	_, err := h.db.DeleteZone(userId, zoneName)
 	if err != nil {
 		zap.L().Error("DataBase.deleteZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", zoneName)
 }
 
 func (h *Handler) getLocations(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
@@ -215,24 +248,24 @@ func (h *Handler) getLocations(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	locations, err := h.db.GetLocations(user, zone, req.Start, req.Count, req.Q)
+	locations, err := h.db.GetLocations(userId, zoneName, req.Start, req.Count, req.Q)
 	if err != nil {
 		zap.L().Error("DataBase.getLocations()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.JSON(http.StatusOK, locations)
+	handlers.SuccessResponse(c, http.StatusOK, "successful", locations)
 }
 
 func (h *Handler) addLocation(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
@@ -243,61 +276,62 @@ func (h *Handler) addLocation(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	model := database.Location{
+	model := database.NewLocation{
 		Name:    req.Name,
 		Enabled: req.Enabled,
 	}
-	_, err = h.db.AddLocation(user, zone, model)
+	_, err = h.db.AddLocation(userId, zoneName, model)
 	if err != nil {
 		zap.L().Error("DataBase.addLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusCreated, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusCreated, "successful", req.Name)
 }
 
 func (h *Handler) getLocation(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	l, err := h.db.GetLocation(user, zone, location)
+	l, err := h.db.GetLocation(userId, zoneName, location)
 	if err != nil {
 		zap.L().Error("DataBase.getLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	resp := GetLocationResponse{
+		Name:    l.Name,
 		Enabled: l.Enabled,
 	}
-	c.JSON(http.StatusOK, &resp)
+	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
 }
 
 func (h *Handler) updateLocation(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
@@ -308,84 +342,83 @@ func (h *Handler) updateLocation(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	model := database.Location{
-		Name:    location,
+	model := database.LocationUpdate{
 		Enabled: req.Enabled,
 	}
-	_, err := h.db.UpdateLocation(user, zone, model)
+	_, err := h.db.UpdateLocation(userId, zoneName, location, model)
 	if err != nil {
 		zap.L().Error("DataBase.updateLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", location)
 }
 
 func (h *Handler) deleteLocation(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	_, err := h.db.DeleteLocation(user, zone, location)
+	_, err := h.db.DeleteLocation(userId, zoneName, location)
 	if err != nil {
 		zap.L().Error("DataBase.deleteLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", location)
 }
 
 func (h *Handler) getRecordSets(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	rrsets, err := h.db.GetRecordSets(user, zone, location)
+	rrsets, err := h.db.GetRecordSets(userId, zoneName, location)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSets()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	c.JSON(http.StatusOK, rrsets)
+	handlers.SuccessResponse(c, http.StatusOK, "successful", rrsets)
 }
 
 func (h *Handler) addRecordSet(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
@@ -396,129 +429,158 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	model := database.RecordSet{
+	value, err := jsoniter.Marshal(req.Value)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "cannot marshal back value")
+		return
+	}
+	model := database.NewRecordSet{
 		Type:    req.Type,
-		Value:   req.Value,
+		Value:   string(value),
 		Enabled: req.Enabled,
 	}
-	_, err = h.db.AddRecordSet(user, zone, location, model)
+	if !rtypeValid(req.Type) {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid record type")
+		return
+	}
+	_, err = h.db.AddRecordSet(userId, zoneName, location, model)
 	if err != nil {
 		zap.L().Error("DataBase.addRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusCreated, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusCreated, "successful", req.Type)
 }
 
 func (h *Handler) getRecordSet(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	rtype := c.Param("rtype")
-	if rtype == "" {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "rtype missing")
+	recordType := c.Param(recordTypeKey)
+	if !rtypeValid(recordType) {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid record type")
 		return
 	}
-	r, err := h.db.GetRecordSet(user, zone, location, rtype)
+	r, err := h.db.GetRecordSet(userId, zoneName, location, recordType)
 	if err != nil {
 		zap.L().Error("DataBase.getRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	resp := GetRecordSetResponse{
-		Value:   r.Value,
-		Enabled: r.Enabled,
+	value := types.TypeToRRSet[recordType]()
+	err = jsoniter.Unmarshal([]byte(r.Value), &value)
+	if err != nil {
+		message := "invalid record value"
+		zap.L().Error(message, zap.Error(err))
+		handlers.ErrorResponse(c, http.StatusInternalServerError, message)
+		return
 	}
-	c.JSON(http.StatusOK, &resp)
+	resp := GetRecordSetResponse{
+		Enabled: r.Enabled,
+		Value: value,
+	}
+	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
 }
 
 func (h *Handler) updateRecordSet(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	rtype := c.Param("rtype")
-	if rtype == "" {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "rtype missing")
+	recordType := c.Param(recordTypeKey)
+	if !rtypeValid(recordType) {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid record type")
 		return
 	}
-	var req UpdateRecordSetRequest
+	value := types.TypeToRRSet[recordType]()
+	req := UpdateRecordSetRequest{
+		Value:   value,
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	model := database.RecordSet{
-		Type:    rtype,
-		Value:   req.Value,
+	valueJSON, err := jsoniter.Marshal(req.Value)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "cannot marshal back value")
+		return
+	}
+	model := database.RecordSetUpdate{
+		Value:   string(valueJSON),
 		Enabled: req.Enabled,
 	}
-	_, err := h.db.UpdateRecordSet(user, zone, location, model)
+	_, err = h.db.UpdateRecordSet(userId, zoneName, location, recordType, model)
 	if err != nil {
 		zap.L().Error("DataBase.updateRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", recordType)
 
 }
 
 func (h *Handler) deleteRecordSet(c *gin.Context) {
-	user := extractUser(c)
-	if user == "" {
+	userId := extractUser(c)
+	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
 		return
 	}
 
-	zone := c.Param("zone")
-	if zone == "" {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	location := c.Param("location")
+	location := c.Param(locationKey)
 	if location == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	rtype := c.Param("rtype")
-	if rtype == "" {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "rtype missing")
+	recordType := c.Param(recordTypeKey)
+	if recordType == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "record missing")
 		return
 	}
-	_, err := h.db.DeleteRecordSet(user, zone, location, rtype)
+	_, err := h.db.DeleteRecordSet(userId, zoneName, location, recordType)
 	if err != nil {
 		zap.L().Error("DataBase.deleteRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
+	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", recordType)
 }
 
-func extractUser(c *gin.Context) string {
+func extractUser(c *gin.Context) database.ObjectId {
 	user, _ := c.Get(handlers.IdentityKey)
-	return user.(*handlers.IdentityData).Email
+	return user.(*handlers.IdentityData).Id
+}
+
+func rtypeValid(rtype string) bool {
+	_, ok := types.SupportedTypes[rtype]
+	return ok
 }

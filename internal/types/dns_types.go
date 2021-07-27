@@ -16,6 +16,24 @@ const (
 	TypeANAME = 500
 )
 
+var SupportedTypes = map[string]struct{}{"a": {}, "aaaa": {}, "cname": {}, "txt": {}, "ns": {}, "mx": {}, "srv": {}, "caa": {}, "ptr": {}, "tlsa": {}, "ds": {}, "aname": {}, "soa": {}}
+
+var TypeToRRSet = map[string]func() RRSet {
+	"a": func() RRSet { return new(IP_RRSet) },
+	"aaaa": func() RRSet { return new(IP_RRSet) },
+	"cname": func() RRSet { return new(CNAME_RRSet) },
+	"txt": func() RRSet { return new(TXT_RRSet) },
+	"ns": func() RRSet { return new(NS_RRSet) },
+	"mx": func() RRSet { return new(MX_RRSet) },
+	"srv": func() RRSet { return new(SRV_RRSet) },
+	"caa": func() RRSet { return new(CAA_RRSet) },
+	"ptr": func() RRSet { return new(PTR_RRSet) },
+	"tlsa": func() RRSet { return new(TLSA_RRSet) },
+	"ds": func() RRSet { return new(DS_RRSet) },
+	"soa": func() RRSet { return new(SOA_RRSet) },
+	"aname": func() RRSet { return new(ANAME_RRSet) },
+}
+
 type RRSet interface {
 	Value(name string) []dns.RR
 	Empty() bool
@@ -327,15 +345,33 @@ func (rrset *DS_RRSet) Empty() bool {
 }
 
 type SOA_RRSet struct {
+	GenericRRSet
 	Ns      string   `json:"ns"`
-	MBox    string   `json:"MBox"`
+	MBox    string   `json:"mbox"`
 	Data    *dns.SOA `json:"-"`
-	Ttl     uint32   `json:"ttl,omitempty"`
 	Refresh uint32   `json:"refresh"`
 	Retry   uint32   `json:"retry"`
 	Expire  uint32   `json:"expire"`
 	MinTtl  uint32   `json:"minttl"`
 	Serial  uint32   `json:"serial"`
+}
+
+func (rrset *SOA_RRSet) Value(name string) []dns.RR {
+	r := new(dns.SOA)
+	r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeSOA,
+		Class: dns.ClassINET, Ttl: rrset.TtlValue}
+	r.Ns = rrset.Ns
+	r.Mbox = rrset.MBox
+	r.Refresh = rrset.Refresh
+	r.Retry = rrset.Retry
+	r.Expire = rrset.Expire
+	r.Minttl = rrset.MinTtl
+	r.Serial = rrset.Serial
+	return nil
+}
+
+func (rrset *SOA_RRSet) Empty() bool {
+	return false
 }
 
 type ANAME_RRSet struct {

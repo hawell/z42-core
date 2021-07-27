@@ -80,7 +80,7 @@ DROP TABLE IF EXISTS `z42`.`RecordSet` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`RecordSet` (
                                                  `Id` CHAR(36) NOT NULL,
-                                                 `Type` ENUM('a', 'aaaa', 'cname', 'txt', 'ns', 'mx', 'srv', 'caa', 'ptr', 'tlsa', 'ds', 'aname') NOT NULL,
+                                                 `Type` ENUM('soa', 'a', 'aaaa', 'cname', 'txt', 'ns', 'mx', 'srv', 'caa', 'ptr', 'tlsa', 'ds', 'aname') NOT NULL,
                                                  `Value` JSON NULL,
                                                  `Enabled` TINYINT NOT NULL,
                                                  `Location_Id` CHAR(36) NOT NULL,
@@ -111,6 +111,29 @@ CREATE TABLE IF NOT EXISTS `z42`.`Verification` (
                                                             REFERENCES `z42`.`User` (`Id`)
                                                             ON DELETE CASCADE
                                                             ON UPDATE NO ACTION)
+    ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `z42`.`ACL`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `z42`.`ACL` ;
+
+CREATE TABLE IF NOT EXISTS `z42`.`ACL` (
+                                           `Id` CHAR(36) NOT NULL,
+                                           `CanRead` TINYINT NOT NULL,
+                                           `CanList` TINYINT NOT NULL,
+                                           `CanEdit` TINYINT NOT NULL,
+                                           `CanInsert` TINYINT NOT NULL,
+                                           `CanDelete` TINYINT NOT NULL,
+                                           `User_Id` CHAR(36) NOT NULL,
+                                           PRIMARY KEY (`Id`),
+                                           INDEX `fk_ACL_User_idx` (`User_Id` ASC) VISIBLE,
+                                           CONSTRAINT `fk_ACL_User`
+                                               FOREIGN KEY (`User_Id`)
+                                                   REFERENCES `z42`.`User` (`Id`)
+                                                   ON DELETE CASCADE
+                                                   ON UPDATE NO ACTION)
     ENGINE = InnoDB;
 
 

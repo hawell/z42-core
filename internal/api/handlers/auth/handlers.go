@@ -12,7 +12,7 @@ import (
 )
 
 type storage interface {
-	AddUser(u database.User) (database.ObjectId, error)
+	AddUser(u database.NewUser) (database.ObjectId, error)
 	GetUser(name string) (database.User, error)
 	AddVerification(user string, verificationType string) (string, error)
 	Verify(code string) error
@@ -88,7 +88,7 @@ func New(db storage, redis *hiredis.Redis) *Handler {
 			})
 		},
 		LogoutResponse: func(c *gin.Context, code int) {
-			handlers.SuccessResponse(c, code, "logout successful")
+			handlers.SuccessResponse(c, code, "logout successful", nil)
 		},
 		RefreshResponse: func(c *gin.Context, code int, token string, expire time.Time) {
 			c.JSON(http.StatusOK, &authenticationToken{
@@ -132,7 +132,7 @@ func (h *Handler) signup(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return
 	}
-	model := database.User{
+	model := database.NewUser{
 		Email:    u.Email,
 		Password: u.Password,
 		Status:   database.UserStatusPending,
@@ -157,7 +157,7 @@ func (h *Handler) signup(c *gin.Context) {
 		return
 	}
 
-	handlers.SuccessResponse(c, http.StatusCreated, "successful")
+	handlers.SuccessResponse(c, http.StatusCreated, "successful", nil)
 }
 
 func (h *Handler) verify(c *gin.Context) {
@@ -174,5 +174,5 @@ func (h *Handler) verify(c *gin.Context) {
 		return
 	}
 
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful")
+	handlers.SuccessResponse(c, http.StatusNoContent, "successful", nil)
 }

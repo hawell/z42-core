@@ -33,14 +33,15 @@ func ZoneConfigFromJson(zone string, configStr string) *ZoneConfig {
 		DnsSec:          false,
 		CnameFlattening: false,
 		SOA: &SOA_RRSet{
-			Ns:      "ns1." + zone,
-			MinTtl:  300,
-			Refresh: 86400,
-			Retry:   7200,
-			Expire:  3600,
-			MBox:    "hostmaster." + zone,
-			Serial:  uint32(time.Now().Unix()),
-			Ttl:     300,
+			GenericRRSet: GenericRRSet{TtlValue: 3600},
+			Ns:           "ns1." + zone,
+			MBox:         "hostmaster." + zone,
+			Data:         nil,
+			Refresh:      86400,
+			Retry:        7200,
+			Expire:       3600,
+			MinTtl:       300,
+			Serial:       uint32(time.Now().Unix()),
 		},
 	}
 	if len(configStr) > 0 {
@@ -51,7 +52,7 @@ func ZoneConfigFromJson(zone string, configStr string) *ZoneConfig {
 	}
 	config.SOA.Ns = dns.Fqdn(config.SOA.Ns)
 	config.SOA.Data = &dns.SOA{
-		Hdr:     dns.RR_Header{Name: zone, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: config.SOA.Ttl, Rdlength: 0},
+		Hdr:     dns.RR_Header{Name: zone, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: config.SOA.Ttl(), Rdlength: 0},
 		Ns:      config.SOA.Ns,
 		Mbox:    config.SOA.MBox,
 		Refresh: config.SOA.Refresh,

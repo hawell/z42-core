@@ -20,7 +20,7 @@ func main() {
 	}
 
 	eventLoggerConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.ErrorLevel),
+		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
 		Development: false,
 		Encoding:    "json",
 		EncoderConfig: zapcore.EncoderConfig{

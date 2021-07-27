@@ -1,6 +1,8 @@
 package database
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type ObjectId string
 
@@ -12,6 +14,12 @@ func NewObjectId() ObjectId {
 
 type User struct {
 	Id       ObjectId
+	Email    string
+	Password string
+	Status   string
+}
+
+type NewUser struct {
 	Email    string
 	Password string
 	Status   string
@@ -35,9 +43,32 @@ type Zone struct {
 	CNameFlattening bool
 }
 
+type NewZone struct {
+	Name            string
+	Enabled         bool
+	Dnssec          bool
+	CNameFlattening bool
+}
+
+type ZoneUpdate struct {
+	Enabled         bool
+	Dnssec          bool
+	CNameFlattening bool
+	SOA string
+}
+
 type Location struct {
 	Id      ObjectId
 	Name    string
+	Enabled bool
+}
+
+type NewLocation struct {
+	Name    string
+	Enabled bool
+}
+
+type LocationUpdate struct {
 	Enabled bool
 }
 
@@ -48,4 +79,20 @@ type RecordSet struct {
 	Enabled bool
 }
 
-var SupportedTypes = []string{"a", "aaaa", "cname", "txt", "ns", "mx", "srv", "caa", "ptr", "tlsa", "ds", "aname"}
+type NewRecordSet struct {
+	Type    string
+	Value   string
+	Enabled bool
+}
+
+type RecordSetUpdate struct {
+	Value   string
+	Enabled bool
+}
+
+type ListItem struct {
+	Id string `json:"id"`
+	Enabled bool `json:"enabled"`
+}
+
+type List []ListItem
