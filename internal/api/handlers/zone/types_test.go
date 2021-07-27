@@ -14,14 +14,14 @@ func TestNewRecordSetRequest_UnmarshalJSON(t *testing.T) {
 	err := jsoniter.Unmarshal([]byte(data), &req)
 	Expect(err).To(BeNil())
 	Expect(req).To(Equal(NewRecordSetRequest{
-		Type:    "a",
-		Value:   &types.IP_RRSet{
-			GenericRRSet:      types.GenericRRSet{
+		Type: "a",
+		Value: &types.IP_RRSet{
+			GenericRRSet: types.GenericRRSet{
 				TtlValue: 300,
 			},
-			Data:              []types.IP_RR{
+			Data: []types.IP_RR{
 				{
-					Ip:      net.ParseIP("6.5.6.5"),
+					Ip: net.ParseIP("6.5.6.5"),
 				},
 			},
 		},

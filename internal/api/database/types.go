@@ -54,7 +54,7 @@ type ZoneUpdate struct {
 	Enabled         bool
 	Dnssec          bool
 	CNameFlattening bool
-	SOA string
+	SOA             string
 }
 
 type Location struct {
@@ -91,8 +91,8 @@ type RecordSetUpdate struct {
 }
 
 type ListItem struct {
-	Id string `json:"id"`
-	Enabled bool `json:"enabled"`
+	Id      string `json:"id"`
+	Enabled bool   `json:"enabled"`
 }
 
 type List []ListItem

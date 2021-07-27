@@ -10,7 +10,7 @@ import (
 var (
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
 	db            *DataBase
-	soa = types.SOA_RRSet{
+	soa           = types.SOA_RRSet{
 		GenericRRSet: types.GenericRRSet{TtlValue: 3600},
 		Ns:           "n1.example.com.",
 		MBox:         "admin.example.com.",
@@ -22,7 +22,7 @@ var (
 	}
 	ns = types.NS_RRSet{
 		GenericRRSet: types.GenericRRSet{TtlValue: 3600},
-		Data:         []types.NS_RR{
+		Data: []types.NS_RR{
 			{Host: "ns1.example.com."},
 			{Host: "ns2.example.com."},
 		},

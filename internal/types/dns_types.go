@@ -18,19 +18,19 @@ const (
 
 var SupportedTypes = map[string]struct{}{"a": {}, "aaaa": {}, "cname": {}, "txt": {}, "ns": {}, "mx": {}, "srv": {}, "caa": {}, "ptr": {}, "tlsa": {}, "ds": {}, "aname": {}, "soa": {}}
 
-var TypeToRRSet = map[string]func() RRSet {
-	"a": func() RRSet { return new(IP_RRSet) },
-	"aaaa": func() RRSet { return new(IP_RRSet) },
+var TypeToRRSet = map[string]func() RRSet{
+	"a":     func() RRSet { return new(IP_RRSet) },
+	"aaaa":  func() RRSet { return new(IP_RRSet) },
 	"cname": func() RRSet { return new(CNAME_RRSet) },
-	"txt": func() RRSet { return new(TXT_RRSet) },
-	"ns": func() RRSet { return new(NS_RRSet) },
-	"mx": func() RRSet { return new(MX_RRSet) },
-	"srv": func() RRSet { return new(SRV_RRSet) },
-	"caa": func() RRSet { return new(CAA_RRSet) },
-	"ptr": func() RRSet { return new(PTR_RRSet) },
-	"tlsa": func() RRSet { return new(TLSA_RRSet) },
-	"ds": func() RRSet { return new(DS_RRSet) },
-	"soa": func() RRSet { return new(SOA_RRSet) },
+	"txt":   func() RRSet { return new(TXT_RRSet) },
+	"ns":    func() RRSet { return new(NS_RRSet) },
+	"mx":    func() RRSet { return new(MX_RRSet) },
+	"srv":   func() RRSet { return new(SRV_RRSet) },
+	"caa":   func() RRSet { return new(CAA_RRSet) },
+	"ptr":   func() RRSet { return new(PTR_RRSet) },
+	"tlsa":  func() RRSet { return new(TLSA_RRSet) },
+	"ds":    func() RRSet { return new(DS_RRSet) },
+	"soa":   func() RRSet { return new(SOA_RRSet) },
 	"aname": func() RRSet { return new(ANAME_RRSet) },
 }
 

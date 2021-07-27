@@ -236,7 +236,7 @@ func (db *DataBase) GetZones(userId ObjectId, start int, count int, q string) (L
 		}
 		return nil, parseError(err)
 	}
-	defer func() {_ = rows.Close()}()
+	defer func() { _ = rows.Close() }()
 	res := List{}
 	for rows.Next() {
 		var item ListItem
@@ -374,7 +374,7 @@ func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, co
 		}
 		return nil, parseError(err)
 	}
-	defer func() {_ = rows.Close() }()
+	defer func() { _ = rows.Close() }()
 	res := List{}
 	for rows.Next() {
 		var item ListItem
@@ -490,7 +490,7 @@ func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location str
 		}
 		return nil, parseError(err)
 	}
-	defer func() {_ = rows.Close()}()
+	defer func() { _ = rows.Close() }()
 	res := List{}
 	for rows.Next() {
 		var item ListItem

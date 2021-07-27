@@ -68,7 +68,7 @@ func TestAddZone(t *testing.T) {
 		Enabled:         true,
 		Dnssec:          true,
 		CNameFlattening: false,
-		SOA:             types.SOA_RRSet{
+		SOA: types.SOA_RRSet{
 			GenericRRSet: types.GenericRRSet{TtlValue: 3600},
 			Ns:           "ns1.example.com.",
 			MBox:         "mail.example.com.",
@@ -78,9 +78,9 @@ func TestAddZone(t *testing.T) {
 			MinTtl:       3600,
 			Serial:       3600,
 		},
-		NS:              types.NS_RRSet{
+		NS: types.NS_RRSet{
 			GenericRRSet: types.GenericRRSet{TtlValue: 3600},
-			Data:         []types.NS_RR{
+			Data: []types.NS_RR{
 				{Host: "ns1.example.com."},
 				{Host: "ns2.example.com."},
 			},
@@ -866,7 +866,7 @@ func addZone(userId database.ObjectId, zone string) (database.ObjectId, error) {
 	}
 	ns := types.NS_RRSet{
 		GenericRRSet: types.GenericRRSet{TtlValue: 3600},
-		Data:         []types.NS_RR{
+		Data: []types.NS_RR{
 			{Host: "ns1.example.com."},
 			{Host: "ns2.example.com."},
 		},

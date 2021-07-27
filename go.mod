@@ -6,8 +6,7 @@ require (
 	github.com/appleboy/gin-jwt/v2 v2.6.4
 	github.com/coredns/coredns v1.8.0
 	github.com/dgraph-io/ristretto v0.0.3
-	github.com/gin-gonic/gin v1.6.3
-	github.com/go-playground/validator/v10 v10.4.1 // indirect
+	github.com/gin-gonic/gin v1.7.0
 	github.com/go-sql-driver/mysql v1.4.0
 	github.com/gomodule/redigo v1.8.3
 	github.com/google/go-cmp v0.5.0

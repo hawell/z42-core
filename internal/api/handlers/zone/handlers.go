@@ -162,7 +162,7 @@ func (h *Handler) getZone(c *gin.Context) {
 		Enabled:         z.Enabled,
 		Dnssec:          z.Dnssec,
 		CNameFlattening: z.CNameFlattening,
-		SOA: soa,
+		SOA:             soa,
 	}
 
 	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
@@ -197,7 +197,7 @@ func (h *Handler) updateZone(c *gin.Context) {
 		Enabled:         req.Enabled,
 		Dnssec:          req.Dnssec,
 		CNameFlattening: req.CNameFlattening,
-		SOA: string(soa),
+		SOA:             string(soa),
 	}
 	_, err = h.db.UpdateZone(userId, zoneName, z)
 	if err != nil {
@@ -490,7 +490,7 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 	}
 	resp := GetRecordSetResponse{
 		Enabled: r.Enabled,
-		Value: value,
+		Value:   value,
 	}
 	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
 }
@@ -519,7 +519,7 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 	}
 	value := types.TypeToRRSet[recordType]()
 	req := UpdateRecordSetRequest{
-		Value:   value,
+		Value: value,
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())

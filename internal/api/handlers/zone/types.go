@@ -19,27 +19,27 @@ type ListResponseItem struct {
 type ListResponse []ListResponseItem
 
 type NewZoneRequest struct {
-	Name            string `json:"name" binding:"required"`
-	Enabled         bool   `json:"enabled,default:true"`
-	Dnssec          bool   `json:"dnssec,default:false"`
-	CNameFlattening bool   `json:"cname_flattening,default:false"`
-	SOA types.SOA_RRSet `json:"soa"`
-	NS types.NS_RRSet `json:"ns"`
+	Name            string          `json:"name" binding:"required"`
+	Enabled         bool            `json:"enabled,default:true"`
+	Dnssec          bool            `json:"dnssec,default:false"`
+	CNameFlattening bool            `json:"cname_flattening,default:false"`
+	SOA             types.SOA_RRSet `json:"soa"`
+	NS              types.NS_RRSet  `json:"ns"`
 }
 
 type GetZoneResponse struct {
-	Name            string `json:"name"`
-	Enabled         bool   `json:"enabled"`
-	Dnssec          bool   `json:"dnssec"`
-	CNameFlattening bool   `json:"cname_flattening"`
-	SOA types.SOA_RRSet `json:"soa"`
+	Name            string          `json:"name"`
+	Enabled         bool            `json:"enabled"`
+	Dnssec          bool            `json:"dnssec"`
+	CNameFlattening bool            `json:"cname_flattening"`
+	SOA             types.SOA_RRSet `json:"soa"`
 }
 
 type UpdateZoneRequest struct {
-	Enabled         bool `json:"enabled,default:true"`
-	Dnssec          bool `json:"dnssec,default:false"`
-	CNameFlattening bool `json:"cname_flattening,default:false"`
-	SOA types.SOA_RRSet `json:"soa"`
+	Enabled         bool            `json:"enabled,default:true"`
+	Dnssec          bool            `json:"dnssec,default:false"`
+	CNameFlattening bool            `json:"cname_flattening,default:false"`
+	SOA             types.SOA_RRSet `json:"soa"`
 }
 
 type NewLocationRequest struct {
@@ -57,15 +57,15 @@ type UpdateLocationRequest struct {
 }
 
 type NewRecordSetRequest struct {
-	Type    string `json:"type" binding:"required"`
+	Type    string      `json:"type" binding:"required"`
 	Value   types.RRSet `json:"value" binding:"required"`
-	Enabled bool   `json:"enabled,default=true"`
+	Enabled bool        `json:"enabled,default=true"`
 }
 
 func (r *NewRecordSetRequest) UnmarshalJSON(data []byte) error {
 	var dat struct {
-		Type string `json:"type"`
-		Enabled bool `json:"enabled,default=true"`
+		Type    string `json:"type"`
+		Enabled bool   `json:"enabled,default=true"`
 	}
 	if err := jsoniter.Unmarshal(data, &dat); err != nil {
 		return err
@@ -90,10 +90,10 @@ func (r *NewRecordSetRequest) UnmarshalJSON(data []byte) error {
 
 type GetRecordSetResponse struct {
 	Value   types.RRSet `json:"value"`
-	Enabled bool   `json:"enabled"`
+	Enabled bool        `json:"enabled"`
 }
 
 type UpdateRecordSetRequest struct {
 	Value   types.RRSet `json:"value" binding:"required"`
-	Enabled bool   `json:"enabled,default=true"`
+	Enabled bool        `json:"enabled,default=true"`
 }
