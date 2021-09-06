@@ -38,6 +38,7 @@ func NewRedisDumpQueryGenerator(redisAddress string) *RedisDumpQueryGenerator {
 			},
 		},
 	})
+	dh.Start()
 	g := new(RedisDumpQueryGenerator)
 	zones := dh.GetZones()
 	for _, zone := range zones {

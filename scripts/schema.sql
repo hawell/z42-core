@@ -21,7 +21,7 @@ DROP TABLE IF EXISTS `z42`.`User` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`User` (
                                             `Id` CHAR(36) NOT NULL,
-                                            `Email` VARCHAR(100) NOT NULL,
+                                            `Email` NVARCHAR(100) NOT NULL,
                                             `Password` VARCHAR(600) NOT NULL,
                                             `Status` ENUM('active', 'disabled', 'pending') NOT NULL,
                                             PRIMARY KEY (`Id`),
@@ -36,7 +36,7 @@ DROP TABLE IF EXISTS `z42`.`Zone` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`Zone` (
                                             `Id` CHAR(36) NOT NULL,
-                                            `Name` VARCHAR(45) NOT NULL,
+                                            `Name` NVARCHAR(256) NOT NULL,
                                             `CNameFlattening` TINYINT NOT NULL,
                                             `Dnssec` TINYINT NOT NULL,
                                             `Enabled` TINYINT NOT NULL,
@@ -59,7 +59,7 @@ DROP TABLE IF EXISTS `z42`.`Location` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`Location` (
                                                 `Id` CHAR(36) NOT NULL,
-                                                `Name` VARCHAR(45) NOT NULL,
+                                                `Name` NVARCHAR(256) NOT NULL,
                                                 `Enabled` TINYINT NOT NULL,
                                                 `Zone_Id` CHAR(36) NOT NULL,
                                                 PRIMARY KEY (`Id`),
@@ -80,7 +80,7 @@ DROP TABLE IF EXISTS `z42`.`RecordSet` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`RecordSet` (
                                                  `Id` CHAR(36) NOT NULL,
-                                                 `Type` ENUM('soa', 'a', 'aaaa', 'cname', 'txt', 'ns', 'mx', 'srv', 'caa', 'ptr', 'tlsa', 'ds', 'aname') NOT NULL,
+                                                 `Type` ENUM('a', 'aaaa', 'aname', 'caa', 'cname', 'ds', 'mx', 'ns', 'ptr', 'srv', 'tlsa', 'txt') NOT NULL,
                                                  `Value` JSON NULL,
                                                  `Enabled` TINYINT NOT NULL,
                                                  `Location_Id` CHAR(36) NOT NULL,
@@ -132,6 +132,45 @@ CREATE TABLE IF NOT EXISTS `z42`.`ACL` (
                                            CONSTRAINT `fk_ACL_User`
                                                FOREIGN KEY (`User_Id`)
                                                    REFERENCES `z42`.`User` (`Id`)
+                                                   ON DELETE CASCADE
+                                                   ON UPDATE NO ACTION)
+    ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `z42`.`Events`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `z42`.`Events` ;
+
+CREATE TABLE IF NOT EXISTS `z42`.`Events` (
+                                              `Revision` INT NOT NULL AUTO_INCREMENT,
+                                              `ZoneId` CHAR(36) NOT NULL,
+                                              `Type` ENUM('add_zone', 'update_zone', 'delete_zone', 'add_location', 'update_location', 'delete_location', 'add_record', 'update_record', 'delete_record') NOT NULL,
+                                              `Value` JSON NULL,
+                                              PRIMARY KEY (`Revision`),
+                                              INDEX `zone_id` (`ZoneId` ASC) VISIBLE)
+    ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `z42`.`SOA`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `z42`.`SOA` ;
+
+CREATE TABLE IF NOT EXISTS `z42`.`SOA` (
+                                           `TTL` INT NOT NULL,
+                                           `NS` NVARCHAR(256) NOT NULL,
+                                           `MBox` NVARCHAR(256) NOT NULL,
+                                           `Refresh` INT NOT NULL,
+                                           `Retry` INT NOT NULL,
+                                           `Expire` INT NOT NULL,
+                                           `MinTTL` INT NOT NULL,
+                                           `Serial` INT NOT NULL,
+                                           `Zone_Id` CHAR(36) NOT NULL,
+                                           INDEX `fk_SOA_Zone_idx` (`Zone_Id` ASC) VISIBLE,
+                                           CONSTRAINT `fk_SOA_Zone`
+                                               FOREIGN KEY (`Zone_Id`)
+                                                   REFERENCES `z42`.`Zone` (`Id`)
                                                    ON DELETE CASCADE
                                                    ON UPDATE NO ACTION)
     ENGINE = InnoDB;

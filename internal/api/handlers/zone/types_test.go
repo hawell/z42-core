@@ -9,6 +9,7 @@ import (
 )
 
 func TestNewRecordSetRequest_UnmarshalJSON(t *testing.T) {
+	RegisterTestingT(t)
 	data := `{"type": "a", "enabled": true, "value": {"ttl":300, "records":[{"ip":"6.5.6.5"}]}}`
 	var req NewRecordSetRequest
 	err := jsoniter.Unmarshal([]byte(data), &req)

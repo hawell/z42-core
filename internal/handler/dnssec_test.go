@@ -96,24 +96,24 @@ Activate: 20200204092439
 
 func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testCase *TestCase) (requestHandler *DnsRequestHandler, e error) {
 	return func(testCase *TestCase) (requestHandler *DnsRequestHandler, e error) {
-
 		r := storage.NewDataHandler(&DefaultRedisDataTestConfig)
+		r.Start()
 		l, _ := zap.NewProduction()
 		h := NewHandler(&testCase.HandlerConfig, r, l)
 		if err := h.RedisData.Clear(); err != nil {
 			return nil, err
 		}
 		for i, zone := range testCase.Zones {
-			if err := h.RedisData.EnableZone(zone); err != nil {
+			if err := r.EnableZone(zone); err != nil {
 				return nil, err
 			}
 			for _, cmd := range testCase.Entries[i] {
-				err := h.RedisData.SetLocationFromJson(zone, cmd[0], cmd[1])
+				err := r.SetLocationFromJson(zone, cmd[0], cmd[1])
 				if err != nil {
 					return nil, errors.New(fmt.Sprintf("[ERROR] 2: %s\n%s", err, cmd[1]))
 				}
 			}
-			if err := h.RedisData.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {
+			if err := r.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {
 				return nil, err
 			}
 			if err := h.RedisData.SetZoneKey(zone, "zsk", zskPub, zskPriv); err != nil {
@@ -129,7 +129,7 @@ func DefaultDnssecInitialize(zskPub, zskPriv, kskPub, kskPriv string) func(testC
 }
 
 func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler, t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	var zsk dns.RR
 	var ksk dns.RR
 	{
@@ -197,16 +197,16 @@ func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestH
 				// FIXME: should it be set[0].Header().Rrtype?
 				if tc.Qtype == dns.TypeDNSKEY {
 					err := rrsig.Verify(ksk.(*dns.DNSKEY), set)
-					g.Expect(err).To(BeNil())
+					Expect(err).To(BeNil())
 				} else {
 					err := rrsig.Verify(zsk.(*dns.DNSKEY), set)
-					g.Expect(err).To(BeNil())
+					Expect(err).To(BeNil())
 				}
 			}
 		}
 		//fmt.Println("dddd")
 		err := test.SortAndCheck(resp, tc)
-		g.Expect(err).To(BeNil())
+		Expect(err).To(BeNil())
 		//fmt.Println("xxxx")
 	}
 }
@@ -646,7 +646,7 @@ var dnssecTestCases = []*TestCase{
 }
 
 func TestAllDnssec(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	for _, testCase := range dnssecTestCases {
 		if !testCase.Enabled {
 			continue
@@ -655,7 +655,7 @@ func TestAllDnssec(t *testing.T) {
 		fmt.Println(testCase.Description)
 		fmt.Println(strings.Repeat("-", 80))
 		h, err := testCase.Initialize(testCase)
-		g.Expect(err).To(BeNil())
+		Expect(err).To(BeNil())
 		testCase.ApplyAndVerify(testCase, h, t)
 		fmt.Println(strings.Repeat("-", 80))
 	}

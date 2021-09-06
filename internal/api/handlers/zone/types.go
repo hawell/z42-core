@@ -7,9 +7,10 @@ import (
 )
 
 type ListRequest struct {
-	Start int    `form:"start,default=0"`
-	Count int    `form:"count,default=100"`
-	Q     string `form:"q,default="`
+	Start     int    `form:"start,default=0"`
+	Count     int    `form:"count,default=100"`
+	Ascending bool   `form:"ascending,default=true"`
+	Q         string `form:"q,default="`
 }
 
 type ListResponseItem struct {

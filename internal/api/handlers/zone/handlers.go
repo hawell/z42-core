@@ -6,28 +6,27 @@ import (
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
-	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
 )
 
 type storage interface {
-	AddZone(userId database.ObjectId, z database.NewZone, soa types.SOA_RRSet, ns types.NS_RRSet) (database.ObjectId, error)
-	GetZones(userId database.ObjectId, start int, count int, q string) (database.List, error)
+	AddZone(userId database.ObjectId, z database.NewZone) (database.ObjectId, error)
+	GetZones(userId database.ObjectId, start int, count int, q string, ascendingOrder bool) (database.List, error)
 	GetZone(userId database.ObjectId, zoneName string) (database.Zone, error)
-	UpdateZone(userId database.ObjectId, zoneName string, z database.ZoneUpdate) (int64, error)
-	DeleteZone(userId database.ObjectId, zoneName string) (int64, error)
-	AddLocation(userId database.ObjectId, zoneName string, l database.NewLocation) (database.ObjectId, error)
-	GetLocations(userId database.ObjectId, zoneName string, start int, count int, q string) (database.List, error)
+	UpdateZone(userId database.ObjectId, z database.ZoneUpdate) error
+	DeleteZone(userId database.ObjectId, z database.ZoneDelete) error
+	AddLocation(userId database.ObjectId, l database.NewLocation) (database.ObjectId, error)
+	GetLocations(userId database.ObjectId, zoneName string, start int, count int, q string, ascendingOrder bool) (database.List, error)
 	GetLocation(userId database.ObjectId, zoneName string, location string) (database.Location, error)
-	UpdateLocation(userId database.ObjectId, zoneName string, location string, l database.LocationUpdate) (int64, error)
-	DeleteLocation(userId database.ObjectId, zoneName string, location string) (int64, error)
-	AddRecordSet(userId database.ObjectId, zoneName string, location string, r database.NewRecordSet) (database.ObjectId, error)
+	UpdateLocation(userId database.ObjectId, l database.LocationUpdate) error
+	DeleteLocation(userId database.ObjectId, l database.LocationDelete) error
+	AddRecordSet(userId database.ObjectId, r database.NewRecordSet) (database.ObjectId, error)
 	GetRecordSets(userId database.ObjectId, zoneName string, location string) (database.List, error)
 	GetRecordSet(userId database.ObjectId, zoneName string, location string, recordType string) (database.RecordSet, error)
-	UpdateRecordSet(userId database.ObjectId, zoneName string, location string, recordType string, r database.RecordSetUpdate) (int64, error)
-	DeleteRecordSet(userId database.ObjectId, zoneName string, location string, recordType string) (int64, error)
+	UpdateRecordSet(userId database.ObjectId, r database.RecordSetUpdate) error
+	DeleteRecordSet(userId database.ObjectId, r database.RecordSetDelete) error
 }
 
 type Handler struct {
@@ -85,7 +84,7 @@ func (h *Handler) getZones(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	zones, err := h.db.GetZones(userId, req.Start, req.Count, req.Q)
+	zones, err := h.db.GetZones(userId, req.Start, req.Count, req.Q, req.Ascending)
 	if err != nil {
 		zap.L().Error("DataBase.getZones()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -111,8 +110,10 @@ func (h *Handler) addZone(c *gin.Context) {
 		Enabled:         z.Enabled,
 		Dnssec:          z.Dnssec,
 		CNameFlattening: z.CNameFlattening,
+		SOA:             z.SOA,
+		NS:              z.NS,
 	}
-	_, err := h.db.AddZone(userId, model, z.SOA, z.NS)
+	_, err := h.db.AddZone(userId, model)
 	if err != nil {
 		zap.L().Error("DataBase.addZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -142,27 +143,12 @@ func (h *Handler) getZone(c *gin.Context) {
 		return
 	}
 
-	r, err := h.db.GetRecordSet(userId, zoneName, "@", "soa")
-	if err != nil {
-		zap.L().Error("DataBase.GetRecordSet()", zap.Error(err))
-		handlers.ErrorResponse(handlers.StatusFromError(c, err))
-		return
-	}
-	var soa types.SOA_RRSet
-	err = jsoniter.Unmarshal([]byte(r.Value), &soa)
-	if err != nil {
-		message := "cannot unmarshal soa record"
-		zap.L().Error(message, zap.Error(err))
-		handlers.ErrorResponse(c, http.StatusInternalServerError, message)
-		return
-	}
-
 	resp := GetZoneResponse{
 		Name:            z.Name,
 		Enabled:         z.Enabled,
 		Dnssec:          z.Dnssec,
 		CNameFlattening: z.CNameFlattening,
-		SOA:             soa,
+		SOA:             z.SOA,
 	}
 
 	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
@@ -187,20 +173,14 @@ func (h *Handler) updateZone(c *gin.Context) {
 		return
 	}
 	// TODO: set soa.serial
-	soa, err := jsoniter.Marshal(req.SOA)
-	if err != nil {
-		zap.L().Error("cannot marshal back to json", zap.Error(err))
-		handlers.ErrorResponse(handlers.StatusFromError(c, err))
-		return
-	}
 	z := database.ZoneUpdate{
+		Name:            zoneName,
 		Enabled:         req.Enabled,
 		Dnssec:          req.Dnssec,
 		CNameFlattening: req.CNameFlattening,
-		SOA:             string(soa),
+		SOA:             req.SOA,
 	}
-	_, err = h.db.UpdateZone(userId, zoneName, z)
-	if err != nil {
+	if err := h.db.UpdateZone(userId, z); err != nil {
 		zap.L().Error("DataBase.updateZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
@@ -220,7 +200,7 @@ func (h *Handler) deleteZone(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing")
 		return
 	}
-	_, err := h.db.DeleteZone(userId, zoneName)
+	err := h.db.DeleteZone(userId, database.ZoneDelete{Name: zoneName})
 	if err != nil {
 		zap.L().Error("DataBase.deleteZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -248,7 +228,7 @@ func (h *Handler) getLocations(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	locations, err := h.db.GetLocations(userId, zoneName, req.Start, req.Count, req.Q)
+	locations, err := h.db.GetLocations(userId, zoneName, req.Start, req.Count, req.Q, req.Ascending)
 	if err != nil {
 		zap.L().Error("DataBase.getLocations()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -277,10 +257,11 @@ func (h *Handler) addLocation(c *gin.Context) {
 		return
 	}
 	model := database.NewLocation{
-		Name:    req.Name,
-		Enabled: req.Enabled,
+		ZoneName: zoneName,
+		Location: req.Name,
+		Enabled:  req.Enabled,
 	}
-	_, err = h.db.AddLocation(userId, zoneName, model)
+	_, err = h.db.AddLocation(userId, model)
 	if err != nil {
 		zap.L().Error("DataBase.addLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -343,9 +324,11 @@ func (h *Handler) updateLocation(c *gin.Context) {
 		return
 	}
 	model := database.LocationUpdate{
-		Enabled: req.Enabled,
+		ZoneName: zoneName,
+		Location: location,
+		Enabled:  req.Enabled,
 	}
-	_, err := h.db.UpdateLocation(userId, zoneName, location, model)
+	err := h.db.UpdateLocation(userId, model)
 	if err != nil {
 		zap.L().Error("DataBase.updateLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -371,7 +354,7 @@ func (h *Handler) deleteLocation(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "location missing")
 		return
 	}
-	_, err := h.db.DeleteLocation(userId, zoneName, location)
+	err := h.db.DeleteLocation(userId, database.LocationDelete{ZoneName: zoneName, Location: location})
 	if err != nil {
 		zap.L().Error("DataBase.deleteLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -429,21 +412,18 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	value, err := jsoniter.Marshal(req.Value)
-	if err != nil {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "cannot marshal back value")
-		return
-	}
 	model := database.NewRecordSet{
-		Type:    req.Type,
-		Value:   string(value),
-		Enabled: req.Enabled,
+		ZoneName: zoneName,
+		Location: location,
+		Type:     req.Type,
+		Value:    req.Value,
+		Enabled:  req.Enabled,
 	}
 	if !rtypeValid(req.Type) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid record type")
 		return
 	}
-	_, err = h.db.AddRecordSet(userId, zoneName, location, model)
+	_, err = h.db.AddRecordSet(userId, model)
 	if err != nil {
 		zap.L().Error("DataBase.addRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
@@ -480,17 +460,9 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	value := types.TypeToRRSet[recordType]()
-	err = jsoniter.Unmarshal([]byte(r.Value), &value)
-	if err != nil {
-		message := "invalid record value"
-		zap.L().Error(message, zap.Error(err))
-		handlers.ErrorResponse(c, http.StatusInternalServerError, message)
-		return
-	}
 	resp := GetRecordSetResponse{
 		Enabled: r.Enabled,
-		Value:   value,
+		Value:   r.Value,
 	}
 	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
 }
@@ -525,23 +497,20 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	valueJSON, err := jsoniter.Marshal(req.Value)
-	if err != nil {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "cannot marshal back value")
-		return
-	}
 	model := database.RecordSetUpdate{
-		Value:   string(valueJSON),
-		Enabled: req.Enabled,
+		ZoneName: zoneName,
+		Location: location,
+		Type:     recordType,
+		Value:    req.Value,
+		Enabled:  req.Enabled,
 	}
-	_, err = h.db.UpdateRecordSet(userId, zoneName, location, recordType, model)
+	err := h.db.UpdateRecordSet(userId, model)
 	if err != nil {
 		zap.L().Error("DataBase.updateRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", recordType)
-
 }
 
 func (h *Handler) deleteRecordSet(c *gin.Context) {
@@ -566,7 +535,7 @@ func (h *Handler) deleteRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "record missing")
 		return
 	}
-	_, err := h.db.DeleteRecordSet(userId, zoneName, location, recordType)
+	err := h.db.DeleteRecordSet(userId, database.RecordSetDelete{ZoneName: zoneName, Location: location, Type: recordType})
 	if err != nil {
 		zap.L().Error("DataBase.deleteRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))

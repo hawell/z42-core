@@ -16,7 +16,7 @@ type TlsConfig struct {
 	CaPath   string `json:"ca_path"`
 }
 
-type ServerConfig struct {
+type Config struct {
 	Ip       string    `json:"ip"`
 	Port     int       `json:"port"`
 	Protocol string    `json:"protocol"`
@@ -53,7 +53,7 @@ func loadTlsConfig(cfg TlsConfig) *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{cert}, RootCAs: root}
 }
 
-func NewServer(config []ServerConfig) []*dns.Server {
+func NewServer(config []Config) []*dns.Server {
 	var servers []*dns.Server
 	for _, cfg := range config {
 		if cfg.Count < 1 {

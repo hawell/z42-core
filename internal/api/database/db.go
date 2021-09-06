@@ -63,19 +63,28 @@ func (db *DataBase) Close() error {
 }
 
 func (db *DataBase) Clear(removeUsers bool) error {
-	if removeUsers {
-		_, err := db.db.Exec("DELETE FROM User")
-		return parseError(err)
-	}
-	err := db.withTransaction(func(t transaction) error {
-		if _, err := db.db.Exec("DELETE FROM Zone"); err != nil {
-			return parseError(err)
+	var err error
+	err = db.withTransaction(func(t transaction) error {
+		if removeUsers {
+			if _, err := t.Exec("DELETE FROM User"); err != nil {
+				return err
+			}
+		} else {
+			if _, err := t.Exec("DELETE FROM Zone"); err != nil {
+				return err
+			}
+			if _, err := t.Exec("DELETE FROM ACL"); err != nil {
+				return err
+			}
+			if _, err := t.Exec("DELETE FROM Verification"); err != nil {
+				return err
+			}
 		}
-		if _, err := db.db.Exec("DELETE FROM ACL"); err != nil {
-			return parseError(err)
+		if _, err := t.Exec("DELETE FROM Events"); err != nil {
+			return err
 		}
-		if _, err := db.db.Exec("DELETE FROM Verification"); err != nil {
-			return parseError(err)
+		if _, err := t.Exec("ALTER TABLE Events AUTO_INCREMENT = 1"); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -171,47 +180,64 @@ func (db *DataBase) getZoneOwner(zoneName string) (ObjectId, error) {
 	return userId, nil
 }
 
-func (db *DataBase) AddZone(userId ObjectId, z NewZone, soa types.SOA_RRSet, ns types.NS_RRSet) (ObjectId, error) {
+func (db *DataBase) GetEvents(revision int, start int, count int) ([]Event, error) {
+	rows, err := db.db.Query("SELECT Revision, ZoneId, Type, Value FROM Events WHERE Revision > ? ORDER BY Revision LIMIT ?, ?", revision, start, count)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var res []Event
+	for rows.Next() {
+		var event Event
+		err := rows.Scan(&event.Revision, &event.ZoneId, &event.Type, &event.Value)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, event)
+	}
+	return res, nil
+}
+
+func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 	owner, err := db.getZoneOwner(z.Name)
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
 	if owner == EmptyObjectId {
-		zoneId := NewObjectId()
+		var zoneId ObjectId
 		err := db.withTransaction(func(t transaction) error {
-			if _, err := db.db.Exec("INSERT INTO Zone(Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", zoneId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, userId); err != nil {
-				return err
-			}
-			if err := db.setPrivileges(userId, zoneId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
-				return err
-			}
-			locationId := NewObjectId()
-			if _, err := db.db.Exec("INSERT INTO Location(Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", locationId, "@", true, zoneId); err != nil {
-				return err
-			}
-			if err := db.setPrivileges(userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
-				return err
-			}
-			soaId := NewObjectId()
-			soaValue, err := jsoniter.Marshal(soa)
+			var err error
+			zoneId, err = db.addZone(userId, z)
 			if err != nil {
 				return err
 			}
-			if _, err = db.db.Exec("INSERT INTO RecordSet(Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", soaId, locationId, "soa", soaValue, true); err != nil {
+			if err = db.setPrivileges(userId, zoneId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
 				return err
 			}
-			if err := db.setPrivileges(userId, soaId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+			if err = db.setSOA(zoneId, z.SOA); err != nil {
 				return err
 			}
-			nsId := NewObjectId()
-			nsValue, err := jsoniter.Marshal(ns)
+			rootLocation := NewLocation{
+				ZoneName: z.Name,
+				Location: "@",
+				Enabled:  true,
+			}
+			locationId, err := db.addLocation(zoneId, rootLocation)
 			if err != nil {
 				return err
 			}
-			if _, err = db.db.Exec("INSERT INTO RecordSet(Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", nsId, locationId, "ns", nsValue, true); err != nil {
+			if err = db.setPrivileges(userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+				return err
+			}
+			nsRecord := NewRecordSet{Type: "ns", Value: &z.NS, Enabled: true}
+			nsId, err := db.addRecordSet(locationId, nsRecord)
+			if err != nil {
 				return err
 			}
 			if err := db.setPrivileges(userId, nsId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+				return err
+			}
+			if _, err = db.addEvent(zoneId, AddZone, z); err != nil {
 				return err
 			}
 			return nil
@@ -227,14 +253,18 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone, soa types.SOA_RRSet, ns 
 	return EmptyObjectId, ErrInvalid
 }
 
-func (db *DataBase) GetZones(userId ObjectId, start int, count int, q string) (List, error) {
+func (db *DataBase) GetZones(userId ObjectId, start int, count int, q string, ascendingOrder bool) (List, error) {
 	like := "%" + q + "%"
-	rows, err := db.db.Query("SELECT Name, Enabled FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?", userId, like, start, count)
+	query := "SELECT Name, Enabled FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?"
+	if !ascendingOrder {
+		query = "SELECT Name, Enabled FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name DESC LIMIT ?, ?"
+	}
+	rows, err := db.db.Query(query, userId, like, start, count)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return List{}, nil
+			return EmptyList(), nil
 		}
-		return nil, parseError(err)
+		return List{}, parseError(err)
 	}
 	defer func() { _ = rows.Close() }()
 	res := List{}
@@ -242,21 +272,15 @@ func (db *DataBase) GetZones(userId ObjectId, start int, count int, q string) (L
 		var item ListItem
 		err := rows.Scan(&item.Id, &item.Enabled)
 		if err != nil {
-			return nil, parseError(err)
+			return List{}, parseError(err)
 		}
-		res = append(res, item)
+		res.Items = append(res.Items, item)
+	}
+	row := db.db.QueryRow("SELECT count(*) FROM Zone WHERE User_Id = ? AND Name LIKE ?", userId, like)
+	if err := row.Scan(&res.Total); err != nil {
+		return List{}, parseError(err)
 	}
 	return res, nil
-}
-
-func (db *DataBase) getZoneId(zoneName string) (ObjectId, error) {
-	var zoneId ObjectId
-	res := db.db.QueryRow("SELECT Id FROM Zone WHERE Name = ?", zoneName)
-	err := res.Scan(&zoneId)
-	if err != nil {
-		return EmptyObjectId, parseError(err)
-	}
-	return zoneId, nil
 }
 
 func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
@@ -267,112 +291,117 @@ func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
 	if err := db.canGetZone(userId, zoneId); err != nil {
 		return Zone{}, parseError(err)
 	}
-	res := db.db.QueryRow("SELECT Id, Name, CNameFlattening, Dnssec, Enabled FROM Zone WHERE Id = ?", zoneId)
-	var z Zone
-	err = res.Scan(&z.Id, &z.Name, &z.CNameFlattening, &z.Dnssec, &z.Enabled)
+	res := db.db.QueryRow("SELECT Id, Name, CNameFlattening, Dnssec, Enabled, TTL, NS, MBox, Refresh, Retry, Expire, MinTTL, Serial FROM Zone LEFT JOIN SOA ON Zone.Id = SOA.Zone_Id WHERE Zone.Id = ?", zoneId)
+	var (
+		z Zone
+	)
+	err = res.Scan(&z.Id, &z.Name, &z.CNameFlattening, &z.Dnssec, &z.Enabled, &z.SOA.TtlValue, &z.SOA.Ns, &z.SOA.MBox, &z.SOA.Refresh, &z.SOA.Retry, &z.SOA.Expire, &z.SOA.MinTtl, &z.SOA.Serial)
 	if err != nil {
 		return Zone{}, parseError(err)
 	}
 	return z, nil
 }
 
-func (db *DataBase) UpdateZone(userId ObjectId, zoneName string, z ZoneUpdate) (int64, error) {
-	zoneId, err := db.getZoneId(zoneName)
+func (db *DataBase) UpdateZone(userId ObjectId, z ZoneUpdate) error {
+	zoneId, err := db.getZoneId(z.Name)
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	var rowsAffected int64
 	err = db.withTransaction(func(t transaction) error {
 		if err := db.canUpdateZone(userId, zoneId); err != nil {
 			return err
 		}
-		res, err := db.db.Exec("UPDATE Zone SET Dnssec = ?, CNameFlattening = ?, Enabled = ? WHERE Id = ?", z.Dnssec, z.CNameFlattening, z.Enabled, zoneId)
-		if err != nil {
+		if err := db.updateZone(zoneId, z); err != nil {
 			return err
 		}
-		rowsAffected, err = res.RowsAffected()
-		if err != nil {
+		if err := db.setSOA(zoneId, z.SOA); err != nil {
 			return err
 		}
-		soa, err := db.GetRecordSet(userId, zoneName, "@", "soa")
-		if err != nil {
-			return err
-		}
-		if _, err = db.db.Exec("UPDATE RecordSet SET Value = ? WHERE Id = ?", z.SOA, soa.Id); err != nil {
-			return err
-		}
-		if err := db.setPrivileges(userId, soa.Id, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+		if _, err := db.addEvent(zoneId, UpdateZone, z); err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	return rowsAffected, nil
+	return nil
 }
 
-func (db *DataBase) DeleteZone(userId ObjectId, zoneName string) (int64, error) {
-	zoneId, err := db.getZoneId(zoneName)
+func (db *DataBase) DeleteZone(userId ObjectId, z ZoneDelete) error {
+	zoneId, err := db.getZoneId(z.Name)
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	if err := db.canDeleteZone(userId, zoneId); err != nil {
-		return 0, parseError(err)
-	}
-	res, err := db.db.Exec("DELETE FROM Zone WHERE Id = ?", zoneId)
+	err = db.withTransaction(func(t transaction) error {
+		if err := db.canDeleteZone(userId, zoneId); err != nil {
+			return err
+		}
+		if err := db.deleteZone(zoneId); err != nil {
+			return err
+		}
+		if err := db.deletePrivileges(zoneId); err != nil {
+			return err
+		}
+		if _, err := db.addEvent(zoneId, DeleteZone, z.Name); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return 0, parseError(err)
-	}
-	if rows == 0 {
-		return 0, ErrNotFound
-	}
-	return rows, parseError(err)
+	return nil
 }
 
-func (db *DataBase) AddLocation(userId ObjectId, zoneName string, l NewLocation) (ObjectId, error) {
-	zoneId, err := db.getZoneId(zoneName)
+func (db *DataBase) AddLocation(userId ObjectId, l NewLocation) (ObjectId, error) {
+	zoneId, err := db.getZoneId(l.ZoneName)
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
 	if err := db.canAddLocation(userId, zoneId); err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	id := NewObjectId()
+	var locationId ObjectId
 	err = db.withTransaction(func(t transaction) error {
-		if _, err := db.db.Exec("INSERT INTO Location(Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", id, l.Name, l.Enabled, zoneId); err != nil {
-			return parseError(err)
+		var err error
+		locationId, err = db.addLocation(zoneId, l)
+		if err != nil {
+			return err
 		}
-		if err := db.setPrivileges(userId, id, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
-			return parseError(err)
+		if err := db.setPrivileges(userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
+			return err
+		}
+		if _, err := db.addEvent(zoneId, AddLocation, l); err != nil {
+			return err
 		}
 		return nil
 	})
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	return id, nil
+	return locationId, nil
 }
 
-func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, count int, q string) (List, error) {
+func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, count int, q string, ascendingOrder bool) (List, error) {
 	zoneId, err := db.getZoneId(zoneName)
 	if err != nil {
-		return nil, parseError(err)
+		return List{}, parseError(err)
 	}
 	if err := db.canGetLocations(userId, zoneId); err != nil {
-		return nil, parseError(err)
+		return List{}, parseError(err)
 	}
 	like := "%" + q + "%"
-	rows, err := db.db.Query("SELECT Name, Enabled FROM Location WHERE Zone_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?", zoneId, like, start, count)
+	query := "SELECT Name, Enabled FROM Location WHERE Zone_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?"
+	if !ascendingOrder {
+		query = "SELECT Name, Enabled FROM Location WHERE Zone_Id = ? AND Name LIKE ? ORDER BY Name DESC LIMIT ?, ?"
+	}
+	rows, err := db.db.Query(query, zoneId, like, start, count)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return List{}, nil
+			return EmptyList(), nil
 		}
-		return nil, parseError(err)
+		return List{}, parseError(err)
 	}
 	defer func() { _ = rows.Close() }()
 	res := List{}
@@ -380,24 +409,15 @@ func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, co
 		var item ListItem
 		err := rows.Scan(&item.Id, &item.Enabled)
 		if err != nil {
-			return nil, parseError(err)
+			return List{}, parseError(err)
 		}
-		res = append(res, item)
+		res.Items = append(res.Items, item)
+	}
+	row := db.db.QueryRow("SELECT count(*) FROM Location WHERE Zone_Id = ? AND Name LIKE ?", zoneId, like)
+	if err := row.Scan(&res.Total); err != nil {
+		return List{}, parseError(err)
 	}
 	return res, nil
-}
-
-func (db *DataBase) getLocationId(zoneName string, location string) (ObjectId, ObjectId, error) {
-	res := db.db.QueryRow("SELECT Zone.Id, L.Id FROM Zone LEFT JOIN Location L on Zone.Id = L.Zone_Id WHERE Zone.Name = ? AND L.Name = ?", zoneName, location)
-	var (
-		zoneId     ObjectId
-		locationId ObjectId
-	)
-	err := res.Scan(&zoneId, &locationId)
-	if err != nil {
-		return EmptyObjectId, EmptyObjectId, parseError(err)
-	}
-	return zoneId, locationId, nil
 }
 
 func (db *DataBase) GetLocation(userId ObjectId, zoneName string, location string) (Location, error) {
@@ -414,81 +434,94 @@ func (db *DataBase) GetLocation(userId ObjectId, zoneName string, location strin
 	return l, parseError(err)
 }
 
-func (db *DataBase) UpdateLocation(userId ObjectId, zoneName string, location string, l LocationUpdate) (int64, error) {
-	zoneId, locationId, err := db.getLocationId(zoneName, location)
+func (db *DataBase) UpdateLocation(userId ObjectId, l LocationUpdate) error {
+	zoneId, locationId, err := db.getLocationId(l.ZoneName, l.Location)
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	if err := db.canUpdateLocation(userId, zoneId, locationId); err != nil {
-		return 0, parseError(err)
-	}
-	res, err := db.db.Exec("UPDATE Location SET Enabled = ? WHERE Id = ?", l.Enabled, locationId)
+	err = db.withTransaction(func(t transaction) error {
+		if err := db.canUpdateLocation(userId, zoneId, locationId); err != nil {
+			return err
+		}
+		if err := db.updateLocation(locationId, l); err != nil {
+			return err
+		}
+		if _, err := db.addEvent(zoneId, UpdateLocation, l); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	return res.RowsAffected()
+	return nil
 }
 
-func (db *DataBase) DeleteLocation(userId ObjectId, zoneName string, location string) (int64, error) {
-	zoneId, locationId, err := db.getLocationId(zoneName, location)
+func (db *DataBase) DeleteLocation(userId ObjectId, l LocationDelete) error {
+	zoneId, locationId, err := db.getLocationId(l.ZoneName, l.Location)
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	if err := db.canDeleteLocation(userId, zoneId, locationId); err != nil {
-		return 0, parseError(err)
-	}
-	res, err := db.db.Exec("DELETE FROM Location WHERE Id = ?", locationId)
+	err = db.withTransaction(func(t transaction) error {
+		if err := db.canDeleteLocation(userId, zoneId, locationId); err != nil {
+			return err
+		}
+		if err := db.deleteLocation(locationId); err != nil {
+			return err
+		}
+		if _, err := db.addEvent(zoneId, DeleteLocation, l); err != nil {
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		return 0, parseError(err)
+		return parseError(err)
 	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return 0, parseError(err)
-	}
-	if rows == 0 {
-		return 0, ErrNotFound
-	}
-	return rows, parseError(err)
+	return nil
 }
 
-func (db *DataBase) AddRecordSet(userId ObjectId, zoneName string, location string, r NewRecordSet) (ObjectId, error) {
-	zoneId, locationId, err := db.getLocationId(zoneName, location)
+func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, error) {
+	zoneId, locationId, err := db.getLocationId(r.ZoneName, r.Location)
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
 	if err := db.canAddRecordSet(userId, zoneId, locationId); err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	id := NewObjectId()
+	var recordId ObjectId
 	err = db.withTransaction(func(t transaction) error {
-		if _, err = db.db.Exec("INSERT INTO RecordSet(Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", id, locationId, r.Type, r.Value, r.Enabled); err != nil {
-			return parseError(err)
+		var err error
+		if recordId, err = db.addRecordSet(locationId, r); err != nil {
+			return err
 		}
-		if err := db.setPrivileges(userId, id, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
-			return parseError(err)
+		if err = db.setPrivileges(userId, recordId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
+			return err
+		}
+		if _, err = db.addEvent(zoneId, AddRecord, r); err != nil {
+			return err
 		}
 		return nil
 	})
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	return id, nil
+	return recordId, nil
 }
 
 func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location string) (List, error) {
 	zoneId, locationId, err := db.getLocationId(zoneName, location)
 	if err != nil {
-		return nil, parseError(err)
+		return List{}, parseError(err)
 	}
 	if err := db.canGetRecordSets(userId, zoneId, locationId); err != nil {
-		return nil, parseError(err)
+		return List{}, parseError(err)
 	}
-	rows, err := db.db.Query("SELECT Type, Enabled FROM RecordSet WHERE Location_Id = ?", locationId)
+	rows, err := db.db.Query("SELECT Type, Enabled FROM RecordSet WHERE Location_Id = ? ORDER BY Type", locationId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return List{}, nil
+			return EmptyList(), nil
 		}
-		return nil, parseError(err)
+		return List{}, parseError(err)
 	}
 	defer func() { _ = rows.Close() }()
 	res := List{}
@@ -496,11 +529,107 @@ func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location str
 		var item ListItem
 		err := rows.Scan(&item.Id, &item.Enabled)
 		if err != nil {
-			return nil, parseError(err)
+			return List{}, parseError(err)
 		}
-		res = append(res, item)
+		res.Items = append(res.Items, item)
+	}
+	row := db.db.QueryRow("SELECT count(*) FROM RecordSet WHERE Location_Id = ?", locationId)
+	if err := row.Scan(&res.Total); err != nil {
+		return List{}, parseError(err)
 	}
 	return res, nil
+}
+
+func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location string, recordType string) (RecordSet, error) {
+	zoneId, locationId, recordId, err := db.getRecordId(zoneName, location, recordType)
+	if err != nil {
+		return RecordSet{}, parseError(err)
+	}
+	if err := db.canGetRecordSet(userId, zoneId, locationId, recordId); err != nil {
+		return RecordSet{}, parseError(err)
+	}
+	row := db.db.QueryRow("SELECT Id, Type, Value, Enabled FROM RecordSet WHERE Id = ?", recordId)
+	var (
+		r     RecordSet
+		value string
+	)
+	err = row.Scan(&r.Id, &r.Type, &value, &r.Enabled)
+	rrset := types.TypeToRRSet[recordType]()
+	err = jsoniter.Unmarshal([]byte(value), &rrset)
+	if err != nil {
+		return RecordSet{}, err
+	}
+	r.Value = rrset
+	return r, parseError(err)
+}
+
+func (db *DataBase) UpdateRecordSet(userId ObjectId, r RecordSetUpdate) error {
+	zoneId, locationId, recordId, err := db.getRecordId(r.ZoneName, r.Location, r.Type)
+	if err != nil {
+		return parseError(err)
+	}
+	err = db.withTransaction(func(t transaction) error {
+		if err := db.canUpdateRecordSet(userId, zoneId, locationId, recordId); err != nil {
+			return err
+		}
+		if err := db.updateRecordSet(recordId, r); err != nil {
+			return err
+		}
+		if _, err := db.addEvent(zoneId, UpdateRecord, r); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return parseError(err)
+	}
+	return nil
+}
+
+func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
+	zoneId, locationId, recordId, err := db.getRecordId(r.ZoneName, r.Location, r.Type)
+	if err != nil {
+		return parseError(err)
+	}
+	err = db.withTransaction(func(t transaction) error {
+		if err := db.canDeleteRecordSet(userId, zoneId, locationId, recordId); err != nil {
+			return parseError(err)
+		}
+		if err := db.deleteRecordSet(recordId); err != nil {
+			return parseError(err)
+		}
+		if _, err := db.addEvent(zoneId, DeleteRecord, r); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return parseError(err)
+	}
+	return nil
+}
+
+func (db *DataBase) getZoneId(zoneName string) (ObjectId, error) {
+	var zoneId ObjectId
+	res := db.db.QueryRow("SELECT Id FROM Zone WHERE Name = ?", zoneName)
+	err := res.Scan(&zoneId)
+	if err != nil {
+		return EmptyObjectId, parseError(err)
+	}
+	return zoneId, nil
+}
+
+func (db *DataBase) getLocationId(zoneName string, location string) (ObjectId, ObjectId, error) {
+	res := db.db.QueryRow("SELECT Zone.Id, L.Id FROM Zone LEFT JOIN Location L on Zone.Id = L.Zone_Id WHERE Zone.Name = ? AND L.Name = ?", zoneName, location)
+	var (
+		zoneId     ObjectId
+		locationId ObjectId
+	)
+	err := res.Scan(&zoneId, &locationId)
+	if err != nil {
+		return EmptyObjectId, EmptyObjectId, parseError(err)
+	}
+	return zoneId, locationId, nil
 }
 
 func (db *DataBase) getRecordId(zoneName string, location string, recordType string) (ObjectId, ObjectId, ObjectId, error) {
@@ -517,55 +646,83 @@ func (db *DataBase) getRecordId(zoneName string, location string, recordType str
 	return zoneId, locationId, recordId, nil
 }
 
-func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location string, recordType string) (RecordSet, error) {
-	zoneId, locationId, recordId, err := db.getRecordId(zoneName, location, recordType)
-	if err != nil {
-		return RecordSet{}, parseError(err)
-	}
-	if err := db.canGetRecordSet(userId, zoneId, locationId, recordId); err != nil {
-		return RecordSet{}, parseError(err)
-	}
-	row := db.db.QueryRow("SELECT Id, Type, Value, Enabled FROM RecordSet WHERE Id = ?", recordId)
-	var r RecordSet
-	err = row.Scan(&r.Id, &r.Type, &r.Value, &r.Enabled)
-	return r, parseError(err)
+func (db *DataBase) setSOA(zoneId ObjectId, soa types.SOA_RRSet) error {
+	_, err := db.db.Exec("REPLACE INTO SOA VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", soa.TtlValue, soa.Ns, soa.MBox, soa.Refresh, soa.Retry, soa.Expire, soa.MinTtl, soa.Serial, zoneId)
+	return err
 }
 
-func (db *DataBase) UpdateRecordSet(userId ObjectId, zoneName string, location string, recordType string, r RecordSetUpdate) (int64, error) {
-	zoneId, locationId, recordId, err := db.getRecordId(zoneName, location, recordType)
-	if err != nil {
-		return 0, parseError(err)
+func (db *DataBase) addZone(userId ObjectId, z NewZone) (ObjectId, error) {
+	zoneId := NewObjectId()
+	if _, err := db.db.Exec("INSERT INTO Zone(Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", zoneId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, userId); err != nil {
+		return EmptyObjectId, err
 	}
-	if err := db.canUpdateRecordSet(userId, zoneId, locationId, recordId); err != nil {
-		return 0, parseError(err)
-	}
-	res, err := db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Id = ?", r.Value, r.Enabled, recordId)
-	if err != nil {
-		return 0, parseError(err)
-	}
-	return res.RowsAffected()
+	return zoneId, nil
 }
 
-func (db *DataBase) DeleteRecordSet(userId ObjectId, zoneName string, location string, recordType string) (int64, error) {
-	zoneId, locationId, recordId, err := db.getRecordId(zoneName, location, recordType)
+func (db *DataBase) updateZone(zoneId ObjectId, z ZoneUpdate) error {
+	_, err := db.db.Exec("UPDATE Zone SET Name = ?, Dnssec = ?, CNameFlattening = ?, Enabled = ? WHERE Id = ?", z.Name, z.Dnssec, z.CNameFlattening, z.Enabled, zoneId)
+	return err
+}
+
+func (db *DataBase) deleteZone(zoneId ObjectId) error {
+	_, err := db.db.Exec("DELETE FROM Zone WHERE Id = ?", zoneId)
+	return err
+}
+
+func (db *DataBase) addLocation(zoneId ObjectId, l NewLocation) (ObjectId, error) {
+	locationId := NewObjectId()
+	if _, err := db.db.Exec("INSERT INTO Location(Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", locationId, l.Location, l.Enabled, zoneId); err != nil {
+		return EmptyObjectId, err
+	}
+	return locationId, nil
+}
+
+func (db *DataBase) updateLocation(locationId ObjectId, l LocationUpdate) error {
+	_, err := db.db.Exec("UPDATE Location SET Name = ?, Enabled = ? WHERE Id = ?", l.Location, l.Enabled, locationId)
+	return err
+}
+
+func (db *DataBase) deleteLocation(locationId ObjectId) error {
+	_, err := db.db.Exec("DELETE FROM Location WHERE Id = ?", locationId)
+	return err
+}
+
+func (db *DataBase) addRecordSet(locationId ObjectId, r NewRecordSet) (ObjectId, error) {
+	value, err := jsoniter.Marshal(r.Value)
 	if err != nil {
-		return 0, parseError(err)
+		return EmptyObjectId, err
 	}
-	if err := db.canDeleteRecordSet(userId, zoneId, locationId, recordId); err != nil {
-		return 0, parseError(err)
+	recordId := NewObjectId()
+	if _, err := db.db.Exec("INSERT INTO RecordSet(Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", recordId, locationId, r.Type, value, r.Enabled); err != nil {
+		return EmptyObjectId, err
 	}
-	res, err := db.db.Exec("DELETE FROM RecordSet WHERE Id = ?", recordId)
+	return recordId, nil
+}
+
+func (db *DataBase) updateRecordSet(recordId ObjectId, r RecordSetUpdate) error {
+	value, err := jsoniter.Marshal(r.Value)
 	if err != nil {
-		return 0, parseError(err)
+		return err
 	}
-	rows, err := res.RowsAffected()
+	_, err = db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Id = ?", value, r.Enabled, recordId)
+	return err
+}
+
+func (db *DataBase) deleteRecordSet(recordId ObjectId) error {
+	_, err := db.db.Exec("DELETE FROM RecordSet WHERE Id = ?", recordId)
+	return err
+}
+
+func (db *DataBase) addEvent(zoneId ObjectId, eventType EventType, value interface{}) (int64, error) {
+	jsonValue, err := jsoniter.Marshal(value)
 	if err != nil {
-		return 0, parseError(err)
+		return 0, err
 	}
-	if rows == 0 {
-		return 0, ErrNotFound
+	res, err := db.db.Exec("INSERT INTO Events(ZoneId, Type, Value) VALUES (?, ?, ?)", zoneId, eventType, jsonValue)
+	if err != nil {
+		return 0, err
 	}
-	return rows, parseError(err)
+	return res.LastInsertId()
 }
 
 func parseError(err error) error {

@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"github.com/miekg/dns"
 	"net"
+	"strings"
 )
 
 const (
@@ -32,6 +33,26 @@ var TypeToRRSet = map[string]func() RRSet{
 	"ds":    func() RRSet { return new(DS_RRSet) },
 	"soa":   func() RRSet { return new(SOA_RRSet) },
 	"aname": func() RRSet { return new(ANAME_RRSet) },
+}
+
+func StringToType(s string) uint16 {
+	s = strings.ToUpper(s)
+	if s == "ANAME" {
+		return TypeANAME
+	}
+	return dns.StringToType[s]
+}
+
+var customTypeToString = map[uint16]string{
+	TypeANAME: "ANAME",
+}
+
+func TypeToString(t uint16) string {
+	s, ok := customTypeToString[t]
+	if !ok {
+		s = dns.TypeToString[t]
+	}
+	return strings.ToLower(s)
 }
 
 type RRSet interface {

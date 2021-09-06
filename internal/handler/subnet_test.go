@@ -9,7 +9,7 @@ import (
 )
 
 func TestSubnet(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	tc := test.Case{
 		Qname: "example.com.", Qtype: dns.TypeA,
 	}
@@ -29,12 +29,12 @@ func TestSubnet(t *testing.T) {
 	r := tc.Msg()
 	r.Extra = append(r.Extra, opt)
 
-	g.Expect(r.IsEdns0()).NotTo(BeNil())
+	Expect(r.IsEdns0()).NotTo(BeNil())
 	w := test.NewRecorder(&test.ResponseWriter{})
 	state := NewRequestContext(w, r)
 
 	subnet := state.SourceSubnet
-	g.Expect(subnet).To(Equal(sa + "/32/0"))
+	Expect(subnet).To(Equal(sa + "/32/0"))
 	address := state.SourceIp
-	g.Expect(address.String()).To(Equal(sa))
+	Expect(address.String()).To(Equal(sa))
 }

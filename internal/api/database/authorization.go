@@ -30,6 +30,11 @@ func (db *DataBase) setPrivileges(userId ObjectId, resourceId ObjectId, acl ACL)
 	return err
 }
 
+func (db *DataBase) deletePrivileges(resourceId ObjectId) error {
+	_, err := db.db.Exec("DELETE FROM ACL WHERE Id = ?", resourceId)
+	return err
+}
+
 func (db *DataBase) canRead(userId ObjectId, resourceId ObjectId) error {
 	acl, err := db.getPrivileges(userId, resourceId)
 	if err != nil {

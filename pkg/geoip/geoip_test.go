@@ -103,7 +103,7 @@ func _() {
 }
 
 func TestDisabled(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	cfg := Config{
 		Enable:    false,
 		CountryDB: countryDB,
@@ -111,18 +111,18 @@ func TestDisabled(t *testing.T) {
 	}
 	geoIp := NewGeoIp(&cfg)
 
-	g.Expect(geoIp.enable).To(BeFalse())
+	Expect(geoIp.enable).To(BeFalse())
 
 	_, err := geoIp.GetASN(net.ParseIP("1.2.3.4"))
-	g.Expect(err).To(Equal(ErrGeoIpDisabled))
+	Expect(err).To(Equal(ErrGeoIpDisabled))
 	_, err = geoIp.GetCountry(net.ParseIP("1.2.3.4"))
-	g.Expect(err).To(Equal(ErrGeoIpDisabled))
+	Expect(err).To(Equal(ErrGeoIpDisabled))
 	_, _, err = geoIp.GetCoordinates(net.ParseIP("1.2.3.4"))
-	g.Expect(err).To(Equal(ErrGeoIpDisabled))
+	Expect(err).To(Equal(ErrGeoIpDisabled))
 }
 
 func TestBadDB(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	cfg := Config{
 		Enable:    true,
 		CountryDB: "ddd",
@@ -130,12 +130,12 @@ func TestBadDB(t *testing.T) {
 	}
 	geoIp := NewGeoIp(&cfg)
 
-	g.Expect(geoIp.enable).To(BeTrue())
+	Expect(geoIp.enable).To(BeTrue())
 
 	_, err := geoIp.GetASN(net.ParseIP("1.2.3.4"))
-	g.Expect(err).To(Equal(ErrBadDB))
+	Expect(err).To(Equal(ErrBadDB))
 	_, err = geoIp.GetCountry(net.ParseIP("1.2.3.4"))
-	g.Expect(err).To(Equal(ErrBadDB))
+	Expect(err).To(Equal(ErrBadDB))
 	_, _, err = geoIp.GetCoordinates(net.ParseIP("1.2.3.4"))
-	g.Expect(err).To(Equal(ErrBadDB))
+	Expect(err).To(Equal(ErrBadDB))
 }

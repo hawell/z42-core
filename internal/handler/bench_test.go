@@ -32,16 +32,17 @@ var benchTestHandler *DnsRequestHandler
 
 func TestMain(m *testing.M) {
 	r := storage.NewDataHandler(&DefaultRedisDataTestConfig)
+	r.Start()
 	l, _ := zap.NewProduction()
 	benchTestHandler = NewHandler(&DefaultHandlerTestConfig, r, l)
-	err := benchTestHandler.RedisData.Clear()
+	err := r.Clear()
 	log.Println(err)
-	err = benchTestHandler.RedisData.EnableZone(benchZone)
+	err = r.EnableZone(benchZone)
 	log.Println(err)
-	err = benchTestHandler.RedisData.SetZoneConfigFromJson(benchZone, "{\"cname_flattening\": false}")
+	err = r.SetZoneConfigFromJson(benchZone, "{\"cname_flattening\": false}")
 	log.Println(err)
 	for _, cmd := range benchEntries {
-		err := benchTestHandler.RedisData.SetLocationFromJson(benchZone, cmd[0], cmd[1])
+		err := r.SetLocationFromJson(benchZone, cmd[0], cmd[1])
 		if err != nil {
 			log.Printf("[ERROR] 1: %s\n%s", err, cmd[1])
 			return

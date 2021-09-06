@@ -23,7 +23,7 @@ import (
 )
 
 type Config struct {
-	Server    []server.ServerConfig           `json:"server"`
+	Server    []server.Config                 `json:"server"`
 	RedisData storage.DataHandlerConfig       `json:"redis_data"`
 	RedisStat storage.StatHandlerConfig       `json:"redis_stat"`
 	Handler   handler.DnsRequestHandlerConfig `json:"handler"`
@@ -31,7 +31,7 @@ type Config struct {
 }
 
 var resolverDefaultConfig = &Config{
-	Server: []server.ServerConfig{
+	Server: []server.Config{
 		{
 			Ip:       "127.0.0.1",
 			Port:     1053,

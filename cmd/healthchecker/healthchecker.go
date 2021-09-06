@@ -130,6 +130,7 @@ func Start() {
 	log.Printf("[INFO] logger loaded")
 
 	redisDataHandler = storage.NewDataHandler(&cfg.RedisData)
+	redisDataHandler.Start()
 	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
 	eventLogger.Info("starting health checker...")

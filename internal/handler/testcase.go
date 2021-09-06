@@ -29,22 +29,23 @@ type TestCase struct {
 
 func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 	r := storage.NewDataHandler(&testCase.RedisDataConfig)
+	r.Start()
 	l, _ := zap.NewProduction()
 	h := NewHandler(&testCase.HandlerConfig, r, l)
 	if err := h.RedisData.Clear(); err != nil {
 		return nil, err
 	}
 	for i, zone := range testCase.Zones {
-		if err := h.RedisData.EnableZone(zone); err != nil {
+		if err := r.EnableZone(zone); err != nil {
 			return nil, err
 		}
 		for _, cmd := range testCase.Entries[i] {
-			err := h.RedisData.SetLocationFromJson(zone, cmd[0], cmd[1])
+			err := r.SetLocationFromJson(zone, cmd[0], cmd[1])
 			if err != nil {
 				return nil, errors.New(fmt.Sprintf("[ERROR] 4: %s\n%s", err, cmd[1]))
 			}
 		}
-		if err := h.RedisData.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {
+		if err := r.SetZoneConfigFromJson(zone, testCase.ZoneConfigs[i]); err != nil {
 			return nil, err
 		}
 	}
@@ -53,7 +54,7 @@ func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 }
 
 func DefaultApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler, t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	for _, tc := range testCase.TestCases {
 
 		r := tc.Msg()
@@ -64,7 +65,7 @@ func DefaultApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler
 		resp := w.Msg
 
 		err := test.SortAndCheck(resp, tc)
-		g.Expect(err).To(BeNil())
+		Expect(err).To(BeNil())
 	}
 }
 

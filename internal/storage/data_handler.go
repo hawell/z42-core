@@ -2,9 +2,11 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"github.com/dgraph-io/ristretto"
 	redisCon "github.com/gomodule/redigo/redis"
 	"github.com/hashicorp/go-immutable-radix"
+	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/dnssec"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
@@ -12,6 +14,7 @@ import (
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -45,12 +48,7 @@ const (
 	zoneForcedReload = time.Minute * 60
 	keyPrefix        = "z42:zones:"
 	zonesKey         = "z42:zones"
-)
-
-var (
-	customTypeToString = map[uint16]string{
-		types.TypeANAME: "ANAME",
-	}
+	revisionKey      = "z42:revision"
 )
 
 func NewDataHandler(config *DataHandlerConfig) *DataHandler {
@@ -75,6 +73,10 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 		Metrics:     false,
 	})
 
+	return dh
+}
+
+func (dh *DataHandler) Start() {
 	dh.LoadZones()
 
 	go func() {
@@ -105,7 +107,7 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 			zap.L().Error("error", zap.Error(err))
 		}, zonesQuitChan)
 
-		reloadTicker := time.NewTicker(time.Duration(config.ZoneReload) * time.Second)
+		reloadTicker := time.NewTicker(time.Duration(dh.config.ZoneReload) * time.Second)
 		forceReloadTicker := time.NewTicker(zoneForcedReload)
 		for {
 			select {
@@ -127,8 +129,6 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 			}
 		}
 	}()
-
-	return dh
 }
 
 func isRRSetEntry(parts []string) bool {
@@ -157,10 +157,7 @@ func zoneConfigKey(zone string) string {
 }
 
 func zoneLocationRRSetKey(zone string, label string, rtype uint16) string {
-	typeStr, ok := customTypeToString[rtype]
-	if !ok {
-		typeStr = dns.TypeToString[rtype]
-	}
+	typeStr := types.TypeToString(rtype)
 	return keyPrefix + zone + ":labels:" + label + ":" + typeStr
 }
 
@@ -614,4 +611,139 @@ func (dh *DataHandler) loadZoneKeys(z *types.Zone) {
 
 func (dh *DataHandler) Clear() error {
 	return dh.redis.Del("*")
+}
+
+func (dh *DataHandler) GetRevision() (int, error) {
+	r, err := dh.redis.Get(revisionKey)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(r)
+}
+
+func (dh *DataHandler) SetRevision(revision int) error {
+	return dh.redis.Set(revisionKey, strconv.Itoa(revision))
+}
+
+func (dh *DataHandler) ApplyEvent(event database.Event) error {
+	var tx hiredis.Transaction
+	switch event.Type {
+	case database.AddZone:
+		var newZone database.NewZone
+		if err := jsoniter.Unmarshal([]byte(event.Value), &newZone); err != nil {
+			return err
+		}
+		config := &types.ZoneConfig{
+			DomainId:        event.ZoneId,
+			SOA:             &newZone.SOA,
+			DnsSec:          newZone.Dnssec,
+			CnameFlattening: newZone.CNameFlattening,
+		}
+		configJson, err := jsoniter.Marshal(config)
+		if err != nil {
+			return err
+		}
+		nsValue, err := jsoniter.Marshal(newZone.NS)
+		if err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		if newZone.Enabled {
+			tx.SAdd(zonesKey, newZone.Name)
+		}
+		tx.
+			SAdd(zoneLocationsKey(newZone.Name), "@").
+			Set(zoneConfigKey(newZone.Name), string(configJson)).
+			Set(zoneLocationRRSetKey(newZone.Name, "@", dns.TypeNS), string(nsValue))
+	case database.UpdateZone:
+		var zoneUpdate database.ZoneUpdate
+		if err := jsoniter.Unmarshal([]byte(event.Value), &zoneUpdate); err != nil {
+			return err
+		}
+		config := &types.ZoneConfig{
+			DomainId:        event.ZoneId,
+			SOA:             &zoneUpdate.SOA,
+			DnsSec:          zoneUpdate.Dnssec,
+			CnameFlattening: zoneUpdate.CNameFlattening,
+		}
+		configJson, err := jsoniter.Marshal(config)
+		if err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		if zoneUpdate.Enabled {
+			tx.SAdd(zonesKey, zoneUpdate.Name)
+		} else {
+			tx.SRem(zonesKey, zoneUpdate.Name)
+		}
+		tx.
+			SAdd(zoneLocationsKey(zoneUpdate.Name), "@").
+			Set(zoneConfigKey(zoneUpdate.Name), string(configJson))
+	case database.DeleteZone:
+		var zoneDelete database.ZoneDelete
+		if err := jsoniter.Unmarshal([]byte(event.Value), &zoneDelete); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		tx.SRem(zonesKey, zoneDelete.Name)
+	case database.AddLocation:
+		var newLocation database.NewLocation
+		if err := jsoniter.Unmarshal([]byte(event.Value), &newLocation); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		if newLocation.Enabled {
+			tx.SAdd(zoneLocationsKey(newLocation.ZoneName), newLocation.Location)
+		}
+	case database.UpdateLocation:
+		var locationUpdate database.LocationUpdate
+		if err := jsoniter.Unmarshal([]byte(event.Value), &locationUpdate); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		if locationUpdate.Enabled {
+			tx.SAdd(zoneLocationsKey(locationUpdate.ZoneName), locationUpdate.Location)
+		} else {
+			tx.SRem(zoneLocationsKey(locationUpdate.ZoneName), locationUpdate.Location)
+		}
+	case database.DeleteLocation:
+		var locationDelete database.LocationDelete
+		if err := jsoniter.Unmarshal([]byte(event.Value), &locationDelete); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		tx.SRem(zoneLocationsKey(locationDelete.ZoneName), locationDelete.Location)
+	case database.AddRecord:
+		var newRecord database.NewRecordSet
+		if err := jsoniter.Unmarshal([]byte(event.Value), &newRecord); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		if newRecord.Enabled {
+			value, _ := jsoniter.Marshal(newRecord.Value)
+			tx.Set(zoneLocationRRSetKey(newRecord.ZoneName, newRecord.Location, types.StringToType(newRecord.Type)), string(value))
+		}
+	case database.UpdateRecord:
+		var recordUpdate database.RecordSetUpdate
+		if err := jsoniter.Unmarshal([]byte(event.Value), &recordUpdate); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		if recordUpdate.Enabled {
+			value, _ := jsoniter.Marshal(recordUpdate.Value)
+			tx.Set(zoneLocationRRSetKey(recordUpdate.ZoneName, recordUpdate.Location, types.StringToType(recordUpdate.Type)), string(value))
+		} else {
+			tx.Del(zoneLocationRRSetKey(recordUpdate.ZoneName, recordUpdate.Location, types.StringToType(recordUpdate.Type)))
+		}
+	case database.DeleteRecord:
+		var recordDelete database.RecordSetDelete
+		if err := jsoniter.Unmarshal([]byte(event.Value), &recordDelete); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		tx.Del(zoneLocationRRSetKey(recordDelete.ZoneName, recordDelete.Location, types.StringToType(recordDelete.Type)))
+	default:
+		return fmt.Errorf("invalid event type: %s", event.Type)
+	}
+	return tx.Set(revisionKey, strconv.Itoa(event.Revision)).Commit()
 }

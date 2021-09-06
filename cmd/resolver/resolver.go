@@ -156,6 +156,7 @@ func Start() {
 	servers = server.NewServer(cfg.Server)
 
 	redisDataHandler = storage.NewDataHandler(&cfg.RedisData)
+	redisDataHandler.Start()
 	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
 	eventLogger.Info("starting handler...")

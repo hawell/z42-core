@@ -9,7 +9,7 @@ import (
 )
 
 func TestWeight(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	// distribution
 	rrset := types.IP_RRSet{
 		GenericRRSet: types.GenericRRSet{
@@ -43,9 +43,9 @@ func TestWeight(t *testing.T) {
 			n[3]++
 		}
 	}
-	g.Expect(n[0] <= n[2]).To(BeTrue())
-	g.Expect(n[2] <= n[3]).To(BeTrue())
-	g.Expect(n[1] <= n[0]).To(BeTrue())
+	Expect(n[0] <= n[2]).To(BeTrue())
+	Expect(n[2] <= n[3]).To(BeTrue())
+	Expect(n[1] <= n[0]).To(BeTrue())
 
 	// all zero
 	for i := range rrset.Data {
@@ -66,7 +66,7 @@ func TestWeight(t *testing.T) {
 		}
 	}
 	for i := 0; i < 4; i++ {
-		g.Expect(n[i] < 2000 && n[i] > 3000).To(BeFalse())
+		Expect(n[i] < 2000 && n[i] > 3000).To(BeFalse())
 	}
 
 	// some zero
@@ -86,8 +86,8 @@ func TestWeight(t *testing.T) {
 		}
 	}
 	log.Println(n)
-	g.Expect(n[0]).To(Equal(0))
-	g.Expect(n[3]).To(Equal(0))
+	Expect(n[0]).To(Equal(0))
+	Expect(n[3]).To(Equal(0))
 
 	// weighted = false
 	n[0], n[1], n[2], n[3] = 0, 0, 0, 0
@@ -108,7 +108,7 @@ func TestWeight(t *testing.T) {
 	}
 	log.Println(n)
 	for i := 0; i < 4; i++ {
-		g.Expect(n[i] >= 20000).To(BeTrue())
-		g.Expect(n[i] <= 30000).To(BeTrue())
+		Expect(n[i] >= 20000).To(BeTrue())
+		Expect(n[i] <= 30000).To(BeTrue())
 	}
 }

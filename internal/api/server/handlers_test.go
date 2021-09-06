@@ -12,6 +12,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -125,17 +126,18 @@ func TestGetZones(t *testing.T) {
 
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": "zone1.com.",
-		},
-		{
-			"id": "zone2.com.",
-		},
-		{
-			"id": "zone3.com.",
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 3,
+			"items": [
+				{"id": "zone1.com.", "enabled": true},
+				{"id": "zone2.com.", "enabled": true},
+				{"id": "zone3.com.", "enabled": true}
+			]
+		}
+	}`))
 
 	// limit results
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones?start=1&count=1", "")
@@ -144,11 +146,16 @@ func TestGetZones(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": "zone2.com.",
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 3,
+			"items": [
+				{"id": "zone2.com.", "enabled": true}
+			]
+		}
+	}`))
 
 	// with q
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones?q=2", "")
@@ -157,11 +164,16 @@ func TestGetZones(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": "zone2.com.",
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 1,
+			"items": [
+				{"id": "zone2.com.", "enabled": true}
+			]
+		}
+	}`))
 
 	// empty results
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones?q=asdas", "")
@@ -170,7 +182,7 @@ func TestGetZones(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(BeEmpty())
+	Expect(body).To(MatchJSON(`{"code": 200, "message": "successful", "data":{"items": null, "total": 0}}`))
 
 	// user with no zone
 	resp = execRequest(users[1].Id, http.MethodGet, "/zones", "")
@@ -179,7 +191,7 @@ func TestGetZones(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(BeEmpty())
+	Expect(body).To(MatchJSON(`{"code": 200, "message": "successful", "data":{"items": null, "total": 0}}`))
 }
 
 func TestGetZone(t *testing.T) {
@@ -196,12 +208,26 @@ func TestGetZone(t *testing.T) {
 	var response handlers.Response
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(Equal(map[string]interface{}{
-		"name":             "zone1.com.",
-		"enabled":          false,
-		"dnssec":           false,
-		"cname_flattening": false,
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+	  	"message": "successful",
+	  	"data": {
+			"name":             "zone1.com.",
+			"enabled":          true,
+			"dnssec":           false,
+			"cname_flattening": false,
+			"soa": {
+				"ttl": 300,
+				"ns": "ns1.example.com.",
+				"mbox": "admin.example.com.",
+				"refresh": 44,
+				"retry": 55,
+				"expire": 66,
+				"minttl": 100,
+				"serial": 123456
+			}
+		}
+	}`))
 
 	// non-existing zone
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+"invalid.none.", "")
@@ -228,12 +254,17 @@ func TestUpdateZone(t *testing.T) {
 	var response handlers.Response
 	err = json.Unmarshal(respBody, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(Equal(map[string]interface{}{
-		"name":             "zone1.com.",
-		"enabled":          true,
-		"dnssec":           true,
-		"cname_flattening": false,
-	}))
+	Expect(respBody).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"name":             "zone1.com.",
+			"enabled":          true,
+			"dnssec":           true,
+			"cname_flattening": false,
+			"soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123456}
+		}
+	}`))
 
 	// non-existing zone
 	resp = execRequest(users[0].Id, http.MethodPut, "/zones/"+"invalid.none.", `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
@@ -328,17 +359,19 @@ func TestGetLocations(t *testing.T) {
 	var response handlers.Response
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": "www1",
-		},
-		{
-			"id": "www2",
-		},
-		{
-			"id": "www3",
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 4,
+			"items": [
+				{"id": "@", "enabled": true},
+				{"id": "www1", "enabled": true},
+				{"id": "www2", "enabled": true},
+				{"id": "www3", "enabled": true}
+			]
+		}
+	}`))
 
 	// unauthorized
 	resp = execRequest(users[1].Id, http.MethodGet, "/zones/"+zone1Name+"/locations", "")
@@ -351,24 +384,26 @@ func TestGetLocations(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": "www4",
-		},
-		{
-			"id": "www5",
-		},
-		{
-			"id": "www6",
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 4,
+			"items": [
+				{"id": "@", "enabled": true},
+				{"id": "www4", "enabled": true},
+				{"id": "www5", "enabled": true},
+				{"id": "www6", "enabled": true}
+			]
+		}
+	}`))
 
 	// zone with no location
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone3Name+"/locations", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(body).To(Equal([]byte(`{"code":200,"message":"successful","data":[{"id":"@"}]}`)))
+	Expect(body).To(Equal([]byte(`{"code":200,"message":"successful","data":{"items":[{"id":"@","enabled":true}],"total":1}}`)))
 
 	// non-existing zone
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+"invalid.none."+"/locations", "")
@@ -381,11 +416,16 @@ func TestGetLocations(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": "www1",
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 4,
+			"items": [
+				{"id": "www1", "enabled": true}
+			]
+		}
+	}`))
 
 	// with q
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations?q=2", "")
@@ -394,18 +434,23 @@ func TestGetLocations(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": "www2",
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 1,
+			"items": [
+				{"id": "www2", "enabled": true}
+			]
+		}
+	}`))
 
 	// empty results
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations?q=asdasd", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(body).To(Equal([]byte(`{"code":200,"message":"successful","data":[]}`)))
+	Expect(body).To(MatchJSON(`{"code":200,"message":"successful","data":{"total": 0, "items":null}}`))
 }
 
 func TestGetLocation(t *testing.T) {
@@ -453,12 +498,19 @@ func TestUpdateLocation(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations/"+location1, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
-	respBody, err := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	var l zone.GetLocationResponse
-	err = json.Unmarshal(respBody, &l)
+	var response handlers.Response
+	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(l.Enabled).To(BeFalse())
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"name": "www",
+			"enabled": false
+		}
+	}`))
 
 	// unauthorized
 	resp = execRequest(users[1].Id, http.MethodPut, "/zones/"+zone1Name+"/locations/"+location1, `{"enabled": false}`)
@@ -548,10 +600,26 @@ func TestGetRecordSets(t *testing.T) {
 	_, err = addLocation(users[0].Id, zone1Name, location2)
 	Expect(err).To(BeNil())
 	r1 := "a"
-	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, `{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`)
+	v1 := &types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data: []types.IP_RR{
+			{
+				Ip: net.ParseIP("1.2.3.4"),
+			},
+		},
+	}
+	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, v1)
 	Expect(err).To(BeNil())
 	r2 := "aaaa"
-	_, err = addRecordSet(users[0].Id, zone1Name, location1, r2, `{"ttl": 300, "records": [{"ip": "::1"}]}`)
+	v2 := &types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data: []types.IP_RR{
+			{
+				Ip: net.ParseIP("::1"),
+			},
+		},
+	}
+	_, err = addRecordSet(users[0].Id, zone1Name, location1, r2, v2)
 	Expect(err).To(BeNil())
 	zone2Name := "zone2.com."
 	_, err = addZone(users[0].Id, zone2Name)
@@ -560,10 +628,18 @@ func TestGetRecordSets(t *testing.T) {
 	_, err = addLocation(users[0].Id, zone2Name, location3)
 	Expect(err).To(BeNil())
 	r3 := "aname"
-	_, err = addRecordSet(users[0].Id, zone2Name, location3, r3, `{"location": "aname.example.com."}`)
+	v3 := &types.ANAME_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Location:     "aname.example.com.",
+	}
+	_, err = addRecordSet(users[0].Id, zone2Name, location3, r3, v3)
 	Expect(err).To(BeNil())
 	r4 := "cname"
-	_, err = addRecordSet(users[0].Id, zone2Name, location3, r4, `{"ttl": 300, "host": "x.example.com."}`)
+	v4 := &types.CNAME_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Host:         "x.example.com.",
+	}
+	_, err = addRecordSet(users[0].Id, zone2Name, location3, r4, v4)
 	Expect(err).To(BeNil())
 
 	// get record sets
@@ -574,14 +650,17 @@ func TestGetRecordSets(t *testing.T) {
 	var response handlers.Response
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": r1,
-		},
-		{
-			"id": r2,
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 2,
+			"items": [
+				{"id": "a", "enabled": true},
+				{"id": "aaaa", "enabled": true}
+			]
+		}
+	}`))
 
 	// another zone
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone2Name+"/locations/"+location3+"/rrsets", "")
@@ -590,21 +669,24 @@ func TestGetRecordSets(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data).To(ContainElements([]map[string]interface{}{
-		{
-			"id": r3,
-		},
-		{
-			"id": r4,
-		},
-	}))
+	Expect(body).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"total": 2,
+			"items": [
+				{"id": "aname", "enabled": true},
+				{"id": "cname", "enabled": true}
+			]
+		}
+	}`))
 
 	// location with no record sets
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations/"+location2+"/rrsets", "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(body).To(Equal([]byte(`{"code":200,"message":"successful","data":[]}`)))
+	Expect(body).To(Equal([]byte(`{"code":200,"message":"successful","data":{"items":null,"total":0}}`)))
 
 	// non-existing location
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations/"+"invalid"+"/rrsets", "")
@@ -628,7 +710,15 @@ func TestGetRecordSet(t *testing.T) {
 	_, err = addLocation(users[0].Id, zone1Name, location1)
 	Expect(err).To(BeNil())
 	r1 := "a"
-	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, `{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`)
+	v1 := &types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data: []types.IP_RR{
+			{
+				Ip: net.ParseIP("1.2.3.4"),
+			},
+		},
+	}
+	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, v1)
 	Expect(err).To(BeNil())
 
 	// get record set
@@ -666,7 +756,15 @@ func TestUpdateRecordSet(t *testing.T) {
 	_, err = addLocation(users[0].Id, zone1Name, location1)
 	Expect(err).To(BeNil())
 	r1 := "a"
-	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, `{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`)
+	v1 := &types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data: []types.IP_RR{
+			{
+				Ip: net.ParseIP("1.2.3.4"),
+			},
+		},
+	}
+	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, v1)
 	Expect(err).To(BeNil())
 	path := "/zones/" + zone1Name + "/locations/" + location1 + "/rrsets/" + r1
 	body := `{"enabled": true, "value": {"ttl": 400, "records": [{"ip": "1.2.3.5"}]}}`
@@ -718,7 +816,15 @@ func TestDeleteRecordSet(t *testing.T) {
 	_, err = addLocation(users[0].Id, zone1Name, location1)
 	Expect(err).To(BeNil())
 	r1 := "a"
-	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, `{"ttl": 300, "records": [{"ip": "1.2.3.4"}]}`)
+	v1 := &types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data: []types.IP_RR{
+			{
+				Ip: net.ParseIP("1.2.3.4"),
+			},
+		},
+	}
+	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, v1)
 	Expect(err).To(BeNil())
 
 	// unauthorized
@@ -794,6 +900,7 @@ func TestMain(m *testing.M) {
 	}
 	tokens = make(map[database.ObjectId]string)
 	for i := range users {
+		fmt.Println(users[i].Email)
 		users[i].Id, err = db.AddUser(database.NewUser{Email: users[i].Email, Password: users[i].Email, Status: database.UserStatusActive})
 		if err != nil {
 			panic(err)
@@ -853,33 +960,32 @@ func initialize(t *testing.T) {
 }
 
 func addZone(userId database.ObjectId, zone string) (database.ObjectId, error) {
-	soa := types.SOA_RRSet{
-		GenericRRSet: types.GenericRRSet{TtlValue: 3600},
+	SOA := types.SOA_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
 		Ns:           "ns1.example.com.",
-		MBox:         "mail.example.com.",
-		Data:         nil,
-		Refresh:      3600,
-		Retry:        3600,
-		Expire:       3600,
-		MinTtl:       3600,
-		Serial:       3600,
+		MBox:         "admin.example.com.",
+		Refresh:      44,
+		Retry:        55,
+		Expire:       66,
+		MinTtl:       100,
+		Serial:       123456,
 	}
-	ns := types.NS_RRSet{
+	NS := types.NS_RRSet{
 		GenericRRSet: types.GenericRRSet{TtlValue: 3600},
 		Data: []types.NS_RR{
 			{Host: "ns1.example.com."},
 			{Host: "ns2.example.com."},
 		},
 	}
-	return db.AddZone(userId, database.NewZone{Name: zone}, soa, ns)
+	return db.AddZone(userId, database.NewZone{Name: zone, Enabled: true, SOA: SOA, NS: NS})
 }
 
 func addLocation(userId database.ObjectId, zoneName string, location string) (database.ObjectId, error) {
-	return db.AddLocation(userId, zoneName, database.NewLocation{Name: location})
+	return db.AddLocation(userId, database.NewLocation{ZoneName: zoneName, Location: location, Enabled: true})
 }
 
-func addRecordSet(userId database.ObjectId, zoneName string, location string, recordType string, recordset string) (database.ObjectId, error) {
-	return db.AddRecordSet(userId, zoneName, location, database.NewRecordSet{Enabled: true, Type: recordType, Value: recordset})
+func addRecordSet(userId database.ObjectId, zoneName string, location string, recordType string, recordset types.RRSet) (database.ObjectId, error) {
+	return db.AddRecordSet(userId, database.NewRecordSet{ZoneName: zoneName, Location: location, Enabled: true, Type: recordType, Value: recordset})
 }
 
 func execRequest(userId database.ObjectId, method string, path string, body string) *http.Response {

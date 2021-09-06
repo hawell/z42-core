@@ -105,9 +105,10 @@ var healthcheckTestConfig = Config{
 }
 
 func TestGet(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	log.Println("TestGet")
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	dh.Start()
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	l, _ := zap.NewProduction()
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
@@ -121,16 +122,17 @@ func TestGet(t *testing.T) {
 	for i, item := range healthcheckGetEntries {
 		stat := h.redisStat.GetHealthStatus(item.Host, item.Ip)
 		log.Println("[DEBUG]", stat, " ", stats[i])
-		g.Expect(stat).To(Equal(stats[i]))
+		Expect(stat).To(Equal(stats[i]))
 	}
 	// h.Stop()
 	h.redisStat.Clear()
 }
 
 func TestFilter(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	log.Println("TestFilter")
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	dh.Start()
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	l, _ := zap.NewProduction()
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
@@ -244,7 +246,7 @@ func TestFilter(t *testing.T) {
 				count++
 			}
 		}
-		g.Expect(count).To(Equal(filterResult[i]))
+		Expect(count).To(Equal(filterResult[i]))
 	}
 	h.redisStat.Clear()
 	// h.Stop()
@@ -253,6 +255,7 @@ func TestFilter(t *testing.T) {
 func TestSet(t *testing.T) {
 	log.Println("TestSet")
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	dh.Start()
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	l, _ := zap.NewProduction()
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
@@ -275,7 +278,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestTransfer(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	log.Printf("TestTransfer")
 
 	var healthcheckTransferItems = [][]string{
@@ -304,6 +307,7 @@ func TestTransfer(t *testing.T) {
 	}
 
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	dh.Start()
 	sh := storage.NewStatHandler(&healthcheckRedisStatConfig)
 	l, _ := zap.NewProduction()
 	h := NewHealthcheck(&healthcheckTestConfig, dh, sh, l)
@@ -339,12 +343,12 @@ func TestTransfer(t *testing.T) {
 	for _, item := range healthCheckTransferResults {
 		key := item.Host + ":" + item.Ip
 		storedItem, _ := h.redisStat.GetHealthcheckItem(key)
-		g.Expect(itemsEqual(item, storedItem)).To(BeTrue())
+		Expect(itemsEqual(item, storedItem)).To(BeTrue())
 	}
 }
 
 func TestHealthCheck(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	var healthcheckStatConfig = storage.StatHandlerConfig{
 		Redis: hiredis.Config{
 			Address:  "redis:6379",
@@ -384,6 +388,7 @@ func TestHealthCheck(t *testing.T) {
 	log.Println("TestHealthCheck")
 
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	dh.Start()
 	sh := storage.NewStatHandler(&healthcheckStatConfig)
 	l, _ := zap.NewProduction()
 	hc := NewHealthcheck(&healthcheckConfig, dh, sh, l)
@@ -404,16 +409,16 @@ func TestHealthCheck(t *testing.T) {
 		h4 := hc.getStatus("z.google.com.", net.ParseIP("192.168.200.2"))
 	*/
 	log.Println(h1, " ", h2, " " /*, h3,, " ", h4*/)
-	g.Expect(h1).To(Equal(3))
-	g.Expect(h2).To(Equal(-3))
+	Expect(h1).To(Equal(3))
+	Expect(h2).To(Equal(-3))
 	/*
-		g.Expect(h3).To(Equal(3))
-		g.Expect(h4).To(Equal(-3))
+		Expect(h3).To(Equal(3))
+		Expect(h4).To(Equal(-3))
 	*/
 }
 
 func TestExpire(t *testing.T) {
-	g := NewGomegaWithT(t)
+	RegisterTestingT(t)
 	var statConfig = storage.StatHandlerConfig{
 		Redis: hiredis.Config{
 			Address:  "redis:6379",
@@ -435,6 +440,7 @@ func TestExpire(t *testing.T) {
 	log.Printf("TestExpire")
 
 	dh := storage.NewDataHandler(&healthcheckRedisDataConfig)
+	dh.Start()
 	sh := storage.NewStatHandler(&statConfig)
 	l, _ := zap.NewProduction()
 	hc := NewHealthcheck(&config, dh, sh, l)
@@ -459,7 +465,7 @@ func TestExpire(t *testing.T) {
 	go hc.Start()
 	time.Sleep(time.Second * 2)
 	status := hc.redisStat.GetHealthStatus("w0.healthcheck.exp.", "1.2.3.4")
-	g.Expect(status).To(Equal(3))
+	Expect(status).To(Equal(3))
 
 	a = fmt.Sprintf("{\"a\":{\"ttl\":300, \"records\":[{\"ip\":\"%s\"}],\"health_check\":%s}}", expireItem[1], expireItem[3])
 	log.Println(a)
@@ -467,5 +473,5 @@ func TestExpire(t *testing.T) {
 
 	time.Sleep(time.Second * 5)
 	status = hc.redisStat.GetHealthStatus("w0.healthcheck.exp.", "1.2.3.4")
-	g.Expect(status).To(Equal(0))
+	Expect(status).To(Equal(0))
 }
