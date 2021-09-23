@@ -3,8 +3,11 @@ package types
 import (
 	"crypto"
 	"github.com/miekg/dns"
+	"math/rand"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -164,6 +167,18 @@ func (rrset *TXT_RRSet) Empty() bool {
 
 type NS_RR struct {
 	Host string `json:"host"`
+}
+
+var nsNames = []string{"alpha", "bravo", "charlie", "echo", "foxtrot", "golf", "hotel", "india", "Juliet", "kilo", "lima", "mike", "november", "oscar", "papa", "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey", "xray", "yankee", "zulu"}
+
+func GenerateNS(authServer string) *NS_RRSet {
+	return &NS_RRSet{
+		GenericRRSet: GenericRRSet{TtlValue: 3600},
+		Data:         []NS_RR{
+			{Host: nsNames[rand.Int()%len(nsNames)] + "." + authServer},
+			{Host: nsNames[rand.Int()%len(nsNames)] + "." + authServer},
+		},
+	}
 }
 
 type NS_RRSet struct {
@@ -363,6 +378,21 @@ func (rrset *DS_RRSet) Value(name string) []dns.RR {
 
 func (rrset *DS_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
+}
+
+func DefaultSOA(zoneName string) *SOA_RRSet {
+	serialStr := time.Now().Format("20060102") + "00"
+	serial, _ := strconv.Atoi(serialStr)
+	return &SOA_RRSet{
+		GenericRRSet: GenericRRSet{TtlValue: 3600},
+		Ns:           "ns1." + zoneName,
+		MBox:         "hostmaster." + zoneName,
+		Refresh:      86400,
+		Retry:        7200,
+		Expire:       3600000,
+		MinTtl:       300,
+		Serial:       uint32(serial),
+	}
 }
 
 type SOA_RRSet struct {

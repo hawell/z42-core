@@ -14,6 +14,8 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,N
 CREATE SCHEMA IF NOT EXISTS `z42` ;
 USE `z42` ;
 
+ALTER DATABASE `z42` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- -----------------------------------------------------
 -- Table `z42`.`User`
 -- -----------------------------------------------------
@@ -21,11 +23,22 @@ DROP TABLE IF EXISTS `z42`.`User` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`User` (
                                             `Id` CHAR(36) NOT NULL,
-                                            `Email` NVARCHAR(100) NOT NULL,
+                                            `Email` VARCHAR(100) NOT NULL,
                                             `Password` VARCHAR(600) NOT NULL,
                                             `Status` ENUM('active', 'disabled', 'pending') NOT NULL,
                                             PRIMARY KEY (`Id`),
                                             UNIQUE INDEX `Email_UNIQUE` (`Email` ASC) VISIBLE)
+    ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
+-- Table `z42`.`Resource`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `z42`.`Resource` ;
+
+CREATE TABLE IF NOT EXISTS `z42`.`Resource` (
+                                                `Id` CHAR(36) NOT NULL,
+                                                PRIMARY KEY (`Id`))
     ENGINE = InnoDB;
 
 
@@ -35,15 +48,20 @@ CREATE TABLE IF NOT EXISTS `z42`.`User` (
 DROP TABLE IF EXISTS `z42`.`Zone` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`Zone` (
-                                            `Id` CHAR(36) NOT NULL,
-                                            `Name` NVARCHAR(256) NOT NULL,
+                                            `Name` VARCHAR(256) NOT NULL,
                                             `CNameFlattening` TINYINT NOT NULL,
                                             `Dnssec` TINYINT NOT NULL,
                                             `Enabled` TINYINT NOT NULL,
+                                            `Resource_Id` CHAR(36) NOT NULL,
                                             `User_Id` CHAR(36) NOT NULL,
-                                            PRIMARY KEY (`Id`),
                                             UNIQUE INDEX `Name_UNIQUE` (`Name` ASC) VISIBLE,
+                                            PRIMARY KEY (`Resource_Id`),
                                             INDEX `fk_Zone_User_idx` (`User_Id` ASC) VISIBLE,
+                                            CONSTRAINT `fk_Zone_Resource`
+                                                FOREIGN KEY (`Resource_Id`)
+                                                    REFERENCES `z42`.`Resource` (`Id`)
+                                                    ON DELETE CASCADE
+                                                    ON UPDATE NO ACTION,
                                             CONSTRAINT `fk_Zone_User`
                                                 FOREIGN KEY (`User_Id`)
                                                     REFERENCES `z42`.`User` (`Id`)
@@ -58,16 +76,21 @@ CREATE TABLE IF NOT EXISTS `z42`.`Zone` (
 DROP TABLE IF EXISTS `z42`.`Location` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`Location` (
-                                                `Id` CHAR(36) NOT NULL,
-                                                `Name` NVARCHAR(256) NOT NULL,
+                                                `Name` VARCHAR(256) NOT NULL,
                                                 `Enabled` TINYINT NOT NULL,
+                                                `Resource_Id` CHAR(36) NOT NULL,
                                                 `Zone_Id` CHAR(36) NOT NULL,
-                                                PRIMARY KEY (`Id`),
+                                                PRIMARY KEY (`Resource_Id`),
                                                 INDEX `fk_Location_Zone_idx` (`Zone_Id` ASC) VISIBLE,
-                                                UNIQUE INDEX `Zone_Location_UNIQUE` (`Zone_Id` ASC, `Name` ASC) VISIBLE,
+                                                UNIQUE INDEX `Zone_Name_UNIQUE` (`Zone_Id` ASC, `Name` ASC) VISIBLE,
+                                                CONSTRAINT `fk_Location_Resource`
+                                                    FOREIGN KEY (`Resource_Id`)
+                                                        REFERENCES `z42`.`Resource` (`Id`)
+                                                        ON DELETE CASCADE
+                                                        ON UPDATE NO ACTION,
                                                 CONSTRAINT `fk_Location_Zone`
                                                     FOREIGN KEY (`Zone_Id`)
-                                                        REFERENCES `z42`.`Zone` (`Id`)
+                                                        REFERENCES `z42`.`Zone` (`Resource_Id`)
                                                         ON DELETE CASCADE
                                                         ON UPDATE NO ACTION)
     ENGINE = InnoDB;
@@ -79,17 +102,22 @@ CREATE TABLE IF NOT EXISTS `z42`.`Location` (
 DROP TABLE IF EXISTS `z42`.`RecordSet` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`RecordSet` (
-                                                 `Id` CHAR(36) NOT NULL,
                                                  `Type` ENUM('a', 'aaaa', 'aname', 'caa', 'cname', 'ds', 'mx', 'ns', 'ptr', 'srv', 'tlsa', 'txt') NOT NULL,
                                                  `Value` JSON NULL,
                                                  `Enabled` TINYINT NOT NULL,
+                                                 `Resource_Id` CHAR(36) NOT NULL,
                                                  `Location_Id` CHAR(36) NOT NULL,
-                                                 PRIMARY KEY (`Id`),
-                                                 UNIQUE INDEX `Location_Type_UNIQUE` (`Type` ASC, `Location_Id` ASC) VISIBLE,
+                                                 PRIMARY KEY (`Resource_Id`),
                                                  INDEX `fk_RecordSet_Location_idx` (`Location_Id` ASC) VISIBLE,
+                                                 UNIQUE INDEX `Location_Type_UNIQUE` (`Type` ASC, `Location_Id` ASC) VISIBLE,
+                                                 CONSTRAINT `fk_RecordSet_Resource`
+                                                     FOREIGN KEY (`Resource_Id`)
+                                                         REFERENCES `z42`.`Resource` (`Id`)
+                                                         ON DELETE CASCADE
+                                                         ON UPDATE NO ACTION,
                                                  CONSTRAINT `fk_RecordSet_Location`
                                                      FOREIGN KEY (`Location_Id`)
-                                                         REFERENCES `z42`.`Location` (`Id`)
+                                                         REFERENCES `z42`.`Location` (`Resource_Id`)
                                                          ON DELETE CASCADE
                                                          ON UPDATE NO ACTION)
     ENGINE = InnoDB;
@@ -120,15 +148,21 @@ CREATE TABLE IF NOT EXISTS `z42`.`Verification` (
 DROP TABLE IF EXISTS `z42`.`ACL` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`ACL` (
-                                           `Id` CHAR(36) NOT NULL,
                                            `CanRead` TINYINT NOT NULL,
                                            `CanList` TINYINT NOT NULL,
                                            `CanEdit` TINYINT NOT NULL,
                                            `CanInsert` TINYINT NOT NULL,
                                            `CanDelete` TINYINT NOT NULL,
+                                           `Resource_Id` CHAR(36) NOT NULL,
                                            `User_Id` CHAR(36) NOT NULL,
-                                           PRIMARY KEY (`Id`),
+                                           PRIMARY KEY (`Resource_Id`, `User_Id`),
                                            INDEX `fk_ACL_User_idx` (`User_Id` ASC) VISIBLE,
+                                           INDEX `fk_ACL_Resource_idx` (`Resource_Id` ASC) VISIBLE,
+                                           CONSTRAINT `fk_ACL_Resource`
+                                               FOREIGN KEY (`Resource_Id`)
+                                                   REFERENCES `z42`.`Resource` (`Id`)
+                                                   ON DELETE CASCADE
+                                                   ON UPDATE NO ACTION,
                                            CONSTRAINT `fk_ACL_User`
                                                FOREIGN KEY (`User_Id`)
                                                    REFERENCES `z42`.`User` (`Id`)
@@ -159,18 +193,18 @@ DROP TABLE IF EXISTS `z42`.`SOA` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`SOA` (
                                            `TTL` INT NOT NULL,
-                                           `NS` NVARCHAR(256) NOT NULL,
-                                           `MBox` NVARCHAR(256) NOT NULL,
+                                           `NS` VARCHAR(256) NOT NULL,
+                                           `MBox` VARCHAR(256) NOT NULL,
                                            `Refresh` INT NOT NULL,
                                            `Retry` INT NOT NULL,
                                            `Expire` INT NOT NULL,
                                            `MinTTL` INT NOT NULL,
                                            `Serial` INT NOT NULL,
                                            `Zone_Id` CHAR(36) NOT NULL,
-                                           INDEX `fk_SOA_Zone_idx` (`Zone_Id` ASC) VISIBLE,
+                                           PRIMARY KEY (`Zone_Id`),
                                            CONSTRAINT `fk_SOA_Zone`
                                                FOREIGN KEY (`Zone_Id`)
-                                                   REFERENCES `z42`.`Zone` (`Id`)
+                                                   REFERENCES `z42`.`Zone` (`Resource_Id`)
                                                    ON DELETE CASCADE
                                                    ON UPDATE NO ACTION)
     ENGINE = InnoDB;

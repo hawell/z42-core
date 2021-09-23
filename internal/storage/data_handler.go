@@ -616,6 +616,9 @@ func (dh *DataHandler) Clear() error {
 func (dh *DataHandler) GetRevision() (int, error) {
 	r, err := dh.redis.Get(revisionKey)
 	if err != nil {
+		if err == redisCon.ErrNil {
+			return 0, nil
+		}
 		return 0, err
 	}
 	return strconv.Atoi(r)

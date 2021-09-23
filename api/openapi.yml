@@ -16,40 +16,21 @@ paths:
     get:
       summary: 'list of all zones'
       parameters:
-        - name: start
-          in: query
-          description: 'start index'
-          required: false
-          schema:
-            type: integer
-        - name: count
-          in: query
-          description: 'number of items in response'
-          required: false
-          schema:
-            type: integer
-        - name: q
-          in: query
-          description: 'search query'
-          required: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/name'
+        - $ref: '#/components/parameters/start'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/ascending'
+        - $ref: '#/components/parameters/q'
       responses:
         200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/zones'
+          $ref: '#/components/responses/list_response'
         400:
           $ref: '#/components/responses/error_response'
 
     post:
       summary: 'create a new zone'
       requestBody:
-        required: true
-        description: 'new zone data'
-        $ref: '#/components/requestBodies/zone'
+        $ref: '#/components/requestBodies/new_zone'
       responses:
         201:
           $ref: '#/components/responses/success_response'
@@ -84,11 +65,9 @@ paths:
           $ref: '#/components/responses/error_response'
 
     put:
-      summary: 'updated zone data'
+      summary: 'update zone data'
       requestBody:
-        required: true
-        description: 'updated zone data'
-        $ref: '#/components/requestBodies/zone'
+        $ref: '#/components/requestBodies/update_zone'
       responses:
         204:
           $ref: '#/components/responses/success_response'
@@ -117,34 +96,18 @@ paths:
         required: true
         schema:
           type: string
+
     get:
       summary: 'list of all locations within zone'
       parameters:
-        - name: start
-          in: query
-          description: 'start index'
-          required: false
-          schema:
-            type: integer
-        - name: count
-          in: query
-          description: 'number of items in response'
-          required: false
-          schema:
-            type: integer
-        - name: q
-          in: query
-          description: 'search query'
-          required: false
-          schema:
-            type: string
+        - $ref: '#/components/parameters/name'
+        - $ref: '#/components/parameters/start'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/ascending'
+        - $ref: '#/components/parameters/q'
       responses:
         200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/locations'
+          $ref: '#/components/responses/list_response'
         400:
           $ref: '#/components/responses/error_response'
         401:
@@ -155,9 +118,7 @@ paths:
     post:
       summary: 'create a new location in zone'
       requestBody:
-        required: true
-        description: 'new location data'
-        $ref: '#/components/requestBodies/location'
+        $ref: '#/components/requestBodies/new_location'
       responses:
         201:
           $ref: '#/components/responses/success_response'
@@ -180,6 +141,7 @@ paths:
         required: true
         schema:
           type: string
+
     get:
       summary: 'get location of a zone'
       responses:
@@ -195,12 +157,11 @@ paths:
           $ref: '#/components/responses/error_response'
         404:
           $ref: '#/components/responses/error_response'
+
     put:
       summary: 'update a location in zone'
       requestBody:
-        required: true
-        description: 'updated location data'
-        $ref: '#/components/requestBodies/location'
+        $ref: '#/components/requestBodies/update_location'
       responses:
         204:
           $ref: '#/components/responses/success_response'
@@ -210,6 +171,7 @@ paths:
           $ref: '#/components/responses/error_response'
         404:
           $ref: '#/components/responses/error_response'
+
     delete:
       summary: 'remove a location from zone'
       responses:
@@ -234,27 +196,23 @@ paths:
         required: true
         schema:
           type: string
+
     get:
       summary: 'list of all rrsets within location'
       responses:
         200:
-          description: 'successful response'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/rrsets'
+          $ref: '#/components/responses/list_response'
         400:
           $ref: '#/components/responses/error_response'
         401:
           $ref: '#/components/responses/error_response'
         404:
           $ref: '#/components/responses/error_response'
+
     post:
       summary: 'create a new rrset in location'
       requestBody:
-        description: 'new rrset data'
-        required: true
-        $ref: '#/components/requestBodies/rrset'
+        $ref: '#/components/requestBodies/new_rrset'
       responses:
         201:
           $ref: '#/components/responses/success_response'
@@ -282,6 +240,7 @@ paths:
         required: true
         schema:
           $ref: '#/components/schemas/rtype'
+
     get:
       summary: 'get rrset of a zone'
       responses:
@@ -297,11 +256,10 @@ paths:
           $ref: '#/components/responses/error_response'
         404:
           $ref: '#/components/responses/error_response'
+
     put:
       summary: 'update a rrset in location'
       requestBody:
-        description: 'updated rrset data'
-        required: true
         $ref: '#/components/requestBodies/rrset'
       responses:
         204:
@@ -312,6 +270,7 @@ paths:
           $ref: '#/components/responses/error_response'
         404:
           $ref: '#/components/responses/error_response'
+
     delete:
       summary: 'remove a rrset from location'
       responses:
@@ -328,9 +287,7 @@ paths:
     post:
       summary: 'create a new user'
       requestBody:
-        required: true
-        description: 'new user data'
-        $ref: '#/components/requestBodies/user'
+        $ref: '#/components/requestBodies/new_user'
       responses:
         201:
           $ref: '#/components/responses/success_response'
@@ -357,10 +314,8 @@ paths:
 
   /auth/login:
     post:
-      summary: 'create a new user'
+      summary: 'login user'
       requestBody:
-        required: true
-        description: 'new user data'
         $ref: '#/components/requestBodies/user'
       responses:
         200:
@@ -393,6 +348,36 @@ paths:
           $ref: '#/components/responses/error_response'
 
 components:
+  parameters:
+    start:
+      name: start
+      in: query
+      description: 'start index'
+      required: false
+      schema:
+        type: integer
+    count:
+      name: count
+      in: query
+      description: 'number of items in response'
+      required: false
+      schema:
+        type: integer
+    ascending:
+      name: ascending
+      in: query
+      description: 'ascending order'
+      required: false
+      schema:
+        type: boolean
+    q:
+      name: q
+      in: query
+      description: 'search query'
+      required: false
+      schema:
+        type: string
+
   securitySchemes:
     app_id:
       type: apiKey
@@ -401,28 +386,94 @@ components:
       in: query
 
   requestBodies:
-    zone:
+    new_zone:
       description: 'zone'
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/zone'
+            $ref: '#/components/schemas/new_zone'
 
-    location:
-      description: 'location'
+    update_zone:
+      description: 'zone'
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/location'
+            $ref: '#/components/schemas/update_zone'
 
-    rrset:
-      description: 'rrset'
+    new_location:
+      description: 'new location'
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/rrset'
+            $ref: '#/components/schemas/new_location'
+
+    update_location:
+      description: 'update location'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/update_location'
+
+    new_rrset:
+      description: new rrset
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/new_rrset'
+
+    update_rrset:
+      description: update rrset
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/update_rrset'
+
+    new_user:
+      description: new user
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+              password:
+                type: string
+
+    user:
+      description: new user
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+              password:
+                type: string
+
 
   responses:
+    list_response:
+      description: 'list response'
+      content:
+        application/json:
+          schema:
+            title: list response
+            type: object
+            properties:
+              total:
+                type: integer
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    enabled:
+                      type: boolean
+
     error_response:
       description: 'error response'
       content:
@@ -448,6 +499,8 @@ components:
                 type: integer
               message:
                 type: string
+              "data":
+                type: object
 
   schemas:
     user:
@@ -472,22 +525,11 @@ components:
           type: string
       example: '{"code": 200, "token":"abcdefg123", "expire":"2006-01-02T15:04:05Z07:00"}'
 
-    zones:
-      title: zones
-      type: array
-      minItems: 0
-      uniqueItems: true
-      items:
-        type: string
-      example: '["example.com.", "my.zon."]'
-
-    zone:
-      title: zone
+    new_zone:
+      title: new zone
       type: object
       properties:
         name:
-          type: string
-        id:
           type: string
         enabled:
           type: boolean
@@ -495,16 +537,59 @@ components:
           type: boolean
         cname_flattening:
           type: boolean
-      example: '{"name": "example.com.", "enabled": true, "dnssec":true, "cname_flattening": false}'
+        soa:
+          $ref: '#/components/schemas/soa'
+        ns:
+          $ref: '#/components/schemas/ns'
+      example: '{"name": "example.com.", "enabled": true, "dnssec":true, "cname_flattening": false, "soa":{"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100}, "ns":{"ttl":300,"records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]}}'
 
-    locations:
-      title: locations
-      type: array
-      minItems: 1
-      uniqueItems: true
-      items:
-        type: string
-      example: '["@", "www", "sub.x"]'
+    update_zone:
+      title: update zone
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        dnssec:
+          type: boolean
+        cname_flattening:
+          type: boolean
+        soa:
+          $ref: '#/components/schemas/soa'
+      example: '{"enabled": true, "dnssec":true, "cname_flattening": false, "soa":{"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100}, "ns":{"ttl":300,"records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]}}'
+
+    zone:
+      title: zone
+      type: object
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        dnssec:
+          type: boolean
+        cname_flattening:
+          type: boolean
+        soa:
+          $ref: '#/components/schemas/soa'
+      example: '{"name": "example.com.", "enabled": true, "dnssec":true, "cname_flattening": false, "soa":{"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100}}'
+
+    new_location:
+      title: location
+      type: object
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+      example: '{"name": "www", "enabled": true}'
+
+    update_location:
+      title: location
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      example: '{"enabled": true}'
 
     location:
       title: location
@@ -516,16 +601,7 @@ components:
           type: boolean
       example: '{"name": "www", "enabled": true}'
 
-    rrsets:
-      title: rrsets
-      type: array
-      minItems: 0
-      uniqueItems: true
-      items:
-        $ref: '#/components/schemas/rtype'
-      example: '["a", "aaaa", "ns", "txt"]'
-
-    rrset:
+    new_rrset:
       title: rrset
       type: object
       properties:
@@ -548,9 +624,69 @@ components:
         enabled:
           type: boolean
 
+    update_rrset:
+      title: rrset
+      type: object
+      properties:
+        value:
+          anyOf:
+            - $ref: '#/components/schemas/a'
+            - $ref: '#/components/schemas/aaaa'
+            - $ref: '#/components/schemas/cname'
+            - $ref: '#/components/schemas/txt'
+            - $ref: '#/components/schemas/ns'
+            - $ref: '#/components/schemas/mx'
+            - $ref: '#/components/schemas/srv'
+            - $ref: '#/components/schemas/caa'
+            - $ref: '#/components/schemas/ptr'
+            - $ref: '#/components/schemas/tlsa'
+            - $ref: '#/components/schemas/ds'
+            - $ref: '#/components/schemas/aname'
+        enabled:
+          type: boolean
+
+    rrset:
+      title: rrset
+      type: object
+      properties:
+        value:
+          anyOf:
+            - $ref: '#/components/schemas/a'
+            - $ref: '#/components/schemas/aaaa'
+            - $ref: '#/components/schemas/cname'
+            - $ref: '#/components/schemas/txt'
+            - $ref: '#/components/schemas/ns'
+            - $ref: '#/components/schemas/mx'
+            - $ref: '#/components/schemas/srv'
+            - $ref: '#/components/schemas/caa'
+            - $ref: '#/components/schemas/ptr'
+            - $ref: '#/components/schemas/tlsa'
+            - $ref: '#/components/schemas/ds'
+            - $ref: '#/components/schemas/aname'
+        enabled:
+          type: boolean
+
     rtype:
       type: string
       enum: [a, aaaa, cname, txt, ns, mx srv, caa, ptr, tlsa, ds, aname]
+
+    soa:
+      title: soa
+      properties:
+        ns:
+          type: string
+        mbox:
+          type: string
+        refresh:
+          type: integer
+        retry:
+          type: integer
+        expire:
+          type: integer
+        minttl:
+          type: integer
+        serial:
+          type: integer
 
     a:
       title: a
@@ -662,7 +798,10 @@ components:
           title: records
           uniqueItems: false
           items:
-            type: string
+            type: object
+            properties:
+              text:
+                type: string
 
     ns:
       title: ns
@@ -678,7 +817,10 @@ components:
           title: records
           uniqueItems: true
           items:
-            type: string
+            type: object
+            properties:
+              host:
+                type: string
 
     mx:
       title: mx

@@ -13,7 +13,7 @@ type ACL struct {
 }
 
 func (db *DataBase) getPrivileges(userId ObjectId, resourceId ObjectId) (ACL, error) {
-	res := db.db.QueryRow("SELECT CanRead, CanList, CanEdit, CanInsert, CanDelete FROM ACL WHERE User_Id = ? AND Id = ?", userId, resourceId)
+	res := db.db.QueryRow("SELECT CanRead, CanList, CanEdit, CanInsert, CanDelete FROM ACL WHERE User_Id = ? AND Resource_Id = ?", userId, resourceId)
 	var acl ACL
 	err := res.Scan(&acl.Read, &acl.List, &acl.Edit, &acl.Insert, &acl.Delete)
 	if err != nil {
@@ -26,12 +26,12 @@ func (db *DataBase) getPrivileges(userId ObjectId, resourceId ObjectId) (ACL, er
 }
 
 func (db *DataBase) setPrivileges(userId ObjectId, resourceId ObjectId, acl ACL) error {
-	_, err := db.db.Exec("REPLACE INTO ACL(Id, CanRead, CanList, CanEdit, CanInsert, CanDelete, User_Id) VALUES (?, ?, ?, ?, ?, ?, ?)", resourceId, acl.Read, acl.List, acl.Edit, acl.Insert, acl.Delete, userId)
+	_, err := db.db.Exec("REPLACE INTO ACL(CanRead, CanList, CanEdit, CanInsert, CanDelete, User_Id, Resource_Id) VALUES (?, ?, ?, ?, ?, ?, ?)", acl.Read, acl.List, acl.Edit, acl.Insert, acl.Delete, userId, resourceId)
 	return err
 }
 
 func (db *DataBase) deletePrivileges(resourceId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM ACL WHERE Id = ?", resourceId)
+	_, err := db.db.Exec("DELETE FROM ACL WHERE Resource_Id = ?", resourceId)
 	return err
 }
 

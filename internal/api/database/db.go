@@ -70,10 +70,7 @@ func (db *DataBase) Clear(removeUsers bool) error {
 				return err
 			}
 		} else {
-			if _, err := t.Exec("DELETE FROM Zone"); err != nil {
-				return err
-			}
-			if _, err := t.Exec("DELETE FROM ACL"); err != nil {
+			if _, err := t.Exec("DELETE FROM Resource"); err != nil {
 				return err
 			}
 			if _, err := t.Exec("DELETE FROM Verification"); err != nil {
@@ -207,7 +204,11 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 		var zoneId ObjectId
 		err := db.withTransaction(func(t transaction) error {
 			var err error
-			zoneId, err = db.addZone(userId, z)
+			zoneId, err = db.addResource()
+			if err != nil {
+				return err
+			}
+			err = db.addZone(userId, zoneId, z)
 			if err != nil {
 				return err
 			}
@@ -222,7 +223,11 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 				Location: "@",
 				Enabled:  true,
 			}
-			locationId, err := db.addLocation(zoneId, rootLocation)
+			locationId, err := db.addResource()
+			if err != nil {
+				return err
+			}
+			err = db.addLocation(zoneId, locationId, rootLocation)
 			if err != nil {
 				return err
 			}
@@ -230,7 +235,11 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 				return err
 			}
 			nsRecord := NewRecordSet{Type: "ns", Value: &z.NS, Enabled: true}
-			nsId, err := db.addRecordSet(locationId, nsRecord)
+			nsId, err := db.addResource()
+			if err != nil {
+				return err
+			}
+			err = db.addRecordSet(locationId, nsId, nsRecord)
 			if err != nil {
 				return err
 			}
@@ -291,7 +300,7 @@ func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
 	if err := db.canGetZone(userId, zoneId); err != nil {
 		return Zone{}, parseError(err)
 	}
-	res := db.db.QueryRow("SELECT Id, Name, CNameFlattening, Dnssec, Enabled, TTL, NS, MBox, Refresh, Retry, Expire, MinTTL, Serial FROM Zone LEFT JOIN SOA ON Zone.Id = SOA.Zone_Id WHERE Zone.Id = ?", zoneId)
+	res := db.db.QueryRow("SELECT Resource_Id, Name, CNameFlattening, Dnssec, Enabled, TTL, NS, MBox, Refresh, Retry, Expire, MinTTL, Serial FROM Zone LEFT JOIN SOA ON Zone.Resource_Id = SOA.Zone_Id WHERE Zone.Resource_Id = ?", zoneId)
 	var (
 		z Zone
 	)
@@ -365,7 +374,11 @@ func (db *DataBase) AddLocation(userId ObjectId, l NewLocation) (ObjectId, error
 	var locationId ObjectId
 	err = db.withTransaction(func(t transaction) error {
 		var err error
-		locationId, err = db.addLocation(zoneId, l)
+		locationId, err = db.addResource()
+		if err != nil {
+			return err
+		}
+		err = db.addLocation(zoneId, locationId, l)
 		if err != nil {
 			return err
 		}
@@ -428,7 +441,7 @@ func (db *DataBase) GetLocation(userId ObjectId, zoneName string, location strin
 	if err := db.canGetLocation(userId, zoneId, locationId); err != nil {
 		return Location{}, parseError(err)
 	}
-	res := db.db.QueryRow("SELECT Id, Name, Enabled FROM Location WHERE Id = ?", locationId)
+	res := db.db.QueryRow("SELECT Resource_Id, Name, Enabled FROM Location WHERE Resource_Id = ?", locationId)
 	var l Location
 	err = res.Scan(&l.Id, &l.Name, &l.Enabled)
 	return l, parseError(err)
@@ -491,7 +504,10 @@ func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, err
 	var recordId ObjectId
 	err = db.withTransaction(func(t transaction) error {
 		var err error
-		if recordId, err = db.addRecordSet(locationId, r); err != nil {
+		if recordId, err = db.addResource(); err != nil {
+			return err
+		}
+		if err = db.addRecordSet(locationId, recordId, r); err != nil {
 			return err
 		}
 		if err = db.setPrivileges(userId, recordId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
@@ -548,7 +564,7 @@ func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location stri
 	if err := db.canGetRecordSet(userId, zoneId, locationId, recordId); err != nil {
 		return RecordSet{}, parseError(err)
 	}
-	row := db.db.QueryRow("SELECT Id, Type, Value, Enabled FROM RecordSet WHERE Id = ?", recordId)
+	row := db.db.QueryRow("SELECT Resource_Id, Type, Value, Enabled FROM RecordSet WHERE Resource_Id = ?", recordId)
 	var (
 		r     RecordSet
 		value string
@@ -611,7 +627,7 @@ func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
 
 func (db *DataBase) getZoneId(zoneName string) (ObjectId, error) {
 	var zoneId ObjectId
-	res := db.db.QueryRow("SELECT Id FROM Zone WHERE Name = ?", zoneName)
+	res := db.db.QueryRow("SELECT Resource_Id FROM Zone WHERE Name = ?", zoneName)
 	err := res.Scan(&zoneId)
 	if err != nil {
 		return EmptyObjectId, parseError(err)
@@ -620,7 +636,7 @@ func (db *DataBase) getZoneId(zoneName string) (ObjectId, error) {
 }
 
 func (db *DataBase) getLocationId(zoneName string, location string) (ObjectId, ObjectId, error) {
-	res := db.db.QueryRow("SELECT Zone.Id, L.Id FROM Zone LEFT JOIN Location L on Zone.Id = L.Zone_Id WHERE Zone.Name = ? AND L.Name = ?", zoneName, location)
+	res := db.db.QueryRow("SELECT Zone.Resource_Id, L.Resource_Id FROM Zone LEFT JOIN Location L on Zone.Resource_Id = L.Zone_Id WHERE Zone.Name = ? AND L.Name = ?", zoneName, location)
 	var (
 		zoneId     ObjectId
 		locationId ObjectId
@@ -633,7 +649,7 @@ func (db *DataBase) getLocationId(zoneName string, location string) (ObjectId, O
 }
 
 func (db *DataBase) getRecordId(zoneName string, location string, recordType string) (ObjectId, ObjectId, ObjectId, error) {
-	res := db.db.QueryRow("SELECT Zone.Id, L.Id, RS.Id FROM Zone LEFT JOIN Location L on Zone.Id = L.Zone_Id LEFT JOIN RecordSet RS on L.Id = RS.Location_Id WHERE Zone.Name = ? AND L.Name = ? AND RS.Type = ?", zoneName, location, recordType)
+	res := db.db.QueryRow("SELECT Zone.Resource_Id, L.Resource_Id, RS.Resource_Id FROM Zone LEFT JOIN Location L on Zone.Resource_Id = L.Zone_Id LEFT JOIN RecordSet RS on L.Resource_Id = RS.Location_Id WHERE Zone.Name = ? AND L.Name = ? AND RS.Type = ?", zoneName, location, recordType)
 	var (
 		zoneId     ObjectId
 		locationId ObjectId
@@ -651,52 +667,57 @@ func (db *DataBase) setSOA(zoneId ObjectId, soa types.SOA_RRSet) error {
 	return err
 }
 
-func (db *DataBase) addZone(userId ObjectId, z NewZone) (ObjectId, error) {
-	zoneId := NewObjectId()
-	if _, err := db.db.Exec("INSERT INTO Zone(Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", zoneId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, userId); err != nil {
+func (db *DataBase) addResource() (ObjectId, error) {
+	ResourceId := NewObjectId()
+	if _, err := db.db.Exec("INSERT INTO Resource(Id) VALUES (?)", ResourceId); err != nil {
 		return EmptyObjectId, err
 	}
-	return zoneId, nil
+	return ResourceId, nil
+}
+
+func (db *DataBase) addZone(userId ObjectId, resourceId ObjectId, z NewZone) error {
+	if _, err := db.db.Exec("INSERT INTO Zone(Resource_Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", resourceId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, userId); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (db *DataBase) updateZone(zoneId ObjectId, z ZoneUpdate) error {
-	_, err := db.db.Exec("UPDATE Zone SET Name = ?, Dnssec = ?, CNameFlattening = ?, Enabled = ? WHERE Id = ?", z.Name, z.Dnssec, z.CNameFlattening, z.Enabled, zoneId)
+	_, err := db.db.Exec("UPDATE Zone SET Name = ?, Dnssec = ?, CNameFlattening = ?, Enabled = ? WHERE Resource_Id = ?", z.Name, z.Dnssec, z.CNameFlattening, z.Enabled, zoneId)
 	return err
 }
 
 func (db *DataBase) deleteZone(zoneId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM Zone WHERE Id = ?", zoneId)
+	_, err := db.db.Exec("DELETE FROM Zone WHERE Resource_Id = ?", zoneId)
 	return err
 }
 
-func (db *DataBase) addLocation(zoneId ObjectId, l NewLocation) (ObjectId, error) {
-	locationId := NewObjectId()
-	if _, err := db.db.Exec("INSERT INTO Location(Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", locationId, l.Location, l.Enabled, zoneId); err != nil {
-		return EmptyObjectId, err
+func (db *DataBase) addLocation(zoneId ObjectId, resourceId ObjectId, l NewLocation) error {
+	if _, err := db.db.Exec("INSERT INTO Location(Resource_Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", resourceId, l.Location, l.Enabled, zoneId); err != nil {
+		return err
 	}
-	return locationId, nil
+	return nil
 }
 
 func (db *DataBase) updateLocation(locationId ObjectId, l LocationUpdate) error {
-	_, err := db.db.Exec("UPDATE Location SET Name = ?, Enabled = ? WHERE Id = ?", l.Location, l.Enabled, locationId)
+	_, err := db.db.Exec("UPDATE Location SET Name = ?, Enabled = ? WHERE Resource_Id = ?", l.Location, l.Enabled, locationId)
 	return err
 }
 
 func (db *DataBase) deleteLocation(locationId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM Location WHERE Id = ?", locationId)
+	_, err := db.db.Exec("DELETE FROM Location WHERE Resource_Id = ?", locationId)
 	return err
 }
 
-func (db *DataBase) addRecordSet(locationId ObjectId, r NewRecordSet) (ObjectId, error) {
+func (db *DataBase) addRecordSet(locationId ObjectId, resourceId ObjectId, r NewRecordSet) error {
 	value, err := jsoniter.Marshal(r.Value)
 	if err != nil {
-		return EmptyObjectId, err
+		return err
 	}
-	recordId := NewObjectId()
-	if _, err := db.db.Exec("INSERT INTO RecordSet(Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", recordId, locationId, r.Type, value, r.Enabled); err != nil {
-		return EmptyObjectId, err
+	if _, err := db.db.Exec("INSERT INTO RecordSet(Resource_Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", resourceId, locationId, r.Type, value, r.Enabled); err != nil {
+		return err
 	}
-	return recordId, nil
+	return nil
 }
 
 func (db *DataBase) updateRecordSet(recordId ObjectId, r RecordSetUpdate) error {
@@ -704,12 +725,12 @@ func (db *DataBase) updateRecordSet(recordId ObjectId, r RecordSetUpdate) error 
 	if err != nil {
 		return err
 	}
-	_, err = db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Id = ?", value, r.Enabled, recordId)
+	_, err = db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Resource_Id = ?", value, r.Enabled, recordId)
 	return err
 }
 
 func (db *DataBase) deleteRecordSet(recordId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM RecordSet WHERE Id = ?", recordId)
+	_, err := db.db.Exec("DELETE FROM RecordSet WHERE Resource_Id = ?", recordId)
 	return err
 }
 

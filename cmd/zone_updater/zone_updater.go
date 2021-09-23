@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/storage"
 	"go.uber.org/zap"
@@ -59,6 +60,9 @@ func main() {
 		events, err := db.GetEvents(revision, 0, 100)
 		if err != nil {
 			zap.L().Fatal("get events failed", zap.Error(err))
+		}
+		if len(events) > 0 {
+			zap.L().Info(fmt.Sprintf("%d new events", len(events)))
 		}
 
 		for _, event := range events {

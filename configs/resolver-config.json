@@ -24,8 +24,8 @@
       "net": "tcp",
       "db": 0,
       "password": "",
-      "prefix": "test_",
-      "suffix": "_test",
+      "prefix": "z42_",
+      "suffix": "_z42",
       "connection": {
         "max_idle_connections": 10,
         "max_active_connections": 10,
@@ -70,7 +70,6 @@
       "country_db": "geoCity.mmdb",
       "asn_db": "geoIsp.mmdb"
     },
-    "max_ttl": 3600,
     "log_source_location": false
   },
   "ratelimit": {

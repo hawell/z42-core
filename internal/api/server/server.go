@@ -15,6 +15,7 @@ type Config struct {
 	BindAddress  string `json:"bind_address,default:localhost:8080"`
 	ReadTimeout  int    `json:"read_timeout,default:10"`
 	WriteTimeout int    `json:"write_timeout,default:10"`
+	AuthoritativeServer string `json:"authoritative_server"`
 }
 
 type Server struct {
@@ -53,7 +54,7 @@ func NewServer(config *Config, db *database.DataBase, redis *hiredis.Redis) *Ser
 
 	zoneGroup := router.Group("/zones")
 	zoneGroup.Use(authHandler.MiddlewareFunc())
-	zoneHandler := zone.New(db, redis)
+	zoneHandler := zone.New(db, redis, config.AuthoritativeServer)
 	zoneHandler.RegisterHandlers(zoneGroup)
 
 	return &Server{

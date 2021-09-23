@@ -1,0 +1,27 @@
+{
+  "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
+  "redis_data": {
+    "zone_cache_size": 10000,
+    "zone_cache_timeout": 60,
+    "zone_reload": 60,
+    "record_cache_size": 1000000,
+    "record_cache_timeout": 60,
+    "redis": {
+      "address": "127.0.0.1:6379",
+      "net": "tcp",
+      "db": 0,
+      "password": "",
+      "prefix": "z42_",
+      "suffix": "_z42",
+      "connection": {
+        "max_idle_connections": 10,
+        "max_active_connections": 10,
+        "connect_timeout": 500,
+        "read_timeout": 500,
+        "idle_keep_alive": 30,
+        "max_keep_alive": 0,
+        "wait_for_connection": false
+      }
+    }
+  }
+}

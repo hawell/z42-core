@@ -20,6 +20,7 @@ var apiDefaultConfig = &Config{
 		BindAddress:  "localhost:8080",
 		ReadTimeout:  10,
 		WriteTimeout: 10,
+		AuthoritativeServer: "z42.com.",
 	},
 	RedisConfig: &hiredis.Config{
 		Address:  "127.0.0.1:6379",

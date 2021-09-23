@@ -30,14 +30,16 @@ type storage interface {
 }
 
 type Handler struct {
+	authoritativeServer string
 	db    storage
 	redis *hiredis.Redis
 }
 
-func New(db storage, redis *hiredis.Redis) *Handler {
+func New(db storage, redis *hiredis.Redis, authoritativeServer string) *Handler {
 	return &Handler{
 		db:    db,
 		redis: redis,
+		authoritativeServer: authoritativeServer,
 	}
 }
 
@@ -110,8 +112,8 @@ func (h *Handler) addZone(c *gin.Context) {
 		Enabled:         z.Enabled,
 		Dnssec:          z.Dnssec,
 		CNameFlattening: z.CNameFlattening,
-		SOA:             z.SOA,
-		NS:              z.NS,
+		SOA:             *types.DefaultSOA(z.Name),
+		NS:              *types.GenerateNS(h.authoritativeServer),
 	}
 	_, err := h.db.AddZone(userId, model)
 	if err != nil {
@@ -172,15 +174,23 @@ func (h *Handler) updateZone(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	// TODO: set soa.serial
-	z := database.ZoneUpdate{
+
+	z, err := h.db.GetZone(userId, zoneName)
+	if err != nil {
+		zap.L().Error("database.getZone()", zap.Error(err))
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	req.SOA.Serial = z.SOA.Serial+1
+
+	zoneUpdate := database.ZoneUpdate{
 		Name:            zoneName,
 		Enabled:         req.Enabled,
 		Dnssec:          req.Dnssec,
 		CNameFlattening: req.CNameFlattening,
 		SOA:             req.SOA,
 	}
-	if err := h.db.UpdateZone(userId, z); err != nil {
+	if err := h.db.UpdateZone(userId, zoneUpdate); err != nil {
 		zap.L().Error("DataBase.updateZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return

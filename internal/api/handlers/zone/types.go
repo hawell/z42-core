@@ -24,8 +24,6 @@ type NewZoneRequest struct {
 	Enabled         bool            `json:"enabled,default:true"`
 	Dnssec          bool            `json:"dnssec,default:false"`
 	CNameFlattening bool            `json:"cname_flattening,default:false"`
-	SOA             types.SOA_RRSet `json:"soa"`
-	NS              types.NS_RRSet  `json:"ns"`
 }
 
 type GetZoneResponse struct {
