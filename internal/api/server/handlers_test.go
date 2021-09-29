@@ -69,23 +69,6 @@ func TestAddZone(t *testing.T) {
 		Enabled:         true,
 		Dnssec:          true,
 		CNameFlattening: false,
-		SOA: types.SOA_RRSet{
-			GenericRRSet: types.GenericRRSet{TtlValue: 3600},
-			Ns:           "ns1.example.com.",
-			MBox:         "mail.example.com.",
-			Refresh:      3600,
-			Retry:        3600,
-			Expire:       3600,
-			MinTtl:       3600,
-			Serial:       3600,
-		},
-		NS: types.NS_RRSet{
-			GenericRRSet: types.GenericRRSet{TtlValue: 3600},
-			Data: []types.NS_RR{
-				{Host: "ns1.example.com."},
-				{Host: "ns2.example.com."},
-			},
-		},
 	}
 	path := "/zones"
 
@@ -245,7 +228,7 @@ func TestUpdateZone(t *testing.T) {
 	Expect(err).To(BeNil())
 
 	// update zone
-	resp := execRequest(users[0].Id, http.MethodPut, "/zones/"+zone1Name, `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
+	resp := execRequest(users[0].Id, http.MethodPut, "/zones/"+zone1Name, `{"enabled": true, "dnssec":true, "cname_flattening": false, "soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123456}}`)
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
@@ -262,7 +245,7 @@ func TestUpdateZone(t *testing.T) {
 			"enabled":          true,
 			"dnssec":           true,
 			"cname_flattening": false,
-			"soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123456}
+			"soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123457}
 		}
 	}`))
 
