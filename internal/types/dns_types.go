@@ -400,10 +400,10 @@ type SOA_RRSet struct {
 	Ns      string   `json:"ns"`
 	MBox    string   `json:"mbox"`
 	Data    *dns.SOA `json:"-"`
-	Refresh uint32   `json:"refresh"`
-	Retry   uint32   `json:"retry"`
-	Expire  uint32   `json:"expire"`
-	MinTtl  uint32   `json:"minttl"`
+	Refresh uint32   `json:"refresh,default:86400"`
+	Retry   uint32   `json:"retry,default:7200"`
+	Expire  uint32   `json:"expire,default:3600000"`
+	MinTtl  uint32   `json:"minttl,default:300"`
 	Serial  uint32   `json:"serial"`
 }
 
