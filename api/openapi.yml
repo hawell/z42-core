@@ -1,4 +1,4 @@
-openapi: '3.1.0'
+openapi: '3.0.3'
 
 info:
   title: 'Zone42 API'
@@ -6,17 +6,16 @@ info:
   version: '1.0'
 
 servers:
-  - url: https://api.zone42.io/1.0/
+  - url: https://api.zone-42.com
 
 security:
-  - app_id: []
+  - bearerAuth: []
 
 paths:
   /zones:
     get:
       summary: 'list of all zones'
       parameters:
-        - $ref: '#/components/parameters/name'
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
         - $ref: '#/components/parameters/ascending'
@@ -260,7 +259,7 @@ paths:
     put:
       summary: 'update a rrset in location'
       requestBody:
-        $ref: '#/components/requestBodies/rrset'
+        $ref: '#/components/requestBodies/update_rrset'
       responses:
         204:
           $ref: '#/components/responses/success_response'
@@ -379,11 +378,10 @@ components:
         type: string
 
   securitySchemes:
-    app_id:
-      type: apiKey
-      description: api key to authorize requests
-      name: appid
-      in: query
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
 
   requestBodies:
     new_zone:
