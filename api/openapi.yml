@@ -285,6 +285,7 @@ paths:
   /auth/signup:
     post:
       summary: 'create a new user'
+      security: []
       requestBody:
         $ref: '#/components/requestBodies/new_user'
       responses:
@@ -298,6 +299,7 @@ paths:
   /auth/verify:
     post:
       summary: 'verify a request'
+      security: []
       parameters:
         - name: code
           in: query
@@ -314,6 +316,7 @@ paths:
   /auth/login:
     post:
       summary: 'login user'
+      security: []
       requestBody:
         $ref: '#/components/requestBodies/user'
       responses:
@@ -535,11 +538,7 @@ components:
           type: boolean
         cname_flattening:
           type: boolean
-        soa:
-          $ref: '#/components/schemas/soa'
-        ns:
-          $ref: '#/components/schemas/ns'
-      example: '{"name": "example.com.", "enabled": true, "dnssec":true, "cname_flattening": false, "soa":{"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100}, "ns":{"ttl":300,"records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]}}'
+      example: '{"name": "example.com.", "enabled": true, "dnssec":false, "cname_flattening": false}'
 
     update_zone:
       title: update zone
@@ -553,7 +552,7 @@ components:
           type: boolean
         soa:
           $ref: '#/components/schemas/soa'
-      example: '{"enabled": true, "dnssec":true, "cname_flattening": false, "soa":{"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100}, "ns":{"ttl":300,"records":[{"host":"ns1.example.com."},{"host":"ns2.example.com."}]}}'
+      example: '{"enabled": true, "dnssec":true, "cname_flattening": false, "soa":{"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100}}'
 
     zone:
       title: zone
@@ -572,7 +571,7 @@ components:
       example: '{"name": "example.com.", "enabled": true, "dnssec":true, "cname_flattening": false, "soa":{"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100}}'
 
     new_location:
-      title: location
+      title: new location
       type: object
       properties:
         name:
@@ -582,7 +581,7 @@ components:
       example: '{"name": "www", "enabled": true}'
 
     update_location:
-      title: location
+      title: update location
       type: object
       properties:
         enabled:
@@ -600,7 +599,7 @@ components:
       example: '{"name": "www", "enabled": true}'
 
     new_rrset:
-      title: rrset
+      title: new rrset
       type: object
       properties:
         type:
@@ -623,7 +622,7 @@ components:
           type: boolean
 
     update_rrset:
-      title: rrset
+      title: update rrset
       type: object
       properties:
         value:
