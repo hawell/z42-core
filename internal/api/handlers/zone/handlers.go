@@ -29,14 +29,14 @@ type storage interface {
 }
 
 type Handler struct {
-	authoritativeServer string
-	db    storage
+	nameServer string
+	db         storage
 }
 
-func New(db storage, authoritativeServer string) *Handler {
+func New(db storage, nameServer string) *Handler {
 	return &Handler{
-		db:    db,
-		authoritativeServer: authoritativeServer,
+		db:         db,
+		nameServer: nameServer,
 	}
 }
 
@@ -110,7 +110,7 @@ func (h *Handler) addZone(c *gin.Context) {
 		Dnssec:          z.Dnssec,
 		CNameFlattening: z.CNameFlattening,
 		SOA:             *types.DefaultSOA(z.Name),
-		NS:              *types.GenerateNS(h.authoritativeServer),
+		NS:              *types.GenerateNS(h.nameServer),
 	}
 	_, err := h.db.AddZone(userId, model)
 	if err != nil {

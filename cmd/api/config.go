@@ -17,15 +17,22 @@ type Config struct {
 var apiDefaultConfig = &Config{
 	DBConnectionString: "root:root@tcp(127.0.0.1:3306)/z42",
 	ServerConfig: &server.Config{
-		BindAddress:  "localhost:8080",
-		ReadTimeout:  10,
-		WriteTimeout: 10,
-		AuthoritativeServer: "z42.com.",
+		BindAddress:   "localhost:8080",
+		ReadTimeout:   10,
+		WriteTimeout:  10,
+		WebServer:    "www.z42.com",
+		ApiServer:    "api.z42.com",
+		NameServer:    "ns.z42.com.",
+		HtmlTemplates: "./templates/*.tmpl",
 	},
 	MailerConfig: &mailer.Config{
 		Address:   "127.0.0.1:25",
 		FromName:  "z42",
-		FromEmail: "noreply@zone-42.com",
+		FromEmail: "noreply@z42.com",
+		WebServer:    "www.z42.com",
+		ApiServer:    "api.z42.com",
+		NameServer:    "ns.z42.com.",
+		HtmlTemplates: "./templates/*.tmpl",
 	},
 }
 

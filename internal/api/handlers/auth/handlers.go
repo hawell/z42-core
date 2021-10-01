@@ -21,16 +21,18 @@ type Handler struct {
 	jwtMiddleWare *jwt.GinJWTMiddleware
 	db            storage
 	mailer        mailer.Mailer
+	serverName    string
 }
 
 const (
 	emailKey = "email"
 )
 
-func New(db storage, mailer mailer.Mailer) *Handler {
+func New(db storage, mailer mailer.Mailer, serverName string) *Handler {
 	handler := &Handler{
-		db:    db,
-		mailer: mailer,
+		db:         db,
+		mailer:     mailer,
+		serverName: serverName,
 	}
 	jwtMiddleware, err := jwt.New(&jwt.GinJWTMiddleware{
 		Realm:       "z42 zone",
@@ -142,7 +144,7 @@ func (h *Handler) signup(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	err = h.mailer.Send(u.Email, u.Email, "email verification", code)
+	err = h.mailer.SendEMailVerification(u.Email, u.Email, code)
 	if err != nil {
 		zap.L().Error("send verification code failed", zap.Error(err))
 		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
@@ -166,5 +168,11 @@ func (h *Handler) verify(c *gin.Context) {
 		return
 	}
 
-	handlers.SuccessResponse(c, http.StatusNoContent, "successful", nil)
+	c.HTML(
+		http.StatusOK,
+		"verification-successful.tmpl",
+		gin.H {
+			"Server": h.serverName,
+		},
+	)
 }

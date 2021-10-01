@@ -1,32 +1,43 @@
 package mailer
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"net/mail"
 	"net/smtp"
 )
 
 type Mailer interface {
-	Send(toName string, toEmail string, subject string, body string) error
+	SendEMailVerification(toName string, toEmail string, code string) error
 }
 
 type Mock struct {
-	SendFunc func(toName string, toEmail string, subject string, body string) error
+	SendEMailVerificationFunc func(toName string, toEmail string, code string) error
 }
 
-func (m *Mock) Send(toName string, toEmail string, subject string, body string) error {
-	return m.SendFunc(toName, toEmail, subject, body)
+func (m *Mock) SendEMailVerification(toName string, toEmail string, code string) error {
+	return m.SendEMailVerificationFunc(toName, toEmail, code)
 }
 
 type SMTP struct {
 	config *Config
+	tmpl *template.Template
 }
 
-func NewSMTP(config *Config) Mailer {
-	return &SMTP{config: config}
+func NewSMTP(config *Config) (Mailer, error) {
+	tmpl, err := template.ParseGlob(config.HtmlTemplates)
+	if err != nil {
+		return nil, err
+	}
+	m := &SMTP{
+		config:     config,
+		tmpl:       tmpl,
+	}
+	return m, nil
 }
 
-func (m *SMTP) Send(toName string, toEmail string, subject string, body string) error {
+func (m *SMTP) SendEMailVerification(toName string, toEmail string, code string) error {
 	c, err := smtp.Dial(m.config.Address)
 	if err != nil {
 		return err
@@ -39,13 +50,27 @@ func (m *SMTP) Send(toName string, toEmail string, subject string, body string) 
 	header := make(map[string]string)
 	header["To"] = to.String()
 	header["From"] = fromHeader
-	header["Subject"] = subject
+	header["Subject"] = "email verification"
 	header["Content-Type"] = `text/html; charset="UTF-8"`
 	msg := ""
 	for k, v := range header {
 		msg += fmt.Sprintf("%s: %s\r\n", k, v)
 	}
-	msg += "\r\n" + body
+	var b bytes.Buffer
+	err = m.tmpl.ExecuteTemplate(
+		&b,
+		"verification-email.tmpl",
+		struct {
+			Server string
+			Code   string
+		}{
+			Server: m.config.ApiServer,
+			Code: code,
+		})
+	if err != nil {
+		return err
+	}
+	msg += "\r\n" + b.String()
 	bMsg := []byte(msg)
 	if err = c.Mail(fromHeader); err != nil {
 		return err

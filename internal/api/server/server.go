@@ -15,7 +15,10 @@ type Config struct {
 	BindAddress  string `json:"bind_address,default:localhost:8080"`
 	ReadTimeout  int    `json:"read_timeout,default:10"`
 	WriteTimeout int    `json:"write_timeout,default:10"`
-	AuthoritativeServer string `json:"authoritative_server"`
+	WebServer    string  `json:"web_server"`
+	ApiServer   string `json:"api_server"`
+	NameServer   string `json:"name_server"`
+	HtmlTemplates string `json:"html_templates"`
 }
 
 type Server struct {
@@ -26,6 +29,7 @@ type Server struct {
 
 func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer) *Server {
 	router := gin.New()
+	router.LoadHTMLGlob(config.HtmlTemplates)
 
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -49,12 +53,12 @@ func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer) *Ser
 	}
 
 	authGroup := router.Group("/auth")
-	authHandler := auth.New(db, mailer)
+	authHandler := auth.New(db, mailer, config.WebServer)
 	authHandler.RegisterHandlers(authGroup)
 
 	zoneGroup := router.Group("/zones")
 	zoneGroup.Use(authHandler.MiddlewareFunc())
-	zoneHandler := zone.New(db, config.AuthoritativeServer)
+	zoneHandler := zone.New(db, config.NameServer)
 	zoneHandler.RegisterHandlers(zoneGroup)
 
 	return &Server{

@@ -49,7 +49,10 @@ func main() {
 		panic(err)
 	}
 
-	m := mailer.NewSMTP(config.MailerConfig)
+	m, err := mailer.NewSMTP(config.MailerConfig)
+	if err != nil {
+		panic(err)
+	}
 
 	s := server.NewServer(config.ServerConfig, db, m)
 	err = s.ListenAndServer()

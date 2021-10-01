@@ -1,11 +1,19 @@
 {
   "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
   "server": {
-    "bind_address": "localhost:3000"
+    "bind_address": "localhost:3000",
+    "web_server": "www.z42.com",
+    "api_server": "api.z42.com",
+    "name_server": "ns.z42.com.",
+    "html_templates": "./templates/*.tmpl"
   },
   "mailer": {
     "address": "127.0.0.1:25",
     "from_name": "zone-42",
-    "from_email": "noreply@zone-42.com"
+    "from_email": "noreply@zone-42.com",
+    "web_server": "www.z42.com",
+    "api_server": "api.z42.com",
+    "name_server": "ns.z42.com.",
+    "html_templates": "./templates/*.tmpl"
   }
 }

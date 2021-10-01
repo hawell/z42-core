@@ -20,9 +20,13 @@ import (
 
 var (
 	serverConfig = Config{
-		BindAddress:  "localhost:8080",
-		ReadTimeout:  10,
-		WriteTimeout: 10,
+		BindAddress:   "localhost:8080",
+		ReadTimeout:   10,
+		WriteTimeout:  10,
+		WebServer:    "z42.com",
+		ApiServer:    "api.z42.com",
+		NameServer:    "ns.z42.com.",
+		HtmlTemplates: "../../../templates/*.tmpl",
 	}
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
 	db            *database.DataBase
@@ -59,6 +63,19 @@ func TestAddZone(t *testing.T) {
 	Expect(err).To(BeNil())
 	resp := execRequest(users[0].Id, http.MethodPost, path, string(body))
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+	z, err := db.GetZone(users[0].Id, "example.com.")
+	Expect(err).To(BeNil())
+	Expect(z).To(Equal(database.Zone{
+		Id:              z.Id,
+		Name:            "example.com.",
+		Enabled:         true,
+		Dnssec:          true,
+		CNameFlattening: false,
+		SOA:             *types.DefaultSOA("example.com."),
+	}))
+	ns, err := db.GetRecordSet(users[0].Id, "example.com.", "@", "ns")
+	Expect(err).To(BeNil())
+	Expect(ns.Value).To(Equal(types.GenerateNS(serverConfig.NameServer)))
 
 	// duplicate
 	resp = execRequest(users[0].Id, http.MethodPost, path, string(body))
@@ -553,6 +570,28 @@ func TestAddRecordSet(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 }
 
+func TestAddLongText(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+	location1 := "default._domainkey"
+	_, err = addLocation(users[0].Id, zone1Name, location1)
+	Expect(err).To(BeNil())
+	path := "/zones/" + zone1Name + "/locations/" + location1 + "/rrsets"
+	body := `{"type":"txt", "enabled":true, "value":{"ttl":300, "records":[{"text":"v=DKIM1;h=sha256;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyApM1TW9+8LDXKGuqSbPUvLM5KN4+UraYalUXoZzX8JB33qxRrp/rMJfpx1RUei+cvw7WRFhLwZ5Ue0yNxQZ+RXsK0MYXGmdcqPLERu1GwJ61w4TEVJyox/++OoO/R/pa/cR/OS2i9d7tjqU8BZCB8o2MF0Sg9FN+FqFB3MzGgWrm2/kChBjA8QffIoSx7T8JuTlEf7pEf03gIIrMy4aYJxw+D0J777B0szlYdKyLRy7WqCcfzJNQU8AXtVX0IlmEdxkqst5IKzKpa3rjwYJ9/MtifcDWV47rdJEQ28Gi3HTmEXZ8L52ZukP1GztPg8hP5h5Y27GCx6WwC6zdlCz1wIDAQAB"}]}}`
+	resp := execRequest(users[0].Id, http.MethodPost, path, body)
+	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+	record, err := db.GetRecordSet(users[0].Id, zone1Name, location1, "txt")
+	Expect(err).To(BeNil())
+	Expect(record.Type).To(Equal("txt"))
+	Expect(record.Enabled).To(BeTrue())
+	Expect(record.Value).To(Equal(&types.TXT_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data:         []types.TXT_RR{{Text: "v=DKIM1;h=sha256;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyApM1TW9+8LDXKGuqSbPUvLM5KN4+UraYalUXoZzX8JB33qxRrp/rMJfpx1RUei+cvw7WRFhLwZ5Ue0yNxQZ+RXsK0MYXGmdcqPLERu1GwJ61w4TEVJyox/++OoO/R/pa/cR/OS2i9d7tjqU8BZCB8o2MF0Sg9FN+FqFB3MzGgWrm2/kChBjA8QffIoSx7T8JuTlEf7pEf03gIIrMy4aYJxw+D0J777B0szlYdKyLRy7WqCcfzJNQU8AXtVX0IlmEdxkqst5IKzKpa3rjwYJ9/MtifcDWV47rdJEQ28Gi3HTmEXZ8L52ZukP1GztPg8hP5h5Y27GCx6WwC6zdlCz1wIDAQAB"}},
+	}))
+}
+
 func TestGetRecordSets(t *testing.T) {
 	initialize(t)
 	zone1Name := "zone1.com."
@@ -843,8 +882,8 @@ func TestVerify(t *testing.T) {
 	// verify user
 	path := "/auth/verify?code=" + code
 	resp := execRequest(users[0].Id, http.MethodPost, path, "")
-	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
-
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	_, err = ioutil.ReadAll(resp.Body)
 	// check user status is active
 	user, err := db.GetUser("user2@example.com")
 	Expect(err).To(BeNil())
@@ -858,7 +897,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	s := NewServer(&serverConfig, db, &mailer.Mock{SendFunc: func(toName string, toEmail string, subject string, body string) error {
+	s := NewServer(&serverConfig, db, &mailer.Mock{SendEMailVerificationFunc: func(toName string, toEmail string, code string) error {
 		return nil
 	}})
 	go func() {
