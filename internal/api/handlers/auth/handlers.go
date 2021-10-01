@@ -12,9 +12,8 @@ import (
 )
 
 type storage interface {
-	AddUser(u database.NewUser) (database.ObjectId, error)
+	AddUser(u database.NewUser) (database.ObjectId, string, error)
 	GetUser(name string) (database.User, error)
-	AddVerification(user string, verificationType string) (string, error)
 	Verify(code string) error
 }
 
@@ -137,16 +136,10 @@ func (h *Handler) signup(c *gin.Context) {
 		Password: u.Password,
 		Status:   database.UserStatusPending,
 	}
-	_, err = h.db.AddUser(model)
+	_, code, err := h.db.AddUser(model)
 	if err != nil {
 		zap.L().Error("DataBase.addUser()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
-		return
-	}
-	code, err := h.db.AddVerification(u.Email, database.VerificationTypeSignup)
-	if err != nil {
-		zap.L().Error("add verification code failed", zap.Error(err))
-		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	err = h.mailer.Send(u.Email, u.Email, "email verification", code)

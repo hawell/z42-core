@@ -9,7 +9,6 @@ import (
 	"github.com/hawell/z42/internal/api/handlers/zone"
 	"github.com/hawell/z42/internal/mailer"
 	"github.com/hawell/z42/internal/types"
-	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -25,26 +24,8 @@ var (
 		ReadTimeout:  10,
 		WriteTimeout: 10,
 	}
-	redisConfig = hiredis.Config{
-		Address:  "127.0.0.1:6379",
-		Net:      "tcp",
-		DB:       0,
-		Password: "",
-		Prefix:   "test_",
-		Suffix:   "_test",
-		Connection: hiredis.ConnectionConfig{
-			MaxIdleConnections:   10,
-			MaxActiveConnections: 10,
-			ConnectTimeout:       500,
-			ReadTimeout:          500,
-			IdleKeepAlive:        30,
-			MaxKeepAlive:         0,
-			WaitForConnection:    false,
-		},
-	}
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
 	db            *database.DataBase
-	redis         *hiredis.Redis
 	tokens        map[database.ObjectId]string
 	client        http.Client
 	users         = []database.User{
@@ -832,10 +813,8 @@ func TestDeleteRecordSet(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 }
 
-func TestSignupAndVerify(t *testing.T) {
+func TestSignup(t *testing.T) {
 	initialize(t)
-	err := redis.Del("email_verification")
-	Expect(err).To(BeNil())
 
 	// add new user
 	body := `{"email": "user1@example.com", "password": "password"}`
@@ -849,21 +828,27 @@ func TestSignupAndVerify(t *testing.T) {
 	Expect(user.Email).To(Equal("user1@example.com"))
 	Expect(user.Status).To(Equal(database.UserStatusPending))
 
-	// get verification code
-	item, err := redis.XRead("email_verification", "0")
+}
+
+func TestVerify(t *testing.T) {
+	initialize(t)
+
+	_, code, err := db.AddUser(database.NewUser{
+		Email:    "user2@example.com",
+		Password: "12345678",
+		Status:   database.UserStatusPending,
+	})
 	Expect(err).To(BeNil())
-	Expect(len(item)).To(Equal(1))
-	code := item[0].Value
 
 	// verify user
-	path = "/auth/verify?code=" + code
-	resp = execRequest(users[0].Id, http.MethodPost, path, "")
+	path := "/auth/verify?code=" + code
+	resp := execRequest(users[0].Id, http.MethodPost, path, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 
 	// check user status is active
-	user, err = db.GetUser("user1@example.com")
+	user, err := db.GetUser("user2@example.com")
 	Expect(err).To(BeNil())
-	Expect(user.Email).To(Equal("user1@example.com"))
+	Expect(user.Email).To(Equal("user2@example.com"))
 	Expect(user.Status).To(Equal(database.UserStatusActive))
 }
 
@@ -873,7 +858,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	redis = hiredis.NewRedis(&redisConfig)
 	s := NewServer(&serverConfig, db, &mailer.Mock{SendFunc: func(toName string, toEmail string, subject string, body string) error {
 		return nil
 	}})
@@ -887,7 +871,7 @@ func TestMain(m *testing.M) {
 	tokens = make(map[database.ObjectId]string)
 	for i := range users {
 		fmt.Println(users[i].Email)
-		users[i].Id, err = db.AddUser(database.NewUser{Email: users[i].Email, Password: users[i].Email, Status: database.UserStatusActive})
+		users[i].Id, _, err = db.AddUser(database.NewUser{Email: users[i].Email, Password: users[i].Email, Status: database.UserStatusActive})
 		if err != nil {
 			panic(err)
 		}

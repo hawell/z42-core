@@ -7,7 +7,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/hawell/z42/internal/types"
 	jsoniter "github.com/json-iterator/go"
-	"log"
 	"math/rand"
 	"time"
 )
@@ -88,34 +87,31 @@ func (db *DataBase) Clear(removeUsers bool) error {
 	return parseError(err)
 }
 
-func (db *DataBase) AddUser(u NewUser) (ObjectId, error) {
-	hash, err := HashPassword(u.Password)
-	if err != nil {
-		return EmptyObjectId, parseError(err)
-	}
-	id := NewObjectId()
-	_, err = db.db.Exec("INSERT INTO User(Id, Email, Password, Status) VALUES (?, ?, ?, ?)", id, u.Email, hash, u.Status)
-	if err != nil {
-		log.Println(err)
-		return EmptyObjectId, parseError(err)
-	}
-	return id, nil
-}
-
-func (db *DataBase) AddVerification(name string, verificationType string) (string, error) {
-	u, err := db.GetUser(name)
-	if err != nil {
-		if err == ErrNotFound {
-			return "", ErrInvalid
+func (db *DataBase) AddUser(u NewUser) (ObjectId, string, error) {
+	var err error
+	userId := EmptyObjectId
+	var code string
+	err = db.withTransaction(func(t transaction) error {
+		hash, err := HashPassword(u.Password)
+		if err != nil {
+			return err
 		}
-		return "", parseError(err)
-	}
-	code := randomString(50)
-	_, err = db.db.Exec("INSERT INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, verificationType, u.Id)
-	if err != nil {
-		return "", parseError(err)
-	}
-	return code, nil
+		userId = NewObjectId()
+		_, err = db.db.Exec("INSERT INTO User(Id, Email, Password, Status) VALUES (?, ?, ?, ?)", userId, u.Email, hash, u.Status)
+		if err != nil {
+			return err
+		}
+
+		if u.Status == UserStatusPending {
+			code = randomString(50)
+			_, err = db.db.Exec("INSERT INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeSignup, userId)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return userId, code, parseError(err)
 }
 
 func (db *DataBase) Verify(code string) error {
