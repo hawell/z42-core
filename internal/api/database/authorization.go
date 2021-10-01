@@ -25,13 +25,13 @@ func (db *DataBase) getPrivileges(userId ObjectId, resourceId ObjectId) (ACL, er
 	return acl, nil
 }
 
-func (db *DataBase) setPrivileges(userId ObjectId, resourceId ObjectId, acl ACL) error {
-	_, err := db.db.Exec("REPLACE INTO ACL(CanRead, CanList, CanEdit, CanInsert, CanDelete, User_Id, Resource_Id) VALUES (?, ?, ?, ?, ?, ?, ?)", acl.Read, acl.List, acl.Edit, acl.Insert, acl.Delete, userId, resourceId)
+func setPrivileges(t *sql.Tx, userId ObjectId, resourceId ObjectId, acl ACL) error {
+	_, err := t.Exec("REPLACE INTO ACL(CanRead, CanList, CanEdit, CanInsert, CanDelete, User_Id, Resource_Id) VALUES (?, ?, ?, ?, ?, ?, ?)", acl.Read, acl.List, acl.Edit, acl.Insert, acl.Delete, userId, resourceId)
 	return err
 }
 
-func (db *DataBase) deletePrivileges(resourceId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM ACL WHERE Resource_Id = ?", resourceId)
+func deletePrivileges(t *sql.Tx, resourceId ObjectId) error {
+	_, err := t.Exec("DELETE FROM ACL WHERE Resource_Id = ?", resourceId)
 	return err
 }
 

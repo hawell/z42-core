@@ -30,16 +30,16 @@ var (
 	client        http.Client
 	users         = []database.User{
 		{
-			Email:    "user1",
-			Password: "user1",
+			Email:    "apiUser1",
+			Password: "apiUser1",
 		},
 		{
-			Email:    "user2",
-			Password: "user2",
+			Email:    "apiUser2",
+			Password: "apiUser2",
 		},
 		{
-			Email:    "user3",
-			Password: "user3",
+			Email:    "apiUser3",
+			Password: "apiUser3",
 		},
 	}
 )

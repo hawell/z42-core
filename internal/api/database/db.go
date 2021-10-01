@@ -63,7 +63,7 @@ func (db *DataBase) Close() error {
 
 func (db *DataBase) Clear(removeUsers bool) error {
 	var err error
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		if removeUsers {
 			if _, err := t.Exec("DELETE FROM User"); err != nil {
 				return err
@@ -91,20 +91,20 @@ func (db *DataBase) AddUser(u NewUser) (ObjectId, string, error) {
 	var err error
 	userId := EmptyObjectId
 	var code string
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		hash, err := HashPassword(u.Password)
 		if err != nil {
 			return err
 		}
 		userId = NewObjectId()
-		_, err = db.db.Exec("INSERT INTO User(Id, Email, Password, Status) VALUES (?, ?, ?, ?)", userId, u.Email, hash, u.Status)
+		_, err = t.Exec("INSERT INTO User(Id, Email, Password, Status) VALUES (?, ?, ?, ?)", userId, u.Email, hash, u.Status)
 		if err != nil {
 			return err
 		}
 
 		if u.Status == UserStatusPending {
 			code = randomString(50)
-			_, err = db.db.Exec("INSERT INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeSignup, userId)
+			_, err = t.Exec("INSERT INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeSignup, userId)
 			if err != nil {
 				return err
 			}
@@ -125,17 +125,19 @@ func (db *DataBase) Verify(code string) error {
 	}
 	switch verificationType {
 	case VerificationTypeSignup:
-		if _, err := db.db.Exec("UPDATE User SET Status = ? WHERE Id = ?", UserStatusActive, userId); err != nil {
-			return parseError(err)
-		}
-		if _, err := db.db.Exec("DELETE FROM Verification WHERE Code = ?", code); err != nil {
-			return parseError(err)
-		}
+		err := db.withTransaction(func(t *sql.Tx) error {
+			if _, err := t.Exec("UPDATE User SET Status = ? WHERE Id = ?", UserStatusActive, userId); err != nil {
+				return err
+			}
+			if _, err := t.Exec("DELETE FROM Verification WHERE Code = ?", code); err != nil {
+				return err
+			}
+			return nil
+		})
+		return parseError(err)
 	default:
 		return errors.New("unknown verification type")
 	}
-
-	return nil
 }
 
 func (db *DataBase) GetUser(name string) (User, error) {
@@ -198,20 +200,20 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 	}
 	if owner == EmptyObjectId {
 		var zoneId ObjectId
-		err := db.withTransaction(func(t transaction) error {
+		err := db.withTransaction(func(t *sql.Tx) error {
 			var err error
-			zoneId, err = db.addResource()
+			zoneId, err = addResource(t)
 			if err != nil {
 				return err
 			}
-			err = db.addZone(userId, zoneId, z)
+			err = addZone(t, userId, zoneId, z)
 			if err != nil {
 				return err
 			}
-			if err = db.setPrivileges(userId, zoneId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
+			if err = setPrivileges(t, userId, zoneId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
 				return err
 			}
-			if err = db.setSOA(zoneId, z.SOA); err != nil {
+			if err = setSOA(t, zoneId, z.SOA); err != nil {
 				return err
 			}
 			rootLocation := NewLocation{
@@ -219,30 +221,30 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 				Location: "@",
 				Enabled:  true,
 			}
-			locationId, err := db.addResource()
+			locationId, err := addResource(t)
 			if err != nil {
 				return err
 			}
-			err = db.addLocation(zoneId, locationId, rootLocation)
+			err = addLocation(t, zoneId, locationId, rootLocation)
 			if err != nil {
 				return err
 			}
-			if err = db.setPrivileges(userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+			if err = setPrivileges(t, userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
 				return err
 			}
 			nsRecord := NewRecordSet{Type: "ns", Value: &z.NS, Enabled: true}
-			nsId, err := db.addResource()
+			nsId, err := addResource(t)
 			if err != nil {
 				return err
 			}
-			err = db.addRecordSet(locationId, nsId, nsRecord)
+			err = addRecordSet(t, locationId, nsId, nsRecord)
 			if err != nil {
 				return err
 			}
-			if err := db.setPrivileges(userId, nsId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+			if err := setPrivileges(t, userId, nsId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
 				return err
 			}
-			if _, err = db.addEvent(zoneId, AddZone, z); err != nil {
+			if _, err = addEvent(t, zoneId, AddZone, z); err != nil {
 				return err
 			}
 			return nil
@@ -312,17 +314,17 @@ func (db *DataBase) UpdateZone(userId ObjectId, z ZoneUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := db.canUpdateZone(userId, zoneId); err != nil {
 			return err
 		}
-		if err := db.updateZone(zoneId, z); err != nil {
+		if err := updateZone(t, zoneId, z); err != nil {
 			return err
 		}
-		if err := db.setSOA(zoneId, z.SOA); err != nil {
+		if err := setSOA(t, zoneId, z.SOA); err != nil {
 			return err
 		}
-		if _, err := db.addEvent(zoneId, UpdateZone, z); err != nil {
+		if _, err := addEvent(t, zoneId, UpdateZone, z); err != nil {
 			return err
 		}
 		return nil
@@ -338,17 +340,17 @@ func (db *DataBase) DeleteZone(userId ObjectId, z ZoneDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := db.canDeleteZone(userId, zoneId); err != nil {
 			return err
 		}
-		if err := db.deleteZone(zoneId); err != nil {
+		if err := deleteZone(t, zoneId); err != nil {
 			return err
 		}
-		if err := db.deletePrivileges(zoneId); err != nil {
+		if err := deletePrivileges(t, zoneId); err != nil {
 			return err
 		}
-		if _, err := db.addEvent(zoneId, DeleteZone, z.Name); err != nil {
+		if _, err := addEvent(t, zoneId, DeleteZone, z.Name); err != nil {
 			return err
 		}
 		return nil
@@ -368,20 +370,20 @@ func (db *DataBase) AddLocation(userId ObjectId, l NewLocation) (ObjectId, error
 		return EmptyObjectId, parseError(err)
 	}
 	var locationId ObjectId
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		var err error
-		locationId, err = db.addResource()
+		locationId, err = addResource(t)
 		if err != nil {
 			return err
 		}
-		err = db.addLocation(zoneId, locationId, l)
+		err = addLocation(t, zoneId, locationId, l)
 		if err != nil {
 			return err
 		}
-		if err := db.setPrivileges(userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
+		if err := setPrivileges(t, userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
 			return err
 		}
-		if _, err := db.addEvent(zoneId, AddLocation, l); err != nil {
+		if _, err := addEvent(t, zoneId, AddLocation, l); err != nil {
 			return err
 		}
 		return nil
@@ -448,14 +450,14 @@ func (db *DataBase) UpdateLocation(userId ObjectId, l LocationUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := db.canUpdateLocation(userId, zoneId, locationId); err != nil {
 			return err
 		}
-		if err := db.updateLocation(locationId, l); err != nil {
+		if err := updateLocation(t, locationId, l); err != nil {
 			return err
 		}
-		if _, err := db.addEvent(zoneId, UpdateLocation, l); err != nil {
+		if _, err := addEvent(t, zoneId, UpdateLocation, l); err != nil {
 			return err
 		}
 		return nil
@@ -471,14 +473,14 @@ func (db *DataBase) DeleteLocation(userId ObjectId, l LocationDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := db.canDeleteLocation(userId, zoneId, locationId); err != nil {
 			return err
 		}
-		if err := db.deleteLocation(locationId); err != nil {
+		if err := deleteLocation(t, locationId); err != nil {
 			return err
 		}
-		if _, err := db.addEvent(zoneId, DeleteLocation, l); err != nil {
+		if _, err := addEvent(t, zoneId, DeleteLocation, l); err != nil {
 			return err
 		}
 		return nil
@@ -498,18 +500,18 @@ func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, err
 		return EmptyObjectId, parseError(err)
 	}
 	var recordId ObjectId
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		var err error
-		if recordId, err = db.addResource(); err != nil {
+		if recordId, err = addResource(t); err != nil {
 			return err
 		}
-		if err = db.addRecordSet(locationId, recordId, r); err != nil {
+		if err = addRecordSet(t, locationId, recordId, r); err != nil {
 			return err
 		}
-		if err = db.setPrivileges(userId, recordId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
+		if err = setPrivileges(t, userId, recordId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
 			return err
 		}
-		if _, err = db.addEvent(zoneId, AddRecord, r); err != nil {
+		if _, err = addEvent(t, zoneId, AddRecord, r); err != nil {
 			return err
 		}
 		return nil
@@ -580,14 +582,14 @@ func (db *DataBase) UpdateRecordSet(userId ObjectId, r RecordSetUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := db.canUpdateRecordSet(userId, zoneId, locationId, recordId); err != nil {
 			return err
 		}
-		if err := db.updateRecordSet(recordId, r); err != nil {
+		if err := updateRecordSet(t, recordId, r); err != nil {
 			return err
 		}
-		if _, err := db.addEvent(zoneId, UpdateRecord, r); err != nil {
+		if _, err := addEvent(t, zoneId, UpdateRecord, r); err != nil {
 			return err
 		}
 		return nil
@@ -603,14 +605,14 @@ func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	err = db.withTransaction(func(t transaction) error {
+	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := db.canDeleteRecordSet(userId, zoneId, locationId, recordId); err != nil {
 			return parseError(err)
 		}
-		if err := db.deleteRecordSet(recordId); err != nil {
+		if err := deleteRecordSet(t, recordId); err != nil {
 			return parseError(err)
 		}
-		if _, err := db.addEvent(zoneId, DeleteRecord, r); err != nil {
+		if _, err := addEvent(t, zoneId, DeleteRecord, r); err != nil {
 			return err
 		}
 		return nil
@@ -658,84 +660,84 @@ func (db *DataBase) getRecordId(zoneName string, location string, recordType str
 	return zoneId, locationId, recordId, nil
 }
 
-func (db *DataBase) setSOA(zoneId ObjectId, soa types.SOA_RRSet) error {
-	_, err := db.db.Exec("REPLACE INTO SOA VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", soa.TtlValue, soa.Ns, soa.MBox, soa.Refresh, soa.Retry, soa.Expire, soa.MinTtl, soa.Serial, zoneId)
+func setSOA(t *sql.Tx, zoneId ObjectId, soa types.SOA_RRSet) error {
+	_, err := t.Exec("REPLACE INTO SOA VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", soa.TtlValue, soa.Ns, soa.MBox, soa.Refresh, soa.Retry, soa.Expire, soa.MinTtl, soa.Serial, zoneId)
 	return err
 }
 
-func (db *DataBase) addResource() (ObjectId, error) {
+func addResource(t *sql.Tx) (ObjectId, error) {
 	ResourceId := NewObjectId()
-	if _, err := db.db.Exec("INSERT INTO Resource(Id) VALUES (?)", ResourceId); err != nil {
+	if _, err := t.Exec("INSERT INTO Resource(Id) VALUES (?)", ResourceId); err != nil {
 		return EmptyObjectId, err
 	}
 	return ResourceId, nil
 }
 
-func (db *DataBase) addZone(userId ObjectId, resourceId ObjectId, z NewZone) error {
-	if _, err := db.db.Exec("INSERT INTO Zone(Resource_Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", resourceId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, userId); err != nil {
+func addZone(t *sql.Tx, userId ObjectId, resourceId ObjectId, z NewZone) error {
+	if _, err := t.Exec("INSERT INTO Zone(Resource_Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", resourceId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, userId); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *DataBase) updateZone(zoneId ObjectId, z ZoneUpdate) error {
-	_, err := db.db.Exec("UPDATE Zone SET Name = ?, Dnssec = ?, CNameFlattening = ?, Enabled = ? WHERE Resource_Id = ?", z.Name, z.Dnssec, z.CNameFlattening, z.Enabled, zoneId)
+func updateZone(t *sql.Tx, zoneId ObjectId, z ZoneUpdate) error {
+	_, err := t.Exec("UPDATE Zone SET Name = ?, Dnssec = ?, CNameFlattening = ?, Enabled = ? WHERE Resource_Id = ?", z.Name, z.Dnssec, z.CNameFlattening, z.Enabled, zoneId)
 	return err
 }
 
-func (db *DataBase) deleteZone(zoneId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM Zone WHERE Resource_Id = ?", zoneId)
+func deleteZone(t *sql.Tx, zoneId ObjectId) error {
+	_, err := t.Exec("DELETE FROM Zone WHERE Resource_Id = ?", zoneId)
 	return err
 }
 
-func (db *DataBase) addLocation(zoneId ObjectId, resourceId ObjectId, l NewLocation) error {
-	if _, err := db.db.Exec("INSERT INTO Location(Resource_Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", resourceId, l.Location, l.Enabled, zoneId); err != nil {
+func addLocation(t *sql.Tx, zoneId ObjectId, resourceId ObjectId, l NewLocation) error {
+	if _, err := t.Exec("INSERT INTO Location(Resource_Id, Name, Enabled, Zone_Id) VALUES (?, ?, ?, ?)", resourceId, l.Location, l.Enabled, zoneId); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *DataBase) updateLocation(locationId ObjectId, l LocationUpdate) error {
-	_, err := db.db.Exec("UPDATE Location SET Name = ?, Enabled = ? WHERE Resource_Id = ?", l.Location, l.Enabled, locationId)
+func updateLocation(t *sql.Tx, locationId ObjectId, l LocationUpdate) error {
+	_, err := t.Exec("UPDATE Location SET Name = ?, Enabled = ? WHERE Resource_Id = ?", l.Location, l.Enabled, locationId)
 	return err
 }
 
-func (db *DataBase) deleteLocation(locationId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM Location WHERE Resource_Id = ?", locationId)
+func deleteLocation(t *sql.Tx, locationId ObjectId) error {
+	_, err := t.Exec("DELETE FROM Location WHERE Resource_Id = ?", locationId)
 	return err
 }
 
-func (db *DataBase) addRecordSet(locationId ObjectId, resourceId ObjectId, r NewRecordSet) error {
+func addRecordSet(t *sql.Tx, locationId ObjectId, resourceId ObjectId, r NewRecordSet) error {
 	value, err := jsoniter.Marshal(r.Value)
 	if err != nil {
 		return err
 	}
-	if _, err := db.db.Exec("INSERT INTO RecordSet(Resource_Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", resourceId, locationId, r.Type, value, r.Enabled); err != nil {
+	if _, err := t.Exec("INSERT INTO RecordSet(Resource_Id, Location_Id, Type, Value, Enabled) VALUES (?, ?, ?, ?, ?)", resourceId, locationId, r.Type, value, r.Enabled); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *DataBase) updateRecordSet(recordId ObjectId, r RecordSetUpdate) error {
+func updateRecordSet(t *sql.Tx, recordId ObjectId, r RecordSetUpdate) error {
 	value, err := jsoniter.Marshal(r.Value)
 	if err != nil {
 		return err
 	}
-	_, err = db.db.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Resource_Id = ?", value, r.Enabled, recordId)
+	_, err = t.Exec("UPDATE RecordSet SET Value = ?, Enabled = ?  WHERE Resource_Id = ?", value, r.Enabled, recordId)
 	return err
 }
 
-func (db *DataBase) deleteRecordSet(recordId ObjectId) error {
-	_, err := db.db.Exec("DELETE FROM RecordSet WHERE Resource_Id = ?", recordId)
+func deleteRecordSet(t *sql.Tx, recordId ObjectId) error {
+	_, err := t.Exec("DELETE FROM RecordSet WHERE Resource_Id = ?", recordId)
 	return err
 }
 
-func (db *DataBase) addEvent(zoneId ObjectId, eventType EventType, value interface{}) (int64, error) {
+func addEvent(t *sql.Tx, zoneId ObjectId, eventType EventType, value interface{}) (int64, error) {
 	jsonValue, err := jsoniter.Marshal(value)
 	if err != nil {
 		return 0, err
 	}
-	res, err := db.db.Exec("INSERT INTO Events(ZoneId, Type, Value) VALUES (?, ?, ?)", zoneId, eventType, jsonValue)
+	res, err := t.Exec("INSERT INTO Events(ZoneId, Type, Value) VALUES (?, ?, ?)", zoneId, eventType, jsonValue)
 	if err != nil {
 		return 0, err
 	}

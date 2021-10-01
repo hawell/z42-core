@@ -4,14 +4,7 @@ import (
 	"database/sql"
 )
 
-type transaction interface {
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	Prepare(query string) (*sql.Stmt, error)
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-	QueryRow(query string, args ...interface{}) *sql.Row
-}
-
-type txFn func(transaction) error
+type txFn func(tx *sql.Tx) error
 
 func (db *DataBase) withTransaction(fn txFn) (err error) {
 	tx, err := db.db.Begin()

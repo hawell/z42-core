@@ -43,32 +43,32 @@ func TestUser(t *testing.T) {
 	Expect(err).To(BeNil())
 
 	// add
-	_, _, err = db.AddUser(NewUser{Email: "user1", Password: "12345678", Status: UserStatusActive})
+	_, _, err = db.AddUser(NewUser{Email: "dbUser1", Password: "12345678", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	// get
-	u, err := db.GetUser("user1")
+	u, err := db.GetUser("dbUser1")
 	Expect(err).To(BeNil())
-	Expect(u.Email).To(Equal("user1"))
+	Expect(u.Email).To(Equal("dbUser1"))
 	Expect(u.Status).To(Equal(UserStatusActive))
 
 	// get non-existing user
-	u, err = db.GetUser("user2")
+	u, err = db.GetUser("dbUser2")
 	Expect(err).To(Equal(ErrNotFound))
 
 	// duplicate
-	_, _, err = db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	_, _, err = db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(Equal(ErrDuplicateEntry))
 
 	// delete
-	res, err := db.DeleteUser("user1")
+	res, err := db.DeleteUser("dbUser1")
 	Expect(err).To(BeNil())
 	Expect(res).To(Equal(int64(1)))
-	_, err = db.GetUser("user1")
+	_, err = db.GetUser("dbUser1")
 	Expect(err).NotTo(BeNil())
 
 	// delete non-existing user
-	res, err = db.DeleteUser("user1")
+	res, err = db.DeleteUser("dbUser1")
 	Expect(err).To(Equal(ErrNotFound))
 	Expect(res).To(Equal(int64(0)))
 }
@@ -77,7 +77,7 @@ func TestAddZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	// add zone for user
@@ -93,7 +93,7 @@ func TestAddZone(t *testing.T) {
 	Expect(err).To(Equal(ErrDuplicateEntry))
 
 	// add zone for another user
-	user2Id, _, err := db.AddUser(NewUser{Email: "user2", Password: "user2", Status: UserStatusActive})
+	user2Id, _, err := db.AddUser(NewUser{Email: "dbUser2", Password: "dbUser2", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	_, err = db.AddZone(user2Id, NewZone{Name: "example4.com.", Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
 	Expect(err).To(BeNil())
@@ -107,11 +107,11 @@ func TestGetZones(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	User1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	User1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
-	User2Id, _, err := db.AddUser(NewUser{Email: "user2", Password: "user2", Status: UserStatusActive})
+	User2Id, _, err := db.AddUser(NewUser{Email: "dbUser2", Password: "dbUser2", Status: UserStatusActive})
 	Expect(err).To(BeNil())
-	User3Id, _, err := db.AddUser(NewUser{Email: "user3", Password: "user3", Status: UserStatusActive})
+	User3Id, _, err := db.AddUser(NewUser{Email: "dbUser3", Password: "dbUser3", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	_, err = db.AddZone(User1Id, NewZone{Name: "example1.com.", Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -200,7 +200,7 @@ func TestGetZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	zoneName := "example1.com."
@@ -228,7 +228,7 @@ func TestUpdateZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	zoneName := "example1.com."
@@ -266,7 +266,7 @@ func TestDeleteZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	zoneName := "zone1.com."
@@ -286,7 +286,7 @@ func TestAddLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zoneName := "example.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zoneName, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -315,7 +315,7 @@ func TestGetLocations(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example1.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -423,7 +423,7 @@ func TestGetLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example1.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -450,7 +450,7 @@ func TestUpdateLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example1.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -480,7 +480,7 @@ func TestDeleteLocation(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example1.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -508,7 +508,7 @@ func TestAddRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -590,7 +590,7 @@ func TestGetRecordSets(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example1.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -655,7 +655,7 @@ func TestGetRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -702,7 +702,7 @@ func TestUpdateRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -756,7 +756,7 @@ func TestDeleteRecordSet(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 	zone1Name := "example.com."
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
@@ -833,7 +833,7 @@ func TestAutoInsertedItemsAfterAddZone(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	// add zone for user
@@ -864,7 +864,7 @@ func TestEvent(t *testing.T) {
 	RegisterTestingT(t)
 	err := db.Clear(true)
 	Expect(err).To(BeNil())
-	user1Id, _, err := db.AddUser(NewUser{Email: "user1", Password: "user1", Status: UserStatusActive})
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
 	zoneName := "example.com."
