@@ -7,6 +7,7 @@ import (
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/api/handlers/zone"
+	"github.com/hawell/z42/internal/mailer"
 	"github.com/hawell/z42/internal/types"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
@@ -873,7 +874,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	redis = hiredis.NewRedis(&redisConfig)
-	s := NewServer(&serverConfig, db, redis)
+	s := NewServer(&serverConfig, db, &mailer.Mock{SendFunc: func(toName string, toEmail string, subject string, body string) error {
+		return nil
+	}})
 	go func() {
 		_ = s.ListenAndServer()
 	}()

@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
-	"github.com/hawell/z42/pkg/hiredis"
+	"github.com/hawell/z42/internal/mailer"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
@@ -21,17 +21,17 @@ type storage interface {
 type Handler struct {
 	jwtMiddleWare *jwt.GinJWTMiddleware
 	db            storage
-	redis         *hiredis.Redis
+	mailer        mailer.Mailer
 }
 
 const (
 	emailKey = "email"
 )
 
-func New(db storage, redis *hiredis.Redis) *Handler {
+func New(db storage, mailer mailer.Mailer) *Handler {
 	handler := &Handler{
 		db:    db,
-		redis: redis,
+		mailer: mailer,
 	}
 	jwtMiddleware, err := jwt.New(&jwt.GinJWTMiddleware{
 		Realm:       "z42 zone",
@@ -149,8 +149,7 @@ func (h *Handler) signup(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// TODO : refactor to function
-	_, err = h.redis.XAdd("email_verification", hiredis.StreamItem{Key: u.Email, Value: code})
+	err = h.mailer.Send(u.Email, u.Email, "email verification", code)
 	if err != nil {
 		zap.L().Error("send verification code failed", zap.Error(err))
 		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())

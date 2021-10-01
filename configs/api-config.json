@@ -2,5 +2,10 @@
   "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
   "server": {
     "bind_address": "localhost:3000"
+  },
+  "mailer": {
+    "address": "127.0.0.1:25",
+    "from_name": "zone-42",
+    "from_email": "noreply@zone-42.com"
   }
 }

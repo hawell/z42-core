@@ -5,7 +5,6 @@ import (
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/types"
-	"github.com/hawell/z42/pkg/hiredis"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
@@ -32,13 +31,11 @@ type storage interface {
 type Handler struct {
 	authoritativeServer string
 	db    storage
-	redis *hiredis.Redis
 }
 
-func New(db storage, redis *hiredis.Redis, authoritativeServer string) *Handler {
+func New(db storage, authoritativeServer string) *Handler {
 	return &Handler{
 		db:    db,
-		redis: redis,
 		authoritativeServer: authoritativeServer,
 	}
 }
