@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
+	"github.com/hawell/z42/internal/api/handlers/recaptcha"
 	"github.com/hawell/z42/internal/api/handlers/zone"
 	"github.com/hawell/z42/internal/mailer"
 	"github.com/hawell/z42/internal/types"
@@ -16,6 +17,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -27,6 +29,8 @@ var (
 		ApiServer:    "api.z42.com",
 		NameServer:    "ns.z42.com.",
 		HtmlTemplates: "../../../templates/*.tmpl",
+		RecaptchaSecretKey: "6LdNW6UcAAAAAL7M90WaPU2h4KwIveMuleVPMlkK",
+		RecaptchaServer: "http://127.0.0.1:9798",
 	}
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
 	db            *database.DataBase
@@ -46,6 +50,7 @@ var (
 			Password: "apiUser3",
 		},
 	}
+	recaptchaServer = recaptcha.NewMockServer("127.0.0.1:9798")
 )
 
 func TestAddZone(t *testing.T) {
@@ -73,9 +78,14 @@ func TestAddZone(t *testing.T) {
 		CNameFlattening: false,
 		SOA:             *types.DefaultSOA("example.com."),
 	}))
-	ns, err := db.GetRecordSet(users[0].Id, "example.com.", "@", "ns")
+	rr, err := db.GetRecordSet(users[0].Id, "example.com.", "@", "ns")
 	Expect(err).To(BeNil())
-	Expect(ns.Value).To(Equal(types.GenerateNS(serverConfig.NameServer)))
+	ns := rr.Value.(*types.NS_RRSet)
+	Expect(len(ns.Data)).To(Equal(2))
+	Expect(ns.TtlValue).To(Equal(uint32(3600)))
+	for i := range ns.Data {
+		Expect(ns.Data[i].Host).To(MatchRegexp(`.*\.ns\.z42.com\.`))
+	}
 
 	// duplicate
 	resp = execRequest(users[0].Id, http.MethodPost, path, string(body))
@@ -462,7 +472,7 @@ func TestGetLocation(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 	// non-existing zone
-	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+"invali.none"+"/locations/"+location1, "")
+	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+"invalid.none"+"/locations/"+location1, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 }
 
@@ -857,7 +867,7 @@ func TestSignup(t *testing.T) {
 
 	// add new user
 	body := `{"email": "user1@example.com", "password": "password"}`
-	path := "/auth/signup"
+	path := "/auth/signup?recaptcha_token=123456"
 	resp := execRequest(users[0].Id, http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
@@ -892,6 +902,23 @@ func TestVerify(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
+	recaptchaServer.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		resp := recaptcha.Response{
+			Success:     true,
+			Score:       1.0,
+			Action:      "login",
+			ChallengeTS: time.Now(),
+			Hostname:    "localhost:8080",
+			ErrorCodes:  nil,
+		}
+		b, _ := jsoniter.Marshal(&resp)
+		if _, err := writer.Write(b); err != nil {
+			panic(err)
+		}
+
+	}
+	go recaptchaServer.Start()
 	var err error
 	db, err = database.Connect(connectionStr)
 	if err != nil {
@@ -936,7 +963,7 @@ func generateURL(path string) string {
 }
 
 func login(user string, password string) (string, error) {
-	url := generateURL("/auth/login")
+	url := generateURL("/auth/login?recaptcha_token=123456")
 	body := strings.NewReader(fmt.Sprintf(`{"email":"%s", "password": "%s"}`, user, password))
 	req, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {

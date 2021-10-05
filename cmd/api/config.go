@@ -24,6 +24,8 @@ var apiDefaultConfig = &Config{
 		ApiServer:    "api.z42.com",
 		NameServer:    "ns.z42.com.",
 		HtmlTemplates: "./templates/*.tmpl",
+		RecaptchaSecretKey: "RECAPTCHA_SECRET_KEY",
+		RecaptchaServer: "https://www.google.com/recaptcha/api/siteverify",
 	},
 	MailerConfig: &mailer.Config{
 		Address:   "127.0.0.1:25",

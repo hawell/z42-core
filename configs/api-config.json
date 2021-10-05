@@ -5,7 +5,9 @@
     "web_server": "www.z42.com",
     "api_server": "api.z42.com",
     "name_server": "ns.z42.com.",
-    "html_templates": "./templates/*.tmpl"
+    "html_templates": "./templates/*.tmpl",
+    "recaptcha_secret_key": "RECAPTCHA_SECRET_KEY",
+    "recaptcha_server": "https://www.google.com/recaptcha/api/siteverify"
   },
   "mailer": {
     "address": "127.0.0.1:25",

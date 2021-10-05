@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers/auth"
+	"github.com/hawell/z42/internal/api/handlers/recaptcha"
 	"github.com/hawell/z42/internal/api/handlers/zone"
 	"github.com/hawell/z42/internal/mailer"
 	"net/http"
@@ -19,6 +20,8 @@ type Config struct {
 	ApiServer   string `json:"api_server"`
 	NameServer   string `json:"name_server"`
 	HtmlTemplates string `json:"html_templates"`
+	RecaptchaSecretKey string `json:"recaptcha_secret_key"`
+	RecaptchaServer string `json:"recaptcha_server"`
 }
 
 type Server struct {
@@ -53,7 +56,8 @@ func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer) *Ser
 	}
 
 	authGroup := router.Group("/auth")
-	authHandler := auth.New(db, mailer, config.WebServer)
+	recaptchaHandler := recaptcha.New(config.RecaptchaServer, config.RecaptchaSecretKey)
+	authHandler := auth.New(db, mailer, recaptchaHandler, config.WebServer)
 	authHandler.RegisterHandlers(authGroup)
 
 	zoneGroup := router.Group("/zones")

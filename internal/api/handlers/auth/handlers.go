@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
+	"github.com/hawell/z42/internal/api/handlers/recaptcha"
 	"github.com/hawell/z42/internal/mailer"
 	"go.uber.org/zap"
 	"net/http"
@@ -22,17 +23,19 @@ type Handler struct {
 	db            storage
 	mailer        mailer.Mailer
 	serverName    string
+	recaptchaHandler *recaptcha.Handler
 }
 
 const (
 	emailKey = "email"
 )
 
-func New(db storage, mailer mailer.Mailer, serverName string) *Handler {
+func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, serverName string) *Handler {
 	handler := &Handler{
 		db:         db,
 		mailer:     mailer,
 		serverName: serverName,
+		recaptchaHandler: recaptchaHandler,
 	}
 	jwtMiddleware, err := jwt.New(&jwt.GinJWTMiddleware{
 		Realm:       "z42 zone",
@@ -115,9 +118,9 @@ func New(db storage, mailer mailer.Mailer, serverName string) *Handler {
 }
 
 func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
-	group.POST("/signup", h.signup)
+	group.POST("/signup", h.recaptchaHandler.MiddlewareFunc(), h.signup)
 	group.POST("/verify", h.verify)
-	group.POST("/login", h.jwtMiddleWare.LoginHandler)
+	group.POST("/login", h.recaptchaHandler.MiddlewareFunc(), h.jwtMiddleWare.LoginHandler)
 	group.POST("/logout", h.jwtMiddleWare.LogoutHandler)
 	group.GET("/refresh_token", h.MiddlewareFunc(), h.jwtMiddleWare.RefreshHandler)
 }
