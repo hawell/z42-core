@@ -12,6 +12,7 @@ import (
 	"github.com/hawell/z42/internal/types"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -22,15 +23,15 @@ import (
 
 var (
 	serverConfig = Config{
-		BindAddress:   "localhost:8080",
-		ReadTimeout:   10,
-		WriteTimeout:  10,
-		WebServer:    "z42.com",
-		ApiServer:    "api.z42.com",
-		NameServer:    "ns.z42.com.",
-		HtmlTemplates: "../../../templates/*.tmpl",
+		BindAddress:        "localhost:8080",
+		ReadTimeout:        10,
+		WriteTimeout:       10,
+		WebServer:          "z42.com",
+		ApiServer:          "api.z42.com",
+		NameServer:         "ns.z42.com.",
+		HtmlTemplates:      "../../../templates/*.tmpl",
 		RecaptchaSecretKey: "6LdNW6UcAAAAAL7M90WaPU2h4KwIveMuleVPMlkK",
-		RecaptchaServer: "http://127.0.0.1:9798",
+		RecaptchaServer:    "http://127.0.0.1:9798",
 	}
 	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
 	db            *database.DataBase
@@ -924,11 +925,21 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	s := NewServer(&serverConfig, db, &mailer.Mock{SendEMailVerificationFunc: func(toName string, toEmail string, code string) error {
-		return nil
-	}})
+	s := NewServer(
+		&serverConfig,
+		db,
+		&mailer.Mock{
+			SendEMailVerificationFunc: func(toName string, toEmail string, code string) error {
+				return nil
+			},
+		},
+		zap.L(),
+	)
 	go func() {
-		_ = s.ListenAndServer()
+		err := s.ListenAndServer()
+		if !errors.Is(err, http.ErrServerClosed) {
+			panic(err)
+		}
 	}()
 	err = db.Clear(true)
 	if err != nil {
@@ -936,7 +947,6 @@ func TestMain(m *testing.M) {
 	}
 	tokens = make(map[database.ObjectId]string)
 	for i := range users {
-		fmt.Println(users[i].Email)
 		users[i].Id, _, err = db.AddUser(database.NewUser{Email: users[i].Email, Password: users[i].Email, Status: database.UserStatusActive})
 		if err != nil {
 			panic(err)

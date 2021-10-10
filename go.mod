@@ -12,6 +12,7 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/gomodule/redigo v1.8.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/golang-lru v0.5.4 // indirect

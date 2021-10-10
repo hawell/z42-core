@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/hawell/z42/internal/healthcheck"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
@@ -10,12 +11,22 @@ import (
 )
 
 type Config struct {
+	AccessLog   *logger.Config            `json:"access_log"`
+	EventLog    *logger.Config            `json:"event_log"`
 	RedisData   storage.DataHandlerConfig `json:"redis_data"`
 	RedisStat   storage.StatHandlerConfig `json:"redis_stat"`
 	Healthcheck healthcheck.Config        `json:"healthcheck"`
 }
 
 var healthcheckerDefaultConfig = &Config{
+	AccessLog: &logger.Config{
+		Level:       "INFO",
+		Destination: "stdout",
+	},
+	EventLog: &logger.Config{
+		Level:       "ERROR",
+		Destination: "stderr",
+	},
 	RedisData: storage.DataHandlerConfig{
 		ZoneCacheSize:      10000,
 		ZoneCacheTimeout:   60,

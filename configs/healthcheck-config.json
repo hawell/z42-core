@@ -1,4 +1,12 @@
 {
+  "event_log": {
+    "level": "ERROR",
+    "destination": "stderr"
+  },
+  "access_log": {
+    "level": "INFO",
+    "destination": "stdout"
+  },
   "redis_data": {
     "zone_cache_size": 10000,
     "zone_cache_timeout": 60,

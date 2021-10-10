@@ -3,7 +3,7 @@ package recaptcha
 import "net/http"
 
 type MockServer struct {
-	server *http.Server
+	server      *http.Server
 	HandlerFunc func(writer http.ResponseWriter, request *http.Request)
 }
 

@@ -19,10 +19,10 @@ type storage interface {
 }
 
 type Handler struct {
-	jwtMiddleWare *jwt.GinJWTMiddleware
-	db            storage
-	mailer        mailer.Mailer
-	serverName    string
+	jwtMiddleWare    *jwt.GinJWTMiddleware
+	db               storage
+	mailer           mailer.Mailer
+	serverName       string
 	recaptchaHandler *recaptcha.Handler
 }
 
@@ -32,9 +32,9 @@ const (
 
 func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, serverName string) *Handler {
 	handler := &Handler{
-		db:         db,
-		mailer:     mailer,
-		serverName: serverName,
+		db:               db,
+		mailer:           mailer,
+		serverName:       serverName,
 		recaptchaHandler: recaptchaHandler,
 	}
 	jwtMiddleware, err := jwt.New(&jwt.GinJWTMiddleware{
@@ -46,6 +46,7 @@ func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, 
 		Authenticator: func(c *gin.Context) (interface{}, error) {
 			var loginValues loginCredentials
 			if err := c.ShouldBind(&loginValues); err != nil {
+				zap.L().Warn("missing login values")
 				return "", jwt.ErrMissingLoginValues
 			}
 			email := loginValues.Email
@@ -53,17 +54,17 @@ func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, 
 
 			user, err := handler.db.GetUser(email)
 			if err != nil {
-				zap.L().Error("user not found")
+				zap.L().Warn("user not found")
 				return nil, jwt.ErrFailedAuthentication
 			}
 
 			if user.Status != database.UserStatusActive {
-				zap.L().Error("user not active")
+				zap.L().Warn("user not active")
 				return nil, jwt.ErrFailedAuthentication
 			}
 
 			if !database.CheckPasswordHash(password, user.Password) {
-				zap.L().Error("password mismatch")
+				zap.L().Warn("password mismatch")
 				return nil, jwt.ErrFailedAuthentication
 			}
 			return &handlers.IdentityData{Id: user.Id, Email: user.Email}, nil
@@ -143,13 +144,11 @@ func (h *Handler) signup(c *gin.Context) {
 	}
 	_, code, err := h.db.AddUser(model)
 	if err != nil {
-		zap.L().Error("DataBase.addUser()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
 	err = h.mailer.SendEMailVerification(u.Email, u.Email, code)
 	if err != nil {
-		zap.L().Error("send verification code failed", zap.Error(err))
 		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -166,7 +165,6 @@ func (h *Handler) verify(c *gin.Context) {
 	}
 	err = h.db.Verify(v.Code)
 	if err != nil {
-		zap.L().Error("verification failed", zap.Error(err))
 		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -174,7 +172,7 @@ func (h *Handler) verify(c *gin.Context) {
 	c.HTML(
 		http.StatusOK,
 		"verification-successful.tmpl",
-		gin.H {
+		gin.H{
 			"Server": h.serverName,
 		},
 	)

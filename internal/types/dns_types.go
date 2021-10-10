@@ -174,7 +174,7 @@ var nsNames = []string{"alpha", "bravo", "charlie", "echo", "foxtrot", "golf", "
 func GenerateNS(authServer string) *NS_RRSet {
 	return &NS_RRSet{
 		GenericRRSet: GenericRRSet{TtlValue: 3600},
-		Data:         []NS_RR{
+		Data: []NS_RR{
 			{Host: nsNames[rand.Int()%len(nsNames)] + "." + authServer},
 			{Host: nsNames[rand.Int()%len(nsNames)] + "." + authServer},
 		},

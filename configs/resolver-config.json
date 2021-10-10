@@ -1,4 +1,12 @@
 {
+  "event_log": {
+    "level": "ERROR",
+    "destination": "stderr"
+  },
+  "access_log": {
+    "level": "INFO",
+    "destination": "stdout"
+  },
   "server": [
     {
       "ip": "127.0.0.1",

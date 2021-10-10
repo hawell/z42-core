@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hawell/z42/internal/handler"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/server"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/internal/upstream"
@@ -14,6 +15,7 @@ import (
 	"github.com/logrusorgru/aurora"
 	"github.com/miekg/dns"
 	"github.com/oschwald/maxminddb-golang"
+	"go.uber.org/zap/zapcore"
 	"log"
 	"net"
 	"os"
@@ -28,6 +30,8 @@ type Config struct {
 	RedisStat storage.StatHandlerConfig       `json:"redis_stat"`
 	Handler   handler.DnsRequestHandlerConfig `json:"handler"`
 	RateLimit ratelimit.Config                `json:"ratelimit"`
+	EventLog  *logger.Config                  `json:"event_log"`
+	AccessLog *logger.Config                  `json:"access_log"`
 }
 
 var resolverDefaultConfig = &Config{
@@ -112,6 +116,14 @@ var resolverDefaultConfig = &Config{
 		Burst:     10,
 		BlackList: []string{},
 		WhiteList: []string{},
+	},
+	AccessLog: &logger.Config{
+		Level:       "info",
+		Destination: "stdout",
+	},
+	EventLog: &logger.Config{
+		Level:       "error",
+		Destination: "stderr",
 	},
 }
 
@@ -286,4 +298,16 @@ func Verify(configFile string) {
 			}
 		}
 	}
+	checkLog := func(loggerConfig *logger.Config) {
+		fmt.Println("checking log...")
+		msg := fmt.Sprintf("checking log level: %s", loggerConfig.Level)
+		level := zapcore.InfoLevel
+		err := level.UnmarshalText([]byte(loggerConfig.Level))
+		printResult(msg, err)
+		msg = fmt.Sprintf("checking whether %s is available", loggerConfig.Destination)
+		_, err = logger.NewLogger(loggerConfig)
+		printResult(msg, err)
+	}
+	checkLog(config.AccessLog)
+	checkLog(config.EventLog)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/hawell/z42/internal/api/server"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/mailer"
 	jsoniter "github.com/json-iterator/go"
 	"log"
@@ -9,30 +10,40 @@ import (
 )
 
 type Config struct {
-	DBConnectionString string          `json:"db_connection_string"`
-	ServerConfig       *server.Config  `json:"server"`
+	DBConnectionString string         `json:"db_connection_string"`
+	EventLog           *logger.Config `json:"event_log"`
+	AccessLog          *logger.Config `json:"access_log"`
+	ServerConfig       *server.Config `json:"server"`
 	MailerConfig       *mailer.Config `json:"mailer"`
 }
 
 var apiDefaultConfig = &Config{
 	DBConnectionString: "root:root@tcp(127.0.0.1:3306)/z42",
+	AccessLog: &logger.Config{
+		Level:       "info",
+		Destination: "stdout",
+	},
+	EventLog: &logger.Config{
+		Level:       "error",
+		Destination: "stderr",
+	},
 	ServerConfig: &server.Config{
-		BindAddress:   "localhost:8080",
-		ReadTimeout:   10,
-		WriteTimeout:  10,
-		WebServer:    "www.z42.com",
-		ApiServer:    "api.z42.com",
-		NameServer:    "ns.z42.com.",
-		HtmlTemplates: "./templates/*.tmpl",
+		BindAddress:        "localhost:8080",
+		ReadTimeout:        10,
+		WriteTimeout:       10,
+		WebServer:          "www.z42.com",
+		ApiServer:          "api.z42.com",
+		NameServer:         "ns.z42.com.",
+		HtmlTemplates:      "./templates/*.tmpl",
 		RecaptchaSecretKey: "RECAPTCHA_SECRET_KEY",
-		RecaptchaServer: "https://www.google.com/recaptcha/api/siteverify",
+		RecaptchaServer:    "https://www.google.com/recaptcha/api/siteverify",
 	},
 	MailerConfig: &mailer.Config{
-		Address:   "127.0.0.1:25",
-		FromName:  "z42",
-		FromEmail: "noreply@z42.com",
-		WebServer:    "www.z42.com",
-		ApiServer:    "api.z42.com",
+		Address:       "127.0.0.1:25",
+		FromName:      "z42",
+		FromEmail:     "noreply@z42.com",
+		WebServer:     "www.z42.com",
+		ApiServer:     "api.z42.com",
 		NameServer:    "ns.z42.com.",
 		HtmlTemplates: "./templates/*.tmpl",
 	},

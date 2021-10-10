@@ -5,8 +5,6 @@ import (
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/types"
-	"go.uber.org/zap"
-	"log"
 	"net/http"
 )
 
@@ -70,7 +68,6 @@ func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 }
 
 func (h *Handler) getZones(c *gin.Context) {
-	log.Println(c.Request.URL.String())
 	userId := extractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing")
@@ -85,7 +82,6 @@ func (h *Handler) getZones(c *gin.Context) {
 	}
 	zones, err := h.db.GetZones(userId, req.Start, req.Count, req.Q, req.Ascending)
 	if err != nil {
-		zap.L().Error("DataBase.getZones()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -114,7 +110,6 @@ func (h *Handler) addZone(c *gin.Context) {
 	}
 	_, err := h.db.AddZone(userId, model)
 	if err != nil {
-		zap.L().Error("DataBase.addZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -137,7 +132,6 @@ func (h *Handler) getZone(c *gin.Context) {
 
 	z, err := h.db.GetZone(userId, zoneName)
 	if err != nil {
-		zap.L().Error("DataBase.GetZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -174,11 +168,10 @@ func (h *Handler) updateZone(c *gin.Context) {
 
 	z, err := h.db.GetZone(userId, zoneName)
 	if err != nil {
-		zap.L().Error("database.getZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	req.SOA.Serial = z.SOA.Serial+1
+	req.SOA.Serial = z.SOA.Serial + 1
 
 	zoneUpdate := database.ZoneUpdate{
 		Name:            zoneName,
@@ -188,7 +181,6 @@ func (h *Handler) updateZone(c *gin.Context) {
 		SOA:             req.SOA,
 	}
 	if err := h.db.UpdateZone(userId, zoneUpdate); err != nil {
-		zap.L().Error("DataBase.updateZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -209,7 +201,6 @@ func (h *Handler) deleteZone(c *gin.Context) {
 	}
 	err := h.db.DeleteZone(userId, database.ZoneDelete{Name: zoneName})
 	if err != nil {
-		zap.L().Error("DataBase.deleteZone()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -237,7 +228,6 @@ func (h *Handler) getLocations(c *gin.Context) {
 	}
 	locations, err := h.db.GetLocations(userId, zoneName, req.Start, req.Count, req.Q, req.Ascending)
 	if err != nil {
-		zap.L().Error("DataBase.getLocations()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -270,7 +260,6 @@ func (h *Handler) addLocation(c *gin.Context) {
 	}
 	_, err = h.db.AddLocation(userId, model)
 	if err != nil {
-		zap.L().Error("DataBase.addLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -296,7 +285,6 @@ func (h *Handler) getLocation(c *gin.Context) {
 	}
 	l, err := h.db.GetLocation(userId, zoneName, location)
 	if err != nil {
-		zap.L().Error("DataBase.getLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -337,7 +325,6 @@ func (h *Handler) updateLocation(c *gin.Context) {
 	}
 	err := h.db.UpdateLocation(userId, model)
 	if err != nil {
-		zap.L().Error("DataBase.updateLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -363,7 +350,6 @@ func (h *Handler) deleteLocation(c *gin.Context) {
 	}
 	err := h.db.DeleteLocation(userId, database.LocationDelete{ZoneName: zoneName, Location: location})
 	if err != nil {
-		zap.L().Error("DataBase.deleteLocation()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -389,7 +375,6 @@ func (h *Handler) getRecordSets(c *gin.Context) {
 	}
 	rrsets, err := h.db.GetRecordSets(userId, zoneName, location)
 	if err != nil {
-		zap.L().Error("DataBase.getRecordSets()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -432,7 +417,6 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 	}
 	_, err = h.db.AddRecordSet(userId, model)
 	if err != nil {
-		zap.L().Error("DataBase.addRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -463,7 +447,6 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 	}
 	r, err := h.db.GetRecordSet(userId, zoneName, location, recordType)
 	if err != nil {
-		zap.L().Error("DataBase.getRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -513,7 +496,6 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 	}
 	err := h.db.UpdateRecordSet(userId, model)
 	if err != nil {
-		zap.L().Error("DataBase.updateRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
@@ -544,7 +526,6 @@ func (h *Handler) deleteRecordSet(c *gin.Context) {
 	}
 	err := h.db.DeleteRecordSet(userId, database.RecordSetDelete{ZoneName: zoneName, Location: location, Type: recordType})
 	if err != nil {
-		zap.L().Error("DataBase.deleteRecordSet()", zap.Error(err))
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}

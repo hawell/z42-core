@@ -4,24 +4,27 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
+	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/api/handlers/auth"
 	"github.com/hawell/z42/internal/api/handlers/recaptcha"
 	"github.com/hawell/z42/internal/api/handlers/zone"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/mailer"
+	"go.uber.org/zap"
 	"net/http"
 	"time"
 )
 
 type Config struct {
-	BindAddress  string `json:"bind_address,default:localhost:8080"`
-	ReadTimeout  int    `json:"read_timeout,default:10"`
-	WriteTimeout int    `json:"write_timeout,default:10"`
-	WebServer    string  `json:"web_server"`
-	ApiServer   string `json:"api_server"`
-	NameServer   string `json:"name_server"`
-	HtmlTemplates string `json:"html_templates"`
+	BindAddress        string `json:"bind_address,default:localhost:8080"`
+	ReadTimeout        int    `json:"read_timeout,default:10"`
+	WriteTimeout       int    `json:"write_timeout,default:10"`
+	WebServer          string `json:"web_server"`
+	ApiServer          string `json:"api_server"`
+	NameServer         string `json:"name_server"`
+	HtmlTemplates      string `json:"html_templates"`
 	RecaptchaSecretKey string `json:"recaptcha_secret_key"`
-	RecaptchaServer string `json:"recaptcha_server"`
+	RecaptchaServer    string `json:"recaptcha_server"`
 }
 
 type Server struct {
@@ -30,10 +33,15 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer) *Server {
+func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer, accessLogger *zap.Logger) *Server {
 	router := gin.New()
 	router.LoadHTMLGlob(config.HtmlTemplates)
-
+	handleRecovery := func(c *gin.Context, err interface{}) {
+		handlers.ErrorResponse(c, http.StatusInternalServerError, err.(string))
+		c.Abort()
+	}
+	router.Use(gin.CustomRecovery(handleRecovery))
+	router.Use(logger.MiddlewareFunc(accessLogger))
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")

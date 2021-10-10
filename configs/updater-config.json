@@ -1,4 +1,8 @@
 {
+  "event_log": {
+    "level": "ERROR",
+    "destination": "stderr"
+  },
   "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
   "redis_data": {
     "zone_cache_size": 10000,

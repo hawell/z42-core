@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
+	"go.uber.org/zap"
 	"net/http"
 )
 
@@ -11,6 +12,14 @@ const IdentityKey = "identity"
 type IdentityData struct {
 	Id    database.ObjectId
 	Email string
+}
+
+func IsClientError(code int) bool {
+	return code/100 == 4
+}
+
+func IsServerError(code int) bool {
+	return code/100 == 5
 }
 
 func StatusFromError(c *gin.Context, err error) (*gin.Context, int, string) {
@@ -35,6 +44,11 @@ type Response struct {
 }
 
 func ErrorResponse(c *gin.Context, code int, message string) {
+	if IsClientError(code) {
+		zap.L().Warn(message, zap.Int("status", code))
+	} else if IsServerError(code) {
+		zap.L().Error(message, zap.Int("status", code))
+	}
 	c.JSON(code, Response{
 		Code:    code,
 		Message: message,

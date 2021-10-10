@@ -22,7 +22,7 @@ func (m *Mock) SendEMailVerification(toName string, toEmail string, code string)
 
 type SMTP struct {
 	config *Config
-	tmpl *template.Template
+	tmpl   *template.Template
 }
 
 func NewSMTP(config *Config) (Mailer, error) {
@@ -31,8 +31,8 @@ func NewSMTP(config *Config) (Mailer, error) {
 		return nil, err
 	}
 	m := &SMTP{
-		config:     config,
-		tmpl:       tmpl,
+		config: config,
+		tmpl:   tmpl,
 	}
 	return m, nil
 }
@@ -65,7 +65,7 @@ func (m *SMTP) SendEMailVerification(toName string, toEmail string, code string)
 			Code   string
 		}{
 			Server: m.config.ApiServer,
-			Code: code,
+			Code:   code,
 		})
 	if err != nil {
 		return err

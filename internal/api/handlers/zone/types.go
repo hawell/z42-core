@@ -20,10 +20,10 @@ type ListResponseItem struct {
 type ListResponse []ListResponseItem
 
 type NewZoneRequest struct {
-	Name            string          `json:"name" binding:"required"`
-	Enabled         bool            `json:"enabled,default:true"`
-	Dnssec          bool            `json:"dnssec,default:false"`
-	CNameFlattening bool            `json:"cname_flattening,default:false"`
+	Name            string `json:"name" binding:"required"`
+	Enabled         bool   `json:"enabled,default:true"`
+	Dnssec          bool   `json:"dnssec,default:false"`
+	CNameFlattening bool   `json:"cname_flattening,default:false"`
 }
 
 type GetZoneResponse struct {

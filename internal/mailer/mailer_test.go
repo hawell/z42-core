@@ -11,9 +11,9 @@ func TestSend(t *testing.T) {
 		Address:       "127.0.0.1:25",
 		FromName:      "z42",
 		FromEmail:     "noreply@zone-42.com",
-		WebServer:    "www.z42.com",
-		ApiServer:    "api.z42.com",
-		NameServer:   "ns.z42.com.",
+		WebServer:     "www.z42.com",
+		ApiServer:     "api.z42.com",
+		NameServer:    "ns.z42.com.",
 		HtmlTemplates: "../../templates/*.tmpl",
 	})
 	Expect(err).To(BeNil())

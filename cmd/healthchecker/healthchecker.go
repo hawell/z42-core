@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/hawell/z42/internal/healthcheck"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/storage"
 	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -24,10 +24,6 @@ var (
 )
 
 func main() {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
-	zap.ReplaceGlobals(logger)
-
 	configPtr := flag.String("c", "config.json", "path to config file")
 	verifyPtr := flag.Bool("t", false, "verify configuration")
 	generateConfigPtr := flag.String("g", "template-config.json", "generate template config file")
@@ -81,48 +77,11 @@ func Start() {
 	cfg, _ := LoadConfig(configFile)
 
 	log.Printf("[INFO] loading logger...")
-	requestLoggerConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
-		Development: false,
-		Encoding:    "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "time",
-			NameKey:        "logger",
-			MessageKey:     "dns_healthcheck",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.EpochTimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	requestLogger, err := requestLoggerConfig.Build()
+	accessLogger, err := logger.NewLogger(cfg.AccessLog)
 	if err != nil {
 		panic(err)
 	}
-	eventLoggerConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.ErrorLevel),
-		Development: false,
-		Encoding:    "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "time",
-			LevelKey:       "level",
-			NameKey:        "logger",
-			CallerKey:      "caller",
-			MessageKey:     "message",
-			StacktraceKey:  "stacktrace",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.EpochTimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	eventLogger, err := eventLoggerConfig.Build()
+	eventLogger, err := logger.NewLogger(cfg.EventLog)
 	if err != nil {
 		panic(err)
 	}
@@ -134,7 +93,7 @@ func Start() {
 	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
 	eventLogger.Info("starting health checker...")
-	healthChecker = healthcheck.NewHealthcheck(&cfg.Healthcheck, redisDataHandler, redisStatHandler, requestLogger)
+	healthChecker = healthcheck.NewHealthcheck(&cfg.Healthcheck, redisDataHandler, redisStatHandler, accessLogger)
 	eventLogger.Info("health checker started")
 }
 

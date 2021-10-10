@@ -4,9 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/hawell/z42/internal/api/database"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/storage"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"time"
 )
 
@@ -19,26 +19,7 @@ func main() {
 		panic(err)
 	}
 
-	eventLoggerConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
-		Development: false,
-		Encoding:    "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "time",
-			LevelKey:       "level",
-			NameKey:        "logger",
-			CallerKey:      "caller",
-			MessageKey:     "message",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.EpochTimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	eventLogger, err := eventLoggerConfig.Build()
+	eventLogger, err := logger.NewLogger(config.EventLog)
 	if err != nil {
 		panic(err)
 	}

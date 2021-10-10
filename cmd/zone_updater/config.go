@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
@@ -9,11 +10,16 @@ import (
 )
 
 type Config struct {
+	EventLog           *logger.Config             `json:"event_log"`
 	DBConnectionString string                     `json:"db_connection_string"`
 	RedisData          *storage.DataHandlerConfig `json:"redis_data"`
 }
 
 var apiDefaultConfig = &Config{
+	EventLog: &logger.Config{
+		Level:       "error",
+		Destination: "stderr",
+	},
 	DBConnectionString: "root:root@tcp(127.0.0.1:3306)/z42",
 	RedisData: &storage.DataHandlerConfig{
 		ZoneCacheSize:      10000,

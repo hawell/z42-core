@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"github.com/hawell/z42/internal/handler"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/server"
 	"github.com/hawell/z42/internal/storage"
 	"github.com/hawell/z42/pkg/ratelimit"
 	"github.com/json-iterator/go"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,7 +27,7 @@ var (
 	dnsRequestHandler *handler.DnsRequestHandler
 	rateLimiter       *ratelimit.RateLimiter
 	configFile        string
-	requestLogger     *zap.Logger
+	accessLogger      *zap.Logger
 	eventLogger       *zap.Logger
 )
 
@@ -105,48 +105,11 @@ func Start() {
 	}
 
 	log.Printf("[INFO] loading logger...")
-	requestLoggerConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
-		Development: false,
-		Encoding:    "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "time",
-			NameKey:        "logger",
-			MessageKey:     "dns_query",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.EpochTimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	requestLogger, err = requestLoggerConfig.Build()
+	accessLogger, err = logger.NewLogger(cfg.AccessLog)
 	if err != nil {
 		panic(err)
 	}
-	eventLoggerConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.ErrorLevel),
-		Development: false,
-		Encoding:    "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "time",
-			LevelKey:       "level",
-			NameKey:        "logger",
-			CallerKey:      "caller",
-			MessageKey:     "message",
-			StacktraceKey:  "stacktrace",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.EpochTimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	eventLogger, err = eventLoggerConfig.Build()
+	eventLogger, err = logger.NewLogger(cfg.EventLog)
 	if err != nil {
 		panic(err)
 	}
@@ -160,7 +123,7 @@ func Start() {
 	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
 	eventLogger.Info("starting handler...")
-	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler, requestLogger)
+	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler, accessLogger)
 	eventLogger.Info("handler started")
 
 	rateLimiter = ratelimit.NewRateLimiter(&cfg.RateLimit)
@@ -186,6 +149,6 @@ func Stop() {
 	dnsRequestHandler.ShutDown()
 	redisDataHandler.ShutDown()
 	redisStatHandler.ShutDown()
-	requestLogger.Sync()
-	eventLogger.Sync()
+	_ = accessLogger.Sync()
+	_ = eventLogger.Sync()
 }

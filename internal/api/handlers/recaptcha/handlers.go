@@ -11,9 +11,9 @@ import (
 )
 
 type Handler struct {
-	client *http.Client
+	client    *http.Client
 	secretKey string
-	server string
+	server    string
 }
 
 const TokenKey = "recaptcha_token"
@@ -21,10 +21,10 @@ const TokenKey = "recaptcha_token"
 func New(server string, secretKey string) *Handler {
 	return &Handler{
 		client: &http.Client{
-			Timeout: time.Duration(5)*time.Second,
+			Timeout: time.Duration(5) * time.Second,
 		},
 		secretKey: secretKey,
-		server: server,
+		server:    server,
 	}
 }
 
@@ -37,46 +37,36 @@ func (h *Handler) MiddlewareFunc() gin.HandlerFunc {
 func (h *Handler) VerifyReCaptcha(ctx *gin.Context) {
 	token := ctx.Query(TokenKey)
 	if token == "" {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, handlers.Response{
-			Code:    http.StatusBadRequest,
-			Message: "recaptcha token is missing",
-		})
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, "recaptcha token is missing")
+		ctx.Abort()
 		return
 	}
 
 	resp, err := h.client.PostForm(h.server,
 		url.Values{"secret": {h.secretKey}, "response": {token}})
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, handlers.Response{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		ctx.Abort()
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, handlers.Response{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		ctx.Abort()
 		return
 	}
 
 	var responseData Response
 	if err := json.Unmarshal(body, &responseData); err != nil {
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, handlers.Response{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		})
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		ctx.Abort()
 		return
 	}
 
 	if responseData.Success == false || responseData.Action != "login" {
-		ctx.AbortWithStatusJSON(http.StatusForbidden, handlers.Response{
-			Code:    http.StatusForbidden,
-			Message: "recaptcha validation failed",
-		})
+		handlers.ErrorResponse(ctx, http.StatusForbidden, "recaptcha validation failed")
+		ctx.Abort()
 		return
 	}
 

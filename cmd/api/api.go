@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/server"
+	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/mailer"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func main() {
@@ -19,29 +20,11 @@ func main() {
 		panic(err)
 	}
 
-	eventLoggerConfig := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
-		Development: false,
-		Encoding:    "json",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:        "time",
-			LevelKey:       "level",
-			NameKey:        "logger",
-			CallerKey:      "caller",
-			MessageKey:     "message",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.LowercaseLevelEncoder,
-			EncodeTime:     zapcore.EpochTimeEncoder,
-			EncodeDuration: zapcore.SecondsDurationEncoder,
-			EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
-	eventLogger, err := eventLoggerConfig.Build()
+	eventLogger, err := logger.NewLogger(config.EventLog)
 	if err != nil {
 		panic(err)
 	}
+
 	zap.ReplaceGlobals(eventLogger)
 
 	db, err := database.Connect(config.DBConnectionString)
@@ -54,7 +37,13 @@ func main() {
 		panic(err)
 	}
 
-	s := server.NewServer(config.ServerConfig, db, m)
+	accessLogger, err := logger.NewLogger(config.AccessLog)
+	if err != nil {
+		panic(err)
+	}
+
+	gin.SetMode(gin.ReleaseMode)
+	s := server.NewServer(config.ServerConfig, db, m, accessLogger)
 	err = s.ListenAndServer()
 	fmt.Println(err)
 }

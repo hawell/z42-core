@@ -1,12 +1,20 @@
 {
   "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
+  "event_log": {
+    "level": "ERROR",
+    "destination": "stderr"
+  },
+  "access_log": {
+    "level": "INFO",
+    "destination": "./api.log"
+  },
   "server": {
     "bind_address": "localhost:3000",
     "web_server": "www.z42.com",
     "api_server": "api.z42.com",
     "name_server": "ns.z42.com.",
     "html_templates": "./templates/*.tmpl",
-    "recaptcha_secret_key": "RECAPTCHA_SECRET_KEY",
+    "recaptcha_secret_key": "6LdNW6UcAAAAAL7M90WaPU2h4KwIveMuleVPMlkK",
     "recaptcha_server": "https://www.google.com/recaptcha/api/siteverify"
   },
   "mailer": {
