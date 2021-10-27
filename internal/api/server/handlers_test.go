@@ -867,8 +867,8 @@ func TestSignup(t *testing.T) {
 	initialize(t)
 
 	// add new user
-	body := `{"email": "user1@example.com", "password": "password"}`
-	path := "/auth/signup?recaptcha_token=123456"
+	body := `{"email": "user1@example.com", "password": "password", "recaptcha_token": "123456"}`
+	path := "/auth/signup"
 	resp := execRequest(users[0].Id, http.MethodPost, path, body)
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
@@ -973,8 +973,8 @@ func generateURL(path string) string {
 }
 
 func login(user string, password string) (string, error) {
-	url := generateURL("/auth/login?recaptcha_token=123456")
-	body := strings.NewReader(fmt.Sprintf(`{"email":"%s", "password": "%s"}`, user, password))
+	url := generateURL("/auth/login")
+	body := strings.NewReader(fmt.Sprintf(`{"email":"%s", "password": "%s", "recaptcha_token": "123456"}`, user, password))
 	req, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
 		return "", err

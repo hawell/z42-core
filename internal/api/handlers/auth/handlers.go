@@ -3,6 +3,7 @@ package auth
 import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/api/handlers/recaptcha"
@@ -45,7 +46,7 @@ func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, 
 		IdentityKey: handlers.IdentityKey,
 		Authenticator: func(c *gin.Context) (interface{}, error) {
 			var loginValues loginCredentials
-			if err := c.ShouldBind(&loginValues); err != nil {
+			if err := c.ShouldBindBodyWith(&loginValues, binding.JSON); err != nil {
 				zap.L().Warn("missing login values")
 				return "", jwt.ErrMissingLoginValues
 			}
@@ -132,7 +133,7 @@ func (h *Handler) MiddlewareFunc() gin.HandlerFunc {
 
 func (h *Handler) signup(c *gin.Context) {
 	var u NewUser
-	err := c.ShouldBindJSON(&u)
+	err := c.ShouldBindBodyWith(&u, binding.JSON)
 	if err != nil {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
 		return

@@ -1,12 +1,12 @@
 {
   "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
   "event_log": {
-    "level": "ERROR",
+    "level": "WARNING",
     "destination": "stderr"
   },
   "access_log": {
     "level": "INFO",
-    "destination": "./api.log"
+    "destination": "stdout"
   },
   "server": {
     "bind_address": "localhost:3000",

@@ -3,6 +3,7 @@ package recaptcha
 import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/hawell/z42/internal/api/handlers"
 	"io/ioutil"
 	"net/http"
@@ -16,12 +17,14 @@ type Handler struct {
 	server    string
 }
 
-const TokenKey = "recaptcha_token"
+type token struct {
+	Value string `form:"recaptcha_token" json:"recaptcha_token" binding:"required"`
+}
 
 func New(server string, secretKey string) *Handler {
 	return &Handler{
 		client: &http.Client{
-			Timeout: time.Duration(5) * time.Second,
+			Timeout: time.Duration(10) * time.Second,
 		},
 		secretKey: secretKey,
 		server:    server,
@@ -35,15 +38,16 @@ func (h *Handler) MiddlewareFunc() gin.HandlerFunc {
 }
 
 func (h *Handler) VerifyReCaptcha(ctx *gin.Context) {
-	token := ctx.Query(TokenKey)
-	if token == "" {
+	var t token
+	err := ctx.ShouldBindBodyWith(&t, binding.JSON)
+	if err != nil || t.Value == "" {
 		handlers.ErrorResponse(ctx, http.StatusBadRequest, "recaptcha token is missing")
 		ctx.Abort()
 		return
 	}
 
 	resp, err := h.client.PostForm(h.server,
-		url.Values{"secret": {h.secretKey}, "response": {token}})
+		url.Values{"secret": {h.secretKey}, "response": {t.Value}})
 	if err != nil {
 		handlers.ErrorResponse(ctx, http.StatusBadRequest, err.Error())
 		ctx.Abort()
