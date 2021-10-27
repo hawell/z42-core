@@ -175,7 +175,7 @@ func TestGetZones(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(body).To(MatchJSON(`{"code": 200, "message": "successful", "data":{"items": null, "total": 0}}`))
+	Expect(body).To(MatchJSON(`{"code": 200, "message": "successful", "data":{"items": [], "total": 0}}`))
 
 	// user with no zone
 	resp = execRequest(users[1].Id, http.MethodGet, "/zones", "")
@@ -184,7 +184,7 @@ func TestGetZones(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(body).To(MatchJSON(`{"code": 200, "message": "successful", "data":{"items": null, "total": 0}}`))
+	Expect(body).To(MatchJSON(`{"code": 200, "message": "successful", "data":{"items": [], "total": 0}}`))
 }
 
 func TestGetZone(t *testing.T) {
@@ -443,7 +443,7 @@ func TestGetLocations(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(body).To(MatchJSON(`{"code":200,"message":"successful","data":{"total": 0, "items":null}}`))
+	Expect(body).To(MatchJSON(`{"code":200,"message":"successful","data":{"total": 0, "items":[]}}`))
 }
 
 func TestGetLocation(t *testing.T) {
@@ -701,7 +701,7 @@ func TestGetRecordSets(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(body).To(Equal([]byte(`{"code":200,"message":"successful","data":{"items":null,"total":0}}`)))
+	Expect(body).To(MatchJSON([]byte(`{"code":200,"message":"successful","data":{"items":[],"total":0}}`)))
 
 	// non-existing location
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations/"+"invalid"+"/rrsets", "")
@@ -741,7 +741,7 @@ func TestGetRecordSet(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(string(body)).To(Equal(
+	Expect(string(body)).To(MatchJSON(
 		`{"code":200,"message":"successful","data":{"value":{"ttl":300,"filter":{},"health_check":{},"records":[{"ip":"1.2.3.4"}]},"enabled":true}}`,
 	))
 
@@ -760,6 +760,40 @@ func TestGetRecordSet(t *testing.T) {
 	// non-existing zone
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+"invalid.none"+"/locations/"+location1+"/rrsets/"+r1, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+}
+
+func TestGetRecordSetWithEmptyRecords(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+	location1 := "www"
+	_, err = addLocation(users[0].Id, zone1Name, location1)
+	Expect(err).To(BeNil())
+	recordsets := []struct {
+		Type string
+		Expected string
+	}{
+		{"a", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"filter":{},"health_check":{},"records":[]},"enabled":true}}`},
+		{"aaaa", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"filter":{},"health_check":{},"records":[]},"enabled":true}}`},
+		{"txt", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
+		{"ns", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
+		{"mx", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
+		{"srv", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
+		{"caa", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
+		{"tlsa", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
+		{"ds", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
+	}
+	for _, r := range recordsets {
+		v := types.TypeToRRSet[r.Type]()
+		_, err = addRecordSet(users[0].Id, zone1Name, location1, r.Type, v)
+		Expect(err).To(BeNil())
+		resp := execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations/"+location1+"/rrsets/"+r.Type, "")
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		body, err := ioutil.ReadAll(resp.Body)
+		Expect(err).To(BeNil())
+		Expect(string(body)).To(MatchJSON(r.Expected), r.Type)
+	}
 }
 
 func TestUpdateRecordSet(t *testing.T) {

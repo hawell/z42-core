@@ -23,19 +23,19 @@ const (
 var SupportedTypes = map[string]struct{}{"a": {}, "aaaa": {}, "cname": {}, "txt": {}, "ns": {}, "mx": {}, "srv": {}, "caa": {}, "ptr": {}, "tlsa": {}, "ds": {}, "aname": {}, "soa": {}}
 
 var TypeToRRSet = map[string]func() RRSet{
-	"a":     func() RRSet { return new(IP_RRSet) },
-	"aaaa":  func() RRSet { return new(IP_RRSet) },
-	"cname": func() RRSet { return new(CNAME_RRSet) },
-	"txt":   func() RRSet { return new(TXT_RRSet) },
-	"ns":    func() RRSet { return new(NS_RRSet) },
-	"mx":    func() RRSet { return new(MX_RRSet) },
-	"srv":   func() RRSet { return new(SRV_RRSet) },
-	"caa":   func() RRSet { return new(CAA_RRSet) },
-	"ptr":   func() RRSet { return new(PTR_RRSet) },
-	"tlsa":  func() RRSet { return new(TLSA_RRSet) },
-	"ds":    func() RRSet { return new(DS_RRSet) },
-	"soa":   func() RRSet { return new(SOA_RRSet) },
-	"aname": func() RRSet { return new(ANAME_RRSet) },
+	"a":     func() RRSet { return &IP_RRSet{Data: []IP_RR{}} },
+	"aaaa":  func() RRSet { return &IP_RRSet{Data: []IP_RR{}} },
+	"cname": func() RRSet { return &CNAME_RRSet{} },
+	"txt":   func() RRSet { return &TXT_RRSet{Data: []TXT_RR{}} },
+	"ns":    func() RRSet { return &NS_RRSet{Data: []NS_RR{}} },
+	"mx":    func() RRSet { return &MX_RRSet{Data: []MX_RR{}} },
+	"srv":   func() RRSet { return &SRV_RRSet{Data: []SRV_RR{}} },
+	"caa":   func() RRSet { return &CAA_RRSet{Data: []CAA_RR{}} },
+	"ptr":   func() RRSet { return &PTR_RRSet{} },
+	"tlsa":  func() RRSet { return &TLSA_RRSet{Data: []TLSA_RR{}} },
+	"ds":    func() RRSet { return &DS_RRSet{Data: []DS_RR{}} },
+	"soa":   func() RRSet { return &SOA_RRSet{} },
+	"aname": func() RRSet { return &ANAME_RRSet{} },
 }
 
 func StringToType(s string) uint16 {
@@ -65,7 +65,7 @@ type RRSet interface {
 }
 
 type GenericRRSet struct {
-	TtlValue uint32 `json:"ttl,omitempty"`
+	TtlValue uint32 `json:"ttl,default:300"`
 }
 
 func (rrset *GenericRRSet) Ttl() uint32 {
@@ -106,7 +106,7 @@ type IP_RRSet struct {
 	GenericRRSet
 	FilterConfig      IpFilterConfig      `json:"filter,omitempty"`
 	HealthCheckConfig IpHealthCheckConfig `json:"health_check,omitempty"`
-	Data              []IP_RR             `json:"records,omitempty"`
+	Data              []IP_RR             `json:"records"`
 }
 
 func (*IP_RRSet) Value(string) []dns.RR {
@@ -143,7 +143,7 @@ type TXT_RR struct {
 
 type TXT_RRSet struct {
 	GenericRRSet
-	Data []TXT_RR `json:"records,omitempty"`
+	Data []TXT_RR `json:"records"`
 }
 
 func (rrset *TXT_RRSet) Value(name string) []dns.RR {
@@ -183,7 +183,7 @@ func GenerateNS(authServer string) *NS_RRSet {
 
 type NS_RRSet struct {
 	GenericRRSet
-	Data []NS_RR `json:"records,omitempty"`
+	Data []NS_RR `json:"records"`
 }
 
 func (rrset *NS_RRSet) Value(name string) []dns.RR {
@@ -212,7 +212,7 @@ type MX_RR struct {
 
 type MX_RRSet struct {
 	GenericRRSet
-	Data []MX_RR `json:"records,omitempty"`
+	Data []MX_RR `json:"records"`
 }
 
 func (rrset *MX_RRSet) Value(name string) []dns.RR {
@@ -244,7 +244,7 @@ type SRV_RR struct {
 
 type SRV_RRSet struct {
 	GenericRRSet
-	Data []SRV_RR `json:"records,omitempty"`
+	Data []SRV_RR `json:"records"`
 }
 
 func (rrset *SRV_RRSet) Value(name string) []dns.RR {
@@ -271,7 +271,7 @@ func (rrset *SRV_RRSet) Empty() bool {
 
 type CAA_RRSet struct {
 	GenericRRSet
-	Data []CAA_RR `json:"records,omitempty"`
+	Data []CAA_RR `json:"records"`
 }
 
 type CAA_RR struct {
@@ -327,7 +327,7 @@ type TLSA_RR struct {
 
 type TLSA_RRSet struct {
 	GenericRRSet
-	Data []TLSA_RR `json:"records,omitempty"`
+	Data []TLSA_RR `json:"records"`
 }
 
 func (rrset *TLSA_RRSet) Value(name string) []dns.RR {
@@ -358,7 +358,7 @@ type DS_RR struct {
 
 type DS_RRSet struct {
 	GenericRRSet
-	Data []DS_RR `json:"records,omitempty"`
+	Data []DS_RR `json:"records"`
 }
 
 func (rrset *DS_RRSet) Value(name string) []dns.RR {
@@ -427,7 +427,7 @@ func (rrset *SOA_RRSet) Empty() bool {
 
 type ANAME_RRSet struct {
 	GenericRRSet
-	Location string `json:"location,omitempty"`
+	Location string `json:"location"`
 }
 
 func (*ANAME_RRSet) Value(string) []dns.RR {

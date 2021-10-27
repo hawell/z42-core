@@ -274,7 +274,7 @@ func (db *DataBase) GetZones(userId ObjectId, start int, count int, q string, as
 		return List{}, parseError(err)
 	}
 	defer func() { _ = rows.Close() }()
-	res := List{}
+	res := List{Items: []ListItem{}}
 	for rows.Next() {
 		var item ListItem
 		err := rows.Scan(&item.Id, &item.Enabled)
@@ -415,7 +415,7 @@ func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, co
 		return List{}, parseError(err)
 	}
 	defer func() { _ = rows.Close() }()
-	res := List{}
+	res := List{Items: []ListItem{}}
 	for rows.Next() {
 		var item ListItem
 		err := rows.Scan(&item.Id, &item.Enabled)
@@ -538,7 +538,7 @@ func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location str
 		return List{}, parseError(err)
 	}
 	defer func() { _ = rows.Close() }()
-	res := List{}
+	res := List{Items: []ListItem{}}
 	for rows.Next() {
 		var item ListItem
 		err := rows.Scan(&item.Id, &item.Enabled)
