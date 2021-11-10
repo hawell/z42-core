@@ -370,7 +370,7 @@ func TestHealthCheck(t *testing.T) {
 	var hcConfig = `{"soa":{"ttl":300, "minttl":100, "mbox":"hostmaster.google.com.","ns":"ns1.google.com.","refresh":44,"retry":55,"expire":66}}`
 	var hcEntries = [][]string{
 		{"www",
-			`{"a":{"ttl":300, "health_check":{"enable":true,"protocol":"http","uri":"","port":80, "up_count": 3, "down_count": -3, "timeout":1000}, "records":[{"ip":"172.217.17.78"}]}}`,
+			`{"a":{"ttl":300, "health_check":{"enable":true,"protocol":"http","uri":"","port":80, "up_count": 3, "down_count": -3, "timeout":1000}, "records":[{"ip":"142.250.185.68"}]}}`,
 		},
 		{"ddd",
 			`{"a":{"ttl":300, "health_check":{"enable":true,"protocol":"http","uri":"/uri2","port":80, "up_count": 3, "down_count": -3, "timeout":1000}, "records":[{"ip":"3.3.3.3"}]}}`,
@@ -402,7 +402,7 @@ func TestHealthCheck(t *testing.T) {
 
 	go hc.Start()
 	time.Sleep(12 * time.Second)
-	h1 := hc.redisStat.GetHealthStatus("www.google.com.", "172.217.17.78")
+	h1 := hc.redisStat.GetHealthStatus("www.google.com.", "142.250.185.68")
 	h2 := hc.redisStat.GetHealthStatus("ddd.google.com.", "3.3.3.3")
 	/*
 		h3 := hc.getStatus("y.google.com.", net.ParseIP("4.2.2.4"))
