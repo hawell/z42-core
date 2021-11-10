@@ -18,7 +18,7 @@ func (db *DataBase) getPrivileges(userId ObjectId, resourceId ObjectId) (ACL, er
 	err := res.Scan(&acl.Read, &acl.List, &acl.Edit, &acl.Insert, &acl.Delete)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return ACL{}, ErrUnauthorized
+			return ACL{}, ErrInvalid
 		}
 		return ACL{}, err
 	}
@@ -41,7 +41,7 @@ func (db *DataBase) canRead(userId ObjectId, resourceId ObjectId) error {
 		return err
 	}
 	if !acl.Read {
-		return ErrUnauthorized
+		return ErrInvalid
 	}
 	return nil
 }
@@ -52,7 +52,7 @@ func (db *DataBase) canList(userId ObjectId, resourceId ObjectId) error {
 		return err
 	}
 	if !acl.List {
-		return ErrUnauthorized
+		return ErrInvalid
 	}
 	return nil
 }
@@ -63,7 +63,7 @@ func (db *DataBase) canEdit(userId ObjectId, resourceId ObjectId) error {
 		return err
 	}
 	if !acl.Edit {
-		return ErrUnauthorized
+		return ErrInvalid
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func (db *DataBase) canInsert(userId ObjectId, resourceId ObjectId) error {
 		return err
 	}
 	if !acl.Insert {
-		return ErrUnauthorized
+		return ErrInvalid
 	}
 	return nil
 }
@@ -85,7 +85,7 @@ func (db *DataBase) canDelete(userId ObjectId, resourceId ObjectId) error {
 		return err
 	}
 	if !acl.Delete {
-		return ErrUnauthorized
+		return ErrInvalid
 	}
 	return nil
 }
