@@ -771,7 +771,7 @@ func TestGetRecordSetWithEmptyRecords(t *testing.T) {
 	_, err = addLocation(users[0].Id, zone1Name, location1)
 	Expect(err).To(BeNil())
 	recordsets := []struct {
-		Type string
+		Type     string
 		Expected string
 	}{
 		{"a", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"filter":{},"health_check":{},"records":[]},"enabled":true}}`},

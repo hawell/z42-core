@@ -170,12 +170,12 @@ func TestGetZones(t *testing.T) {
 	// user with no zones
 	zones, err = db.GetZones(User3Id, 0, 100, "", true)
 	Expect(err).To(BeNil())
-	Expect(zones).To(Equal(List{}))
+	Expect(zones).To(Equal(List{Items: []ListItem{}}))
 
 	// non-existing user
 	zones, err = db.GetZones(NewObjectId(), 0, 100, "", true)
 	Expect(err).To(BeNil())
-	Expect(zones).To(Equal(List{}))
+	Expect(zones).To(Equal(List{Items: []ListItem{}}))
 
 	// limit results
 	zones, err = db.GetZones(User2Id, 1, 1, "", true)
@@ -193,7 +193,7 @@ func TestGetZones(t *testing.T) {
 	// empty results
 	zones, err = db.GetZones(User1Id, 0, 100, "no-result", true)
 	Expect(err).To(BeNil())
-	Expect(zones).To(Equal(List{}))
+	Expect(zones).To(Equal(List{Items: []ListItem{}}))
 }
 
 func TestGetZone(t *testing.T) {
