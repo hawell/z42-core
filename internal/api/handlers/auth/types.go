@@ -19,3 +19,12 @@ type authenticationToken struct {
 	Token  string `form:"token" json:"token" binding:"required"`
 	Expire string `form:"expire" json:"expire" binding:"required"`
 }
+
+type recovery struct {
+	Email string `form:"email" json:"email" binding:"required"`
+}
+
+type passwordReset struct {
+	Password string `form:"password" json:"password" binding:"required"`
+	Code     string `form:"code" json:"code" binding:"required"`
+}

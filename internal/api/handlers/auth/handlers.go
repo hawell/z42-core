@@ -17,6 +17,8 @@ type storage interface {
 	AddUser(u database.NewUser) (database.ObjectId, string, error)
 	GetUser(name string) (database.User, error)
 	Verify(code string) error
+	SetRecoveryCode(userId database.ObjectId) (string, error)
+	ResetPassword(code string, newPassword string) error
 }
 
 type Handler struct {
@@ -122,6 +124,8 @@ func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, 
 func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 	group.POST("/signup", h.recaptchaHandler.MiddlewareFunc(), h.signup)
 	group.POST("/verify", h.verify)
+	group.POST("/recover", h.recaptchaHandler.MiddlewareFunc(), h.recover)
+	group.PATCH("/reset", h.recaptchaHandler.MiddlewareFunc(), h.reset)
 	group.POST("/login", h.recaptchaHandler.MiddlewareFunc(), h.jwtMiddleWare.LoginHandler)
 	group.POST("/logout", h.jwtMiddleWare.LogoutHandler)
 	group.GET("/refresh_token", h.MiddlewareFunc(), h.jwtMiddleWare.RefreshHandler)
@@ -154,7 +158,10 @@ func (h *Handler) signup(c *gin.Context) {
 		return
 	}
 
-	handlers.SuccessResponse(c, http.StatusCreated, "successful", nil)
+	handlers.SuccessResponse(c, http.StatusCreated,
+		"You still have to verify your email address inorder to complete your account validation process. Please check your inbox and click the link emailed to you.",
+		nil,
+	)
 }
 
 func (h *Handler) verify(c *gin.Context) {
@@ -176,5 +183,52 @@ func (h *Handler) verify(c *gin.Context) {
 		gin.H{
 			"Server": h.serverName,
 		},
+	)
+}
+
+func (h *Handler) recover(c *gin.Context) {
+	var r recovery
+	err := c.ShouldBindBodyWith(&r, binding.JSON)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid email")
+		return
+	}
+	user, err := h.db.GetUser(r.Email)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	code, err := h.db.SetRecoveryCode(user.Id)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	err = h.mailer.SendPasswordReset(user.Email, user.Email, code)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	handlers.SuccessResponse(c, http.StatusOK,
+		"a password recovery link has been sent to your email address. Please check your inbox and click the link emailed to you.",
+		nil)
+}
+
+func (h *Handler) reset(c *gin.Context) {
+	var r passwordReset
+	err := c.ShouldBindBodyWith(&r, binding.JSON)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid password reset request")
+		return
+	}
+	err = h.db.ResetPassword(r.Code, r.Password)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+
+	handlers.SuccessResponse(c, http.StatusAccepted,
+		"your password has been updated successfully. you may now login using your new password",
+		nil,
 	)
 }

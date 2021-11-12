@@ -130,10 +130,11 @@ DROP TABLE IF EXISTS `z42`.`Verification` ;
 
 CREATE TABLE IF NOT EXISTS `z42`.`Verification` (
                                                     `Code` VARCHAR(100) NOT NULL,
-                                                    `Type` ENUM('signup') NULL,
+                                                    `Type` ENUM('signup', 'recover') NOT NULL,
                                                     `User_Id` CHAR(36) NOT NULL,
                                                     UNIQUE INDEX `Code_UNIQUE` (`Code` ASC) VISIBLE,
                                                     INDEX `fk_Verification_User_idx` (`User_Id` ASC) VISIBLE,
+                                                    PRIMARY KEY (`User_Id`, `Type`),
                                                     CONSTRAINT `fk_Verification_User`
                                                         FOREIGN KEY (`User_Id`)
                                                             REFERENCES `z42`.`User` (`Id`)

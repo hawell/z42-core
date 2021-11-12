@@ -10,14 +10,20 @@ import (
 
 type Mailer interface {
 	SendEMailVerification(toName string, toEmail string, code string) error
+	SendPasswordReset(toName string, toEmail string, code string) error
 }
 
 type Mock struct {
 	SendEMailVerificationFunc func(toName string, toEmail string, code string) error
+	SendPasswordResetFunc     func(toName string, toEmail string, code string) error
 }
 
 func (m *Mock) SendEMailVerification(toName string, toEmail string, code string) error {
 	return m.SendEMailVerificationFunc(toName, toEmail, code)
+}
+
+func (m *Mock) SendPasswordReset(toName string, toEmail string, code string) error {
+	return m.SendPasswordResetFunc(toName, toEmail, code)
 }
 
 type SMTP struct {
@@ -38,6 +44,42 @@ func NewSMTP(config *Config) (Mailer, error) {
 }
 
 func (m *SMTP) SendEMailVerification(toName string, toEmail string, code string) error {
+	var b bytes.Buffer
+	err := m.tmpl.ExecuteTemplate(
+		&b,
+		"verification-email.tmpl",
+		struct {
+			Server string
+			Code   string
+		}{
+			Server: m.config.ApiServer,
+			Code:   code,
+		})
+	if err != nil {
+		return err
+	}
+	return m.send(toName, toEmail, b.String())
+}
+
+func (m *SMTP) SendPasswordReset(toName string, toEmail string, code string) error {
+	var b bytes.Buffer
+	err := m.tmpl.ExecuteTemplate(
+		&b,
+		"password-reset-email.tmpl",
+		struct {
+			Server string
+			Code   string
+		}{
+			Server: m.config.WebServer,
+			Code:   code,
+		})
+	if err != nil {
+		return err
+	}
+	return m.send(toName, toEmail, b.String())
+}
+
+func (m *SMTP) send(toName string, toEmail string, body string) error {
 	c, err := smtp.Dial(m.config.Address)
 	if err != nil {
 		return err
@@ -56,21 +98,7 @@ func (m *SMTP) SendEMailVerification(toName string, toEmail string, code string)
 	for k, v := range header {
 		msg += fmt.Sprintf("%s: %s\r\n", k, v)
 	}
-	var b bytes.Buffer
-	err = m.tmpl.ExecuteTemplate(
-		&b,
-		"verification-email.tmpl",
-		struct {
-			Server string
-			Code   string
-		}{
-			Server: m.config.ApiServer,
-			Code:   code,
-		})
-	if err != nil {
-		return err
-	}
-	msg += "\r\n" + b.String()
+	msg += "\r\n" + body
 	bMsg := []byte(msg)
 	if err = c.Mail(fromHeader); err != nil {
 		return err

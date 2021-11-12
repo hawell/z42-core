@@ -11,16 +11,15 @@ import (
 	"time"
 )
 
-var src = rand.NewSource(time.Now().UnixNano())
-
-const (
-	letterBytes   = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
-)
-
 func randomString(n int) string {
+	const (
+		letterBytes   = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		letterIdxBits = 6                    // 6 bits to represent a letter index
+		letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+		letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+	)
+
+	src := rand.NewSource(time.Now().UnixNano())
 	b := make([]byte, n)
 	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
 	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
@@ -104,7 +103,7 @@ func (db *DataBase) AddUser(u NewUser) (ObjectId, string, error) {
 
 		if u.Status == UserStatusPending {
 			code = randomString(50)
-			_, err = t.Exec("INSERT INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeSignup, userId)
+			_, err = t.Exec("REPLACE INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeSignup, userId)
 			if err != nil {
 				return err
 			}
@@ -115,29 +114,55 @@ func (db *DataBase) AddUser(u NewUser) (ObjectId, string, error) {
 }
 
 func (db *DataBase) Verify(code string) error {
+	return db.applyVerifiedAction(code, VerificationTypeSignup, func(t *sql.Tx, userId string) error {
+		_, err := t.Exec("UPDATE User SET Status = ? WHERE Id = ?", UserStatusActive, userId)
+		return err
+	})
+}
+
+func (db *DataBase) SetRecoveryCode(userId ObjectId) (string, error) {
+	code := randomString(50)
+	_, err := db.db.Exec("REPLACE INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeRecover, userId)
+	if err != nil {
+		return "", err
+	}
+	return code, nil
+}
+
+func (db *DataBase) ResetPassword(code string, newPassword string) error {
+	return db.applyVerifiedAction(code, VerificationTypeRecover, func(t *sql.Tx, userId string) error {
+		hash, err := HashPassword(newPassword)
+		if err != nil {
+			return err
+		}
+		_, err = t.Exec("UPDATE User SET Password = ? WHERE Id = ?", hash, userId)
+		return err
+	})
+}
+
+func (db *DataBase) applyVerifiedAction(code string, actionType string, action func(t *sql.Tx, userId string) error) error {
 	res := db.db.QueryRow("select U.Id, V.Type from Verification V left join User U on U.Id = V.User_Id WHERE Code = ?", code)
 	var (
-		userId           ObjectId
-		verificationType string
+		userId     ObjectId
+		storedType string
 	)
-	if err := res.Scan(&userId, &verificationType); err != nil {
+	if err := res.Scan(&userId, &storedType); err != nil {
 		return parseError(err)
 	}
-	switch verificationType {
-	case VerificationTypeSignup:
-		err := db.withTransaction(func(t *sql.Tx) error {
-			if _, err := t.Exec("UPDATE User SET Status = ? WHERE Id = ?", UserStatusActive, userId); err != nil {
-				return err
-			}
-			if _, err := t.Exec("DELETE FROM Verification WHERE Code = ?", code); err != nil {
-				return err
-			}
-			return nil
-		})
-		return parseError(err)
-	default:
+	if storedType != actionType {
 		return errors.New("unknown verification type")
 	}
+
+	err := db.withTransaction(func(t *sql.Tx) error {
+		if err := action(t, string(userId)); err != nil {
+			return err
+		}
+		if _, err := t.Exec("DELETE FROM Verification WHERE Code = ?", code); err != nil {
+			return err
+		}
+		return nil
+	})
+	return parseError(err)
 }
 
 func (db *DataBase) GetUser(name string) (User, error) {
@@ -621,6 +646,16 @@ func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
 		return parseError(err)
 	}
 	return nil
+}
+
+func (db *DataBase) GetVerification(userId ObjectId, verificationType string) (string, error) {
+	res := db.db.QueryRow("SELECT Code FROM Verification WHERE User_Id = ? AND Type = ?", userId, verificationType)
+	var code string
+	err := res.Scan(&code)
+	if err != nil {
+		return "", parseError(err)
+	}
+	return code, nil
 }
 
 func (db *DataBase) getZoneId(zoneName string) (ObjectId, error) {

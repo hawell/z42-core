@@ -35,7 +35,8 @@ const (
 )
 
 const (
-	VerificationTypeSignup = "signup"
+	VerificationTypeSignup  = "signup"
+	VerificationTypeRecover = "recover"
 )
 
 type Zone struct {
