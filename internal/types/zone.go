@@ -28,6 +28,14 @@ type ZoneConfig struct {
 	CnameFlattening bool       `json:"cname_flattening,omitempty"`
 }
 
+type ZoneKeys struct {
+	KSKPrivate string
+	KSKPublic  string
+	ZSKPrivate string
+	ZSKPublic  string
+	DS         string
+}
+
 func ZoneConfigFromJson(zone string, configStr string) *ZoneConfig {
 	config := &ZoneConfig{
 		DnsSec:          false,

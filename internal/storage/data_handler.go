@@ -657,7 +657,11 @@ func (dh *DataHandler) ApplyEvent(event database.Event) error {
 		tx.
 			SAdd(zoneLocationsKey(newZone.Name), "@").
 			Set(zoneConfigKey(newZone.Name), string(configJson)).
-			Set(zoneLocationRRSetKey(newZone.Name, "@", dns.TypeNS), string(nsValue))
+			Set(zoneLocationRRSetKey(newZone.Name, "@", dns.TypeNS), string(nsValue)).
+			Set(zonePubKey(newZone.Name, "ksk"), newZone.Keys.KSKPublic).
+			Set(zonePrivKey(newZone.Name, "ksk"), newZone.Keys.KSKPrivate).
+			Set(zonePubKey(newZone.Name, "zsk"), newZone.Keys.ZSKPublic).
+			Set(zonePrivKey(newZone.Name, "zsk"), newZone.Keys.ZSKPrivate)
 	case database.UpdateZone:
 		var zoneUpdate database.ZoneUpdate
 		if err := jsoniter.Unmarshal([]byte(event.Value), &zoneUpdate); err != nil {

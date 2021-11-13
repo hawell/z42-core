@@ -106,7 +106,7 @@ func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, 
 			})
 		},
 		Unauthorized: func(c *gin.Context, code int, message string) {
-			handlers.ErrorResponse(c, code, message)
+			handlers.ErrorResponse(c, code, message, nil)
 		},
 		TokenLookup:   "header: Authorization, query: token, cookie: jwt",
 		TokenHeadName: "Bearer",
@@ -139,7 +139,7 @@ func (h *Handler) signup(c *gin.Context) {
 	var u NewUser
 	err := c.ShouldBindBodyWith(&u, binding.JSON)
 	if err != nil {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid input format", err)
 		return
 	}
 	model := database.NewUser{
@@ -154,7 +154,7 @@ func (h *Handler) signup(c *gin.Context) {
 	}
 	err = h.mailer.SendEMailVerification(u.Email, u.Email, code)
 	if err != nil {
-		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
+		handlers.ErrorResponse(c, http.StatusInternalServerError, "cannot send email verification", err)
 		return
 	}
 
@@ -168,12 +168,12 @@ func (h *Handler) verify(c *gin.Context) {
 	var v verification
 	err := c.ShouldBindQuery(&v)
 	if err != nil {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid code")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid code", err)
 		return
 	}
 	err = h.db.Verify(v.Code)
 	if err != nil {
-		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
+		handlers.ErrorResponse(c, http.StatusInternalServerError, "verification failed", err)
 		return
 	}
 
@@ -190,7 +190,7 @@ func (h *Handler) recover(c *gin.Context) {
 	var r recovery
 	err := c.ShouldBindBodyWith(&r, binding.JSON)
 	if err != nil {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid email")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid email", err)
 		return
 	}
 	user, err := h.db.GetUser(r.Email)
@@ -205,7 +205,7 @@ func (h *Handler) recover(c *gin.Context) {
 	}
 	err = h.mailer.SendPasswordReset(user.Email, user.Email, code)
 	if err != nil {
-		handlers.ErrorResponse(c, http.StatusInternalServerError, err.Error())
+		handlers.ErrorResponse(c, http.StatusInternalServerError, "send password reset failed", err)
 		return
 	}
 
@@ -218,7 +218,7 @@ func (h *Handler) reset(c *gin.Context) {
 	var r passwordReset
 	err := c.ShouldBindBodyWith(&r, binding.JSON)
 	if err != nil {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid password reset request")
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid password reset request", err)
 		return
 	}
 	err = h.db.ResetPassword(r.Code, r.Password)

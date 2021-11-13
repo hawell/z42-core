@@ -71,6 +71,8 @@ func TestAddZone(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 	z, err := db.GetZone(users[0].Id, "example.com.")
 	Expect(err).To(BeNil())
+	Expect(z.DS).To(MatchRegexp(`example.com.\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	z.DS = ""
 	Expect(z).To(Equal(database.Zone{
 		Id:              z.Id,
 		Name:            "example.com.",
@@ -218,7 +220,8 @@ func TestGetZone(t *testing.T) {
 				"expire": 66,
 				"minttl": 100,
 				"serial": 123456
-			}
+			},
+			"ds": ""
 		}
 	}`))
 
@@ -255,7 +258,8 @@ func TestUpdateZone(t *testing.T) {
 			"enabled":          true,
 			"dnssec":           true,
 			"cname_flattening": false,
-			"soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123457}
+			"soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123457},
+			"ds": ""
 		}
 	}`))
 
@@ -944,7 +948,7 @@ func TestRecover(t *testing.T) {
 	resp := execRequest("", http.MethodPost, path, body)
 	b, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(resp.Status).To(Equal(http.StatusOK), string(b))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK), string(b))
 
 	// should have a verification of type recover
 	_, err = db.GetVerification(users[0].Id, database.VerificationTypeRecover)
@@ -952,7 +956,7 @@ func TestRecover(t *testing.T) {
 
 	// duplicate request
 	resp = execRequest("", http.MethodPost, path, body)
-	Expect(resp.Status).To(Equal(http.StatusCreated))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	_, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 
@@ -969,7 +973,7 @@ func TestReset(t *testing.T) {
 	resp := execRequest("", http.MethodPost, path, body)
 	b, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
-	Expect(resp.Status).To(Equal(http.StatusOK), string(b))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK), string(b))
 
 	code, err := db.GetVerification(users[0].Id, database.VerificationTypeRecover)
 	Expect(err).To(BeNil())
@@ -977,7 +981,7 @@ func TestReset(t *testing.T) {
 	path = "/auth/reset"
 	body = fmt.Sprintf(`{"password": "password2", "code": "%s", "recaptcha_token": "123456"}`, code)
 	resp = execRequest(users[0].Id, http.MethodPatch, path, body)
-	Expect(resp.Status).To(Equal(http.StatusAccepted))
+	Expect(resp.StatusCode).To(Equal(http.StatusAccepted))
 	_, err = ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 

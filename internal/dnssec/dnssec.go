@@ -3,6 +3,7 @@ package dnssec
 import (
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"errors"
 	"github.com/hawell/z42/internal/types"
 	"go.uber.org/zap"
 
@@ -15,6 +16,47 @@ var (
 	NsecBitmapSubDelegation = []uint16{dns.TypeNS, dns.TypeDS, dns.TypeRRSIG, dns.TypeNSEC}
 	NsecBitmapNameError     = []uint16{dns.TypeRRSIG, dns.TypeNSEC}
 )
+
+func GenerateKeys(zoneName string) (types.ZoneKeys, error) {
+	zsk := new(dns.DNSKEY)
+	zsk.Hdr.Rrtype = dns.TypeDNSKEY
+	zsk.Hdr.Name = zoneName
+	zsk.Hdr.Class = dns.ClassINET
+	zsk.Hdr.Ttl = 14400
+	zsk.Flags = 256
+	zsk.Protocol = 3
+	zsk.Algorithm = dns.ECDSAP256SHA256
+	zskPrivateKey, err := zsk.Generate(256)
+	if err != nil {
+		return types.ZoneKeys{}, err
+	}
+
+	ksk := new(dns.DNSKEY)
+	ksk.Hdr.Rrtype = dns.TypeDNSKEY
+	ksk.Hdr.Name = zoneName
+	ksk.Hdr.Class = dns.ClassINET
+	ksk.Hdr.Ttl = 14400
+	ksk.Flags = 257
+	ksk.Protocol = 3
+	ksk.Algorithm = dns.RSASHA256
+	kskPrivateKey, err := ksk.Generate(512)
+	if err != nil {
+		return types.ZoneKeys{}, err
+	}
+
+	ds := ksk.ToDS(dns.SHA256)
+	if ds == nil {
+		return types.ZoneKeys{}, errors.New("cannot create DS record")
+	}
+
+	return types.ZoneKeys{
+		KSKPrivate: ksk.PrivateKeyString(kskPrivateKey),
+		KSKPublic:  ksk.String(),
+		ZSKPrivate: zsk.PrivateKeyString(zskPrivateKey),
+		ZSKPublic:  zsk.String(),
+		DS:         ds.String(),
+	}, nil
+}
 
 func FilterNsecBitmap(qtype uint16, bitmap []uint16) []uint16 {
 	res := make([]uint16, 0, len(bitmap))

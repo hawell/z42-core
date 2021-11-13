@@ -41,7 +41,7 @@ func (h *Handler) VerifyReCaptcha(ctx *gin.Context) {
 	var t token
 	err := ctx.ShouldBindBodyWith(&t, binding.JSON)
 	if err != nil || t.Value == "" {
-		handlers.ErrorResponse(ctx, http.StatusBadRequest, "recaptcha token is missing")
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, "recaptcha token is missing", err)
 		ctx.Abort()
 		return
 	}
@@ -49,27 +49,27 @@ func (h *Handler) VerifyReCaptcha(ctx *gin.Context) {
 	resp, err := h.client.PostForm(h.server,
 		url.Values{"secret": {h.secretKey}, "response": {t.Value}})
 	if err != nil {
-		handlers.ErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, "recaptcha PostForm failed", err)
 		ctx.Abort()
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		handlers.ErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, "reading response body failed", err)
 		ctx.Abort()
 		return
 	}
 
 	var responseData Response
 	if err := json.Unmarshal(body, &responseData); err != nil {
-		handlers.ErrorResponse(ctx, http.StatusBadRequest, err.Error())
+		handlers.ErrorResponse(ctx, http.StatusBadRequest, "unmarshal response body failed", err)
 		ctx.Abort()
 		return
 	}
 
 	if responseData.Success == false || responseData.Action != "login" {
-		handlers.ErrorResponse(ctx, http.StatusForbidden, "recaptcha validation failed")
+		handlers.ErrorResponse(ctx, http.StatusForbidden, "recaptcha validation failed", nil)
 		ctx.Abort()
 		return
 	}

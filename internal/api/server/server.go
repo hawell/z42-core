@@ -37,7 +37,7 @@ func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer, acce
 	router := gin.New()
 	router.LoadHTMLGlob(config.HtmlTemplates)
 	handleRecovery := func(c *gin.Context, err interface{}) {
-		handlers.ErrorResponse(c, http.StatusInternalServerError, err.(string))
+		handlers.ErrorResponse(c, http.StatusInternalServerError, err.(string), nil)
 		c.Abort()
 	}
 	router.Use(gin.CustomRecovery(handleRecovery))

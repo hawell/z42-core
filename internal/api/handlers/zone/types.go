@@ -32,6 +32,7 @@ type GetZoneResponse struct {
 	Dnssec          bool            `json:"dnssec"`
 	CNameFlattening bool            `json:"cname_flattening"`
 	SOA             types.SOA_RRSet `json:"soa"`
+	DS              string          `json:"ds"`
 }
 
 type UpdateZoneRequest struct {

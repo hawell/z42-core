@@ -211,6 +211,27 @@ CREATE TABLE IF NOT EXISTS `z42`.`SOA` (
     ENGINE = InnoDB;
 
 
+-- -----------------------------------------------------
+-- Table `z42`.`Keys`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `z42`.`Keys` ;
+
+CREATE TABLE IF NOT EXISTS `z42`.`Keys` (
+                                            `KSK_Private` VARCHAR(2048) NOT NULL,
+                                            `KSK_Public` VARCHAR(512) NOT NULL,
+                                            `ZSK_Private` VARCHAR(2048) NOT NULL,
+                                            `ZSK_Public` VARCHAR(512) NOT NULL,
+                                            `DS` VARCHAR(256) NOT NULL,
+                                            `Zone_Id` CHAR(36) NOT NULL,
+                                            PRIMARY KEY (`Zone_Id`),
+                                            CONSTRAINT `fk_dnssec_Zone`
+                                                FOREIGN KEY (`Zone_Id`)
+                                                    REFERENCES `z42`.`Zone` (`Resource_Id`)
+                                                    ON DELETE CASCADE
+                                                    ON UPDATE NO ACTION)
+    ENGINE = InnoDB;
+
+
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;

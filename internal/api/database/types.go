@@ -46,6 +46,7 @@ type Zone struct {
 	Dnssec          bool
 	CNameFlattening bool
 	SOA             types.SOA_RRSet
+	DS              string
 }
 
 type NewZone struct {
@@ -54,6 +55,7 @@ type NewZone struct {
 	Dnssec          bool            `json:"dnssec"`
 	CNameFlattening bool            `json:"cname_flattening"`
 	SOA             types.SOA_RRSet `json:"soa"`
+	Keys            types.ZoneKeys  `json:"keys"`
 	NS              types.NS_RRSet  `json:"ns"`
 }
 

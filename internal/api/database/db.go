@@ -269,6 +269,9 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 			if err := setPrivileges(t, userId, nsId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
 				return err
 			}
+			if err = setZoneKeys(t, zoneId, z.Keys); err != nil {
+				return err
+			}
 			if _, err = addEvent(t, zoneId, AddZone, z); err != nil {
 				return err
 			}
@@ -323,11 +326,11 @@ func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
 	if err := db.canGetZone(userId, zoneId); err != nil {
 		return Zone{}, parseError(err)
 	}
-	res := db.db.QueryRow("SELECT Resource_Id, Name, CNameFlattening, Dnssec, Enabled, TTL, NS, MBox, Refresh, Retry, Expire, MinTTL, Serial FROM Zone LEFT JOIN SOA ON Zone.Resource_Id = SOA.Zone_Id WHERE Zone.Resource_Id = ?", zoneId)
+	res := db.db.QueryRow("SELECT Resource_Id, Name, CNameFlattening, Dnssec, Enabled, TTL, NS, MBox, Refresh, Retry, Expire, MinTTL, Serial, DS FROM Zone LEFT JOIN SOA ON Zone.Resource_Id = SOA.Zone_Id  LEFT JOIN `Keys` K ON Zone.Resource_Id = K.Zone_Id WHERE Zone.Resource_Id = ?", zoneId)
 	var (
 		z Zone
 	)
-	err = res.Scan(&z.Id, &z.Name, &z.CNameFlattening, &z.Dnssec, &z.Enabled, &z.SOA.TtlValue, &z.SOA.Ns, &z.SOA.MBox, &z.SOA.Refresh, &z.SOA.Retry, &z.SOA.Expire, &z.SOA.MinTtl, &z.SOA.Serial)
+	err = res.Scan(&z.Id, &z.Name, &z.CNameFlattening, &z.Dnssec, &z.Enabled, &z.SOA.TtlValue, &z.SOA.Ns, &z.SOA.MBox, &z.SOA.Refresh, &z.SOA.Retry, &z.SOA.Expire, &z.SOA.MinTtl, &z.SOA.Serial, &z.DS)
 	if err != nil {
 		return Zone{}, parseError(err)
 	}
@@ -764,6 +767,11 @@ func updateRecordSet(t *sql.Tx, recordId ObjectId, r RecordSetUpdate) error {
 
 func deleteRecordSet(t *sql.Tx, recordId ObjectId) error {
 	_, err := t.Exec("DELETE FROM RecordSet WHERE Resource_Id = ?", recordId)
+	return err
+}
+
+func setZoneKeys(t *sql.Tx, zoneId ObjectId, zoneKeys types.ZoneKeys) error {
+	_, err := t.Exec("INSERT INTO `Keys`(KSK_Private, KSK_Public, ZSK_Private, ZSK_Public, DS, Zone_Id) VALUES (?, ?, ?, ?, ?, ?)", zoneKeys.KSKPrivate, zoneKeys.KSKPublic, zoneKeys.ZSKPrivate, zoneKeys.ZSKPublic, zoneKeys.DS, zoneId)
 	return err
 }
 

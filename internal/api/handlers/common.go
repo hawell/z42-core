@@ -22,18 +22,18 @@ func IsServerError(code int) bool {
 	return code/100 == 5
 }
 
-func StatusFromError(c *gin.Context, err error) (*gin.Context, int, string) {
+func StatusFromError(c *gin.Context, err error) (*gin.Context, int, string, error) {
 	switch err {
 	case database.ErrInvalid:
-		return c, http.StatusForbidden, "invalid request"
+		return c, http.StatusForbidden, "invalid request", err
 	case database.ErrDuplicateEntry:
-		return c, http.StatusConflict, "duplicate entry"
+		return c, http.StatusConflict, "duplicate entry", err
 	case database.ErrNotFound:
-		return c, http.StatusNotFound, "entry not found"
+		return c, http.StatusNotFound, "entry not found", err
 	case database.ErrUnauthorized:
-		return c, http.StatusUnauthorized, "authorization failed"
+		return c, http.StatusUnauthorized, "authorization failed", err
 	default:
-		return c, http.StatusInternalServerError, "internal error"
+		return c, http.StatusInternalServerError, "internal error", err
 	}
 }
 
@@ -43,11 +43,11 @@ type Response struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-func ErrorResponse(c *gin.Context, code int, message string) {
+func ErrorResponse(c *gin.Context, code int, message string, err error) {
 	if IsClientError(code) {
-		zap.L().Warn(message, zap.Int("status", code))
+		zap.L().Warn(message, zap.Int("status", code), zap.Error(err))
 	} else if IsServerError(code) {
-		zap.L().Error(message, zap.Int("status", code))
+		zap.L().Error(message, zap.Int("status", code), zap.Error(err))
 	}
 	c.JSON(code, Response{
 		Code:    code,
