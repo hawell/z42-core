@@ -2,6 +2,8 @@ package types
 
 import (
 	"crypto"
+	"errors"
+	"fmt"
 	"github.com/miekg/dns"
 	"math/rand"
 	"net"
@@ -20,22 +22,62 @@ const (
 	TypeANAME = 500
 )
 
-var SupportedTypes = map[string]struct{}{"a": {}, "aaaa": {}, "cname": {}, "txt": {}, "ns": {}, "mx": {}, "srv": {}, "caa": {}, "ptr": {}, "tlsa": {}, "ds": {}, "aname": {}, "soa": {}}
+func IsSupported(t uint16) bool {
+	switch t {
+	case dns.TypeA,
+		dns.TypeAAAA,
+		dns.TypeCNAME,
+		dns.TypeTXT,
+		dns.TypeNS,
+		dns.TypeMX,
+		dns.TypeSRV,
+		dns.TypeCAA,
+		dns.TypePTR,
+		dns.TypeTLSA,
+		dns.TypeDS,
+		TypeANAME,
+		dns.TypeSOA:
+		return true
+	default:
+		return false
+	}
+}
 
-var TypeToRRSet = map[string]func() RRSet{
-	"a":     func() RRSet { return &IP_RRSet{Data: []IP_RR{}} },
-	"aaaa":  func() RRSet { return &IP_RRSet{Data: []IP_RR{}} },
-	"cname": func() RRSet { return &CNAME_RRSet{} },
-	"txt":   func() RRSet { return &TXT_RRSet{Data: []TXT_RR{}} },
-	"ns":    func() RRSet { return &NS_RRSet{Data: []NS_RR{}} },
-	"mx":    func() RRSet { return &MX_RRSet{Data: []MX_RR{}} },
-	"srv":   func() RRSet { return &SRV_RRSet{Data: []SRV_RR{}} },
-	"caa":   func() RRSet { return &CAA_RRSet{Data: []CAA_RR{}} },
-	"ptr":   func() RRSet { return &PTR_RRSet{} },
-	"tlsa":  func() RRSet { return &TLSA_RRSet{Data: []TLSA_RR{}} },
-	"ds":    func() RRSet { return &DS_RRSet{Data: []DS_RR{}} },
-	"soa":   func() RRSet { return &SOA_RRSet{} },
-	"aname": func() RRSet { return &ANAME_RRSet{} },
+func TypeToRRSet(t uint16) RRSet {
+	switch t {
+	case dns.TypeA:
+		return &IP_RRSet{Data: []IP_RR{}}
+	case dns.TypeAAAA:
+		return &IP_RRSet{Data: []IP_RR{}}
+	case dns.TypeCNAME:
+		return &CNAME_RRSet{}
+	case dns.TypeTXT:
+		return &TXT_RRSet{Data: []TXT_RR{}}
+	case dns.TypeNS:
+		return &NS_RRSet{Data: []NS_RR{}}
+	case dns.TypeMX:
+		return &MX_RRSet{Data: []MX_RR{}}
+	case dns.TypeSRV:
+		return &SRV_RRSet{Data: []SRV_RR{}}
+	case dns.TypeCAA:
+		return &CAA_RRSet{Data: []CAA_RR{}}
+	case dns.TypePTR:
+		return &PTR_RRSet{}
+	case dns.TypeTLSA:
+		return &TLSA_RRSet{Data: []TLSA_RR{}}
+	case dns.TypeDS:
+		return &DS_RRSet{Data: []DS_RR{}}
+	case dns.TypeSOA:
+		return &SOA_RRSet{}
+	case TypeANAME:
+		return &ANAME_RRSet{}
+	default:
+		return nil
+	}
+}
+
+func TypeStrToRRSet(t string) RRSet {
+	return TypeToRRSet(StringToType(t))
 }
 
 func StringToType(s string) uint16 {
@@ -62,6 +104,22 @@ type RRSet interface {
 	Value(name string) []dns.RR
 	Empty() bool
 	Ttl() uint32
+	Parse(rr dns.RR) error
+}
+
+var errInvalidType = errors.New("invalid type")
+
+func String(rrset RRSet, name string) string {
+	v := rrset.Value("")
+	if len(v) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "%s%s\n", name, v[0].String())
+	for i := 1; i < len(v); i++ {
+		_, _ = fmt.Fprintf(&b, "\t%s\n", v[i].String())
+	}
+	return b.String()
 }
 
 type GenericRRSet struct {
@@ -109,12 +167,46 @@ type IP_RRSet struct {
 	Data              []IP_RR             `json:"records"`
 }
 
-func (*IP_RRSet) Value(string) []dns.RR {
-	return nil
+func (rrset *IP_RRSet) Value(name string) []dns.RR {
+	var res []dns.RR
+	for _, record := range rrset.Data {
+		if record.Ip.String() == "" {
+			continue
+		}
+		if record.Ip.To4() != nil {
+			r := new(dns.A)
+			r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeA,
+				Class: dns.ClassINET, Ttl: rrset.TtlValue}
+			r.A = record.Ip
+			res = append(res, r)
+		} else {
+			r := new(dns.AAAA)
+			r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeAAAA,
+				Class: dns.ClassINET, Ttl: rrset.TtlValue}
+			r.AAAA = record.Ip
+			res = append(res, r)
+		}
+	}
+	return res
 }
 
 func (rrset *IP_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
+}
+
+func (rrset *IP_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeA && r.Header().Rrtype != dns.TypeAAAA {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	if r.Header().Rrtype == dns.TypeA {
+		rrset.Data = append(rrset.Data, IP_RR{Ip: r.(*dns.A).A})
+	} else {
+		rrset.Data = append(rrset.Data, IP_RR{Ip: r.(*dns.AAAA).AAAA})
+	}
+	return nil
 }
 
 type CNAME_RRSet struct {
@@ -135,6 +227,15 @@ func (rrset *CNAME_RRSet) Value(name string) []dns.RR {
 
 func (rrset *CNAME_RRSet) Empty() bool {
 	return len(rrset.Host) == 0
+}
+
+func (rrset *CNAME_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeCNAME {
+		return errInvalidType
+	}
+	rrset.TtlValue = r.Header().Ttl
+	rrset.Host = r.(*dns.CNAME).Target
+	return nil
 }
 
 type TXT_RR struct {
@@ -163,6 +264,17 @@ func (rrset *TXT_RRSet) Value(name string) []dns.RR {
 
 func (rrset *TXT_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
+}
+
+func (rrset *TXT_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeTXT {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	rrset.Data = append(rrset.Data, TXT_RR{Text: strings.Join(r.(*dns.TXT).Txt, "")})
+	return nil
 }
 
 type NS_RR struct {
@@ -205,6 +317,17 @@ func (rrset *NS_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
 }
 
+func (rrset *NS_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeNS {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	rrset.Data = append(rrset.Data, NS_RR{Host: r.(*dns.NS).Ns})
+	return nil
+}
+
 type MX_RR struct {
 	Host       string `json:"host"`
 	Preference uint16 `json:"preference"`
@@ -233,6 +356,17 @@ func (rrset *MX_RRSet) Value(name string) []dns.RR {
 
 func (rrset *MX_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
+}
+
+func (rrset *MX_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeMX {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	rrset.Data = append(rrset.Data, MX_RR{Host: r.(*dns.MX).Mx, Preference: r.(*dns.MX).Preference})
+	return nil
 }
 
 type SRV_RR struct {
@@ -269,6 +403,23 @@ func (rrset *SRV_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
 }
 
+func (rrset *SRV_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeSRV {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	srv := r.(*dns.SRV)
+	rrset.Data = append(rrset.Data, SRV_RR{
+		Target:   srv.Target,
+		Priority: srv.Priority,
+		Weight:   srv.Weight,
+		Port:     srv.Port,
+	})
+	return nil
+}
+
 type CAA_RRSet struct {
 	GenericRRSet
 	Data []CAA_RR `json:"records"`
@@ -298,6 +449,22 @@ func (rrset *CAA_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
 }
 
+func (rrset *CAA_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeCAA {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	caa := r.(*dns.CAA)
+	rrset.Data = append(rrset.Data, CAA_RR{
+		Tag:   caa.Tag,
+		Value: caa.Value,
+		Flag:  caa.Flag,
+	})
+	return nil
+}
+
 type PTR_RRSet struct {
 	GenericRRSet
 	Domain string `json:"domain"`
@@ -316,6 +483,15 @@ func (rrset *PTR_RRSet) Value(name string) []dns.RR {
 
 func (rrset *PTR_RRSet) Empty() bool {
 	return len(rrset.Domain) == 0
+}
+
+func (rrset *PTR_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypePTR {
+		return errInvalidType
+	}
+	rrset.TtlValue = r.Header().Ttl
+	rrset.Domain = r.(*dns.PTR).Ptr
+	return nil
 }
 
 type TLSA_RR struct {
@@ -349,6 +525,23 @@ func (rrset *TLSA_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
 }
 
+func (rrset *TLSA_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeTLSA {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	tlsa := r.(*dns.TLSA)
+	rrset.Data = append(rrset.Data, TLSA_RR{
+		Usage:        tlsa.Usage,
+		Selector:     tlsa.Selector,
+		MatchingType: tlsa.MatchingType,
+		Certificate:  tlsa.Certificate,
+	})
+	return nil
+}
+
 type DS_RR struct {
 	KeyTag     uint16 `json:"key_tag"`
 	Algorithm  uint8  `json:"algorithm"`
@@ -378,6 +571,23 @@ func (rrset *DS_RRSet) Value(name string) []dns.RR {
 
 func (rrset *DS_RRSet) Empty() bool {
 	return len(rrset.Data) == 0
+}
+
+func (rrset *DS_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeDS {
+		return errInvalidType
+	}
+	if len(rrset.Data) == 0 {
+		rrset.TtlValue = r.Header().Ttl
+	}
+	ds := r.(*dns.DS)
+	rrset.Data = append(rrset.Data, DS_RR{
+		KeyTag:     ds.KeyTag,
+		Algorithm:  ds.Algorithm,
+		DigestType: ds.DigestType,
+		Digest:     ds.Digest,
+	})
+	return nil
 }
 
 func DefaultSOA(zoneName string) *SOA_RRSet {
@@ -418,11 +628,27 @@ func (rrset *SOA_RRSet) Value(name string) []dns.RR {
 	r.Expire = rrset.Expire
 	r.Minttl = rrset.MinTtl
 	r.Serial = rrset.Serial
-	return nil
+	return []dns.RR{r}
 }
 
 func (rrset *SOA_RRSet) Empty() bool {
 	return false
+}
+
+func (rrset *SOA_RRSet) Parse(r dns.RR) error {
+	if r.Header().Rrtype != dns.TypeSOA {
+		return errInvalidType
+	}
+	rrset.TtlValue = r.Header().Ttl
+	soa := r.(*dns.SOA)
+	rrset.Ns = soa.Ns
+	rrset.Expire = soa.Expire
+	rrset.MBox = soa.Mbox
+	rrset.MinTtl = soa.Minttl
+	rrset.Refresh = soa.Refresh
+	rrset.Retry = soa.Retry
+	rrset.Serial = soa.Serial
+	return nil
 }
 
 type ANAME_RRSet struct {
@@ -430,12 +656,20 @@ type ANAME_RRSet struct {
 	Location string `json:"location"`
 }
 
-func (*ANAME_RRSet) Value(string) []dns.RR {
-	return nil
+func (rrset *ANAME_RRSet) Value(name string) []dns.RR {
+	r := new(dns.CNAME)
+	r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME,
+		Class: dns.ClassINET, Ttl: rrset.TtlValue}
+	r.Target = rrset.Location
+	return []dns.RR{r}
 }
 
 func (rrset *ANAME_RRSet) Empty() bool {
 	return len(rrset.Location) == 0
+}
+
+func (rrset *ANAME_RRSet) Parse(dns.RR) error {
+	return errInvalidType
 }
 
 type RRSetKey struct {

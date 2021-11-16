@@ -156,9 +156,8 @@ func zoneConfigKey(zone string) string {
 	return keyPrefix + zone + ":config"
 }
 
-func zoneLocationRRSetKey(zone string, label string, rtype uint16) string {
-	typeStr := types.TypeToString(rtype)
-	return keyPrefix + zone + ":labels:" + label + ":" + typeStr
+func zoneLocationRRSetKey(zone string, label string, rtype string) string {
+	return keyPrefix + zone + ":labels:" + label + ":" + rtype
 }
 
 func zonePubKey(zone string, keyType string) string {
@@ -167,6 +166,18 @@ func zonePubKey(zone string, keyType string) string {
 
 func zonePrivKey(zone string, keyType string) string {
 	return keyPrefix + zone + ":" + keyType + ":priv"
+}
+
+func zoneWildcard(zone string) string {
+	return keyPrefix + zone + ":*"
+}
+
+func zoneLocationsWildcard(zone string) string {
+	return keyPrefix + zone + ":labels:*"
+}
+
+func locationWildcard(zone string, label string) string {
+	return keyPrefix + zone + ":labels:" + label + ":*"
 }
 
 // TODO: make this function internal
@@ -284,7 +295,7 @@ func (dh *DataHandler) SetZoneConfigFromJson(zone string, config string) error {
 }
 
 func (dh *DataHandler) getRRSet(zone string, label string, rtype uint16, result types.RRSet) (types.RRSet, error) {
-	key := zoneLocationRRSetKey(zone, label, rtype)
+	key := zoneLocationRRSetKey(zone, label, types.TypeToString(rtype))
 	cachedRRSet, found := dh.recordCache.Get(key)
 	var r types.RRSet
 	if found {
@@ -327,7 +338,7 @@ func (dh *DataHandler) getRRSet(zone string, label string, rtype uint16, result 
 }
 
 func (dh *DataHandler) SetRRSetFromJson(zone string, label string, rtype uint16, value string) error {
-	return dh.redis.Set(zoneLocationRRSetKey(zone, label, rtype), value)
+	return dh.redis.Set(zoneLocationRRSetKey(zone, label, types.TypeToString(rtype)), value)
 }
 
 func (dh *DataHandler) SetRRSet(zone string, label string, rtype uint16, rrset types.RRSet) error {
@@ -655,13 +666,30 @@ func (dh *DataHandler) ApplyEvent(event database.Event) error {
 			tx.SAdd(zonesKey, newZone.Name)
 		}
 		tx.
+			Del(zoneWildcard(newZone.Name)).
 			SAdd(zoneLocationsKey(newZone.Name), "@").
 			Set(zoneConfigKey(newZone.Name), string(configJson)).
-			Set(zoneLocationRRSetKey(newZone.Name, "@", dns.TypeNS), string(nsValue)).
+			Set(zoneLocationRRSetKey(newZone.Name, "@", types.TypeToString(dns.TypeNS)), string(nsValue)).
 			Set(zonePubKey(newZone.Name, "ksk"), newZone.Keys.KSKPublic).
 			Set(zonePrivKey(newZone.Name, "ksk"), newZone.Keys.KSKPrivate).
 			Set(zonePubKey(newZone.Name, "zsk"), newZone.Keys.ZSKPublic).
 			Set(zonePrivKey(newZone.Name, "zsk"), newZone.Keys.ZSKPrivate)
+	case database.ImportZone:
+		var importZone database.ZoneImport
+		zap.L().Error("importZone", zap.String("data", event.Value))
+		if err := jsoniter.Unmarshal([]byte(event.Value), &importZone); err != nil {
+			return err
+		}
+		tx = dh.redis.Start()
+		tx.
+			Del(zoneLocationsWildcard(importZone.Name))
+		for location, entry := range importZone.Entries {
+			tx.SAdd(zoneLocationsKey(importZone.Name), location)
+			for recordType, recordValue := range entry {
+				value, _ := jsoniter.Marshal(recordValue)
+				tx.Set(zoneLocationRRSetKey(importZone.Name, location, recordType), string(value))
+			}
+		}
 	case database.UpdateZone:
 		var zoneUpdate database.ZoneUpdate
 		if err := jsoniter.Unmarshal([]byte(event.Value), &zoneUpdate); err != nil {
@@ -692,7 +720,9 @@ func (dh *DataHandler) ApplyEvent(event database.Event) error {
 			return err
 		}
 		tx = dh.redis.Start()
-		tx.SRem(zonesKey, zoneDelete.Name)
+		tx.
+			SRem(zonesKey, zoneDelete.Name).
+			Del(zoneWildcard(zoneDelete.Name))
 	case database.AddLocation:
 		var newLocation database.NewLocation
 		if err := jsoniter.Unmarshal([]byte(event.Value), &newLocation); err != nil {
@@ -719,7 +749,9 @@ func (dh *DataHandler) ApplyEvent(event database.Event) error {
 			return err
 		}
 		tx = dh.redis.Start()
-		tx.SRem(zoneLocationsKey(locationDelete.ZoneName), locationDelete.Location)
+		tx.
+			SRem(zoneLocationsKey(locationDelete.ZoneName), locationDelete.Location).
+			Del(locationWildcard(locationDelete.ZoneName, locationDelete.Location))
 	case database.AddRecord:
 		var newRecord database.NewRecordSet
 		if err := jsoniter.Unmarshal([]byte(event.Value), &newRecord); err != nil {
@@ -728,7 +760,7 @@ func (dh *DataHandler) ApplyEvent(event database.Event) error {
 		tx = dh.redis.Start()
 		if newRecord.Enabled {
 			value, _ := jsoniter.Marshal(newRecord.Value)
-			tx.Set(zoneLocationRRSetKey(newRecord.ZoneName, newRecord.Location, types.StringToType(newRecord.Type)), string(value))
+			tx.Set(zoneLocationRRSetKey(newRecord.ZoneName, newRecord.Location, newRecord.Type), string(value))
 		}
 	case database.UpdateRecord:
 		var recordUpdate database.RecordSetUpdate
@@ -738,9 +770,9 @@ func (dh *DataHandler) ApplyEvent(event database.Event) error {
 		tx = dh.redis.Start()
 		if recordUpdate.Enabled {
 			value, _ := jsoniter.Marshal(recordUpdate.Value)
-			tx.Set(zoneLocationRRSetKey(recordUpdate.ZoneName, recordUpdate.Location, types.StringToType(recordUpdate.Type)), string(value))
+			tx.Set(zoneLocationRRSetKey(recordUpdate.ZoneName, recordUpdate.Location, recordUpdate.Type), string(value))
 		} else {
-			tx.Del(zoneLocationRRSetKey(recordUpdate.ZoneName, recordUpdate.Location, types.StringToType(recordUpdate.Type)))
+			tx.Del(zoneLocationRRSetKey(recordUpdate.ZoneName, recordUpdate.Location, recordUpdate.Type))
 		}
 	case database.DeleteRecord:
 		var recordDelete database.RecordSetDelete
@@ -748,7 +780,7 @@ func (dh *DataHandler) ApplyEvent(event database.Event) error {
 			return err
 		}
 		tx = dh.redis.Start()
-		tx.Del(zoneLocationRRSetKey(recordDelete.ZoneName, recordDelete.Location, types.StringToType(recordDelete.Type)))
+		tx.Del(zoneLocationRRSetKey(recordDelete.ZoneName, recordDelete.Location, recordDelete.Type))
 	default:
 		return fmt.Errorf("invalid event type: %s", event.Type)
 	}

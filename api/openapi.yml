@@ -88,6 +88,57 @@ paths:
         404:
           $ref: '#/components/responses/error_response'
 
+  /zones/{zone}/import:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: 'import zone data'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          $ref: '#/components/responses/success_response'
+        400:
+          $ref: '#/components/responses/error_response'
+        401:
+          $ref: '#/components/responses/error_response'
+        404:
+          $ref: '#/components/responses/error_response'
+
+  /zones/{zone}/export:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 'export zone data'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            text/plain:
+              schema:
+                type: string
+        400:
+          $ref: '#/components/responses/error_response'
+        401:
+          $ref: '#/components/responses/error_response'
+        404:
+          $ref: '#/components/responses/error_response'
+
   /zones/{zone}/locations:
     parameters:
       - name: zone

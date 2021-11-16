@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
 	"github.com/hawell/z42/internal/types"
@@ -71,6 +72,35 @@ type ZoneDelete struct {
 	Name string `json:"name"`
 }
 
+type ZoneImport struct {
+	Name    string                            `json:"name"`
+	Entries map[string]map[string]types.RRSet `json:"entries"`
+}
+
+func (zi *ZoneImport) UnmarshalJSON(data []byte) error {
+	var _zi struct {
+		Name    string                                `json:"name"`
+		Entries map[string]map[string]json.RawMessage `json:"entries"`
+	}
+	err := jsoniter.Unmarshal(data, &_zi)
+	if err != nil {
+		return err
+	}
+	zi.Name = _zi.Name
+	zi.Entries = make(map[string]map[string]types.RRSet)
+	for label, location := range _zi.Entries {
+		zi.Entries[label] = make(map[string]types.RRSet)
+		for rtype, rvalue := range location {
+			rrset := types.TypeStrToRRSet(rtype)
+			if err = jsoniter.Unmarshal(rvalue, rrset); err != nil {
+				return err
+			}
+			zi.Entries[label][rtype] = rrset
+		}
+	}
+	return nil
+}
+
 type Location struct {
 	Id      ObjectId
 	Name    string
@@ -119,14 +149,14 @@ func (r *NewRecordSet) UnmarshalJSON(data []byte) error {
 	if err := jsoniter.Unmarshal(data, &dat); err != nil {
 		return err
 	}
-	value := types.TypeToRRSet[dat.Type]
+	value := types.TypeStrToRRSet(dat.Type)
 	if value == nil {
 		return errors.New("invalid record type")
 	}
 	val := struct {
 		Value types.RRSet `json:"value"`
 	}{
-		Value: value(),
+		Value: value,
 	}
 	if err := jsoniter.Unmarshal(data, &val); err != nil {
 		return err
@@ -157,14 +187,14 @@ func (r *RecordSetUpdate) UnmarshalJSON(data []byte) error {
 	if err := jsoniter.Unmarshal(data, &dat); err != nil {
 		return err
 	}
-	value := types.TypeToRRSet[dat.Type]
+	value := types.TypeStrToRRSet(dat.Type)
 	if value == nil {
 		return errors.New("invalid record type")
 	}
 	val := struct {
 		Value types.RRSet `json:"value"`
 	}{
-		Value: value(),
+		Value: value,
 	}
 	if err := jsoniter.Unmarshal(data, &val); err != nil {
 		return err
@@ -213,6 +243,7 @@ const (
 	AddZone        EventType = "add_zone"
 	UpdateZone     EventType = "update_zone"
 	DeleteZone     EventType = "delete_zone"
+	ImportZone     EventType = "import_zone"
 	AddLocation    EventType = "add_location"
 	UpdateLocation EventType = "update_location"
 	DeleteLocation EventType = "delete_location"

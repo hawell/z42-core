@@ -1,15 +1,22 @@
 package zone
 
 import (
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/dnssec"
 	"github.com/hawell/z42/internal/types"
+	"github.com/miekg/dns"
+	"io/ioutil"
 	"net/http"
+	"strings"
+	"time"
 )
 
 type storage interface {
+	ImportZone(userId database.ObjectId, z database.ZoneImport) error
 	AddZone(userId database.ObjectId, z database.NewZone) (database.ObjectId, error)
 	GetZones(userId database.ObjectId, start int, count int, q string, ascendingOrder bool) (database.List, error)
 	GetZone(userId database.ObjectId, zoneName string) (database.Zone, error)
@@ -52,6 +59,9 @@ func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 	group.GET("/:zone_name", h.getZone)
 	group.PUT("/:zone_name", h.updateZone)
 	group.DELETE("/:zone_name", h.deleteZone)
+
+	group.POST("/:zone_name/import", h.importZone)
+	group.GET("/:zone_name/export", h.exportZone)
 
 	group.GET("/:zone_name/locations", h.getLocations)
 	group.POST("/:zone_name/locations", h.addLocation)
@@ -134,7 +144,7 @@ func (h *Handler) getZone(c *gin.Context) {
 
 	zoneName := c.Param(zoneNameKey)
 	if zoneName == "" {
-		handlers.ErrorResponse(c, http.StatusBadRequest, "zone missing", nil)
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone name missing", nil)
 		return
 	}
 
@@ -488,7 +498,7 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid record type", nil)
 		return
 	}
-	value := types.TypeToRRSet[recordType]()
+	value := types.TypeStrToRRSet(recordType)
 	req := UpdateRecordSetRequest{
 		Value: value,
 	}
@@ -541,12 +551,164 @@ func (h *Handler) deleteRecordSet(c *gin.Context) {
 	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", recordType)
 }
 
+func (h *Handler) importZone(c *gin.Context) {
+	userId := extractUser(c)
+	if userId == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
+		return
+	}
+
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone name missing", nil)
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "FormFile not found", err)
+		return
+	}
+	f, err := file.Open()
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "cannot open input file", err)
+		return
+	}
+	content, err := ioutil.ReadAll(f)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "error reading input file", err)
+		return
+	}
+
+	entries := map[string]map[string]types.RRSet{}
+	z := dns.NewZoneParser(strings.NewReader(string(content)), zoneName, "")
+	z.SetIncludeAllowed(false)
+	z.SetDefaultTTL(300)
+	for rr, ok := z.Next(); ok; rr, ok = z.Next() {
+		if !strings.HasSuffix(rr.Header().Name, zoneName) {
+			handlers.ErrorResponse(c, http.StatusBadRequest, "invalid origin", nil)
+			return
+		}
+		if !types.IsSupported(rr.Header().Rrtype) || rr.Header().Rrtype == dns.TypeSOA {
+			continue
+		}
+		var label string
+		if rr.Header().Name == zoneName {
+			if rr.Header().Rrtype == dns.TypeNS {
+				continue
+			}
+			label = "@"
+		} else {
+			label = strings.TrimSuffix(rr.Header().Name, "."+zoneName)
+		}
+		var (
+			rrset types.RRSet
+			ok    bool
+		)
+		if _, ok = entries[label]; !ok {
+			entries[label] = make(map[string]types.RRSet)
+		}
+		if rrset, ok = entries[label][types.TypeToString(rr.Header().Rrtype)]; !ok {
+			rrset = types.TypeToRRSet(rr.Header().Rrtype)
+		}
+		if err = rrset.Parse(rr); err != nil {
+			handlers.ErrorResponse(c, http.StatusBadRequest, "parse error", err)
+			return
+		}
+		entries[label][types.TypeToString(rr.Header().Rrtype)] = rrset
+	}
+	if _, ok := entries["@"]; !ok {
+		entries["@"] = make(map[string]types.RRSet)
+	}
+	entries["@"][types.TypeToString(dns.TypeNS)] = types.GenerateNS(h.nameServer)
+	if err = z.Err(); err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "invalid format", err)
+		return
+	}
+	if err = h.db.ImportZone(userId, database.ZoneImport{
+		Name:    zoneName,
+		Entries: entries,
+	}); err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+
+	handlers.SuccessResponse(c, http.StatusOK, "successful", nil)
+}
+
+func (h *Handler) exportZone(c *gin.Context) {
+	userId := extractUser(c)
+	if userId == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
+		return
+	}
+
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone name missing", nil)
+		return
+	}
+
+	z, err := h.db.GetZone(userId, zoneName)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "$ORIGIN %s\n", z.Name)
+	_, _ = fmt.Fprintf(&b, "$TTL %d\n\n", 300)
+
+	b.WriteString(types.String(&z.SOA, "@"))
+	b.WriteString("\n")
+	start := 0
+	for {
+		ls, err := h.db.GetLocations(userId, z.Name, start, 10, "", true)
+		if err != nil {
+			handlers.ErrorResponse(handlers.StatusFromError(c, err))
+			return
+		}
+		if len(ls.Items) == 0 {
+			break
+		}
+		for _, l := range ls.Items {
+			_, err := h.db.GetLocation(userId, z.Name, l.Id)
+			if errors.Is(err, database.ErrInvalid) {
+				continue
+			}
+			if l.Enabled {
+				rs, err := h.db.GetRecordSets(userId, z.Name, l.Id)
+				if err != nil {
+					handlers.ErrorResponse(handlers.StatusFromError(c, err))
+					return
+				}
+				for _, r := range rs.Items {
+					s, err := h.db.GetRecordSet(userId, z.Name, l.Id, r.Id)
+					if errors.Is(err, database.ErrInvalid) {
+						continue
+					}
+					if err != nil {
+						handlers.ErrorResponse(handlers.StatusFromError(c, err))
+						return
+					}
+					b.WriteString(types.String(s.Value, l.Id))
+					b.WriteString("\n")
+				}
+			}
+		}
+		start += len(ls.Items)
+	}
+	downloadName := z.Name + time.Now().UTC().Format("20060102150405.zone")
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Disposition", "attachment; filename="+downloadName)
+	c.Data(http.StatusOK, "text/plain", []byte(b.String()))
+}
+
 func extractUser(c *gin.Context) database.ObjectId {
 	user, _ := c.Get(handlers.IdentityKey)
 	return user.(*handlers.IdentityData).Id
 }
 
 func rtypeValid(rtype string) bool {
-	_, ok := types.SupportedTypes[rtype]
-	return ok
+	return types.IsSupported(types.StringToType(rtype))
 }

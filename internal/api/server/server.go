@@ -19,6 +19,7 @@ type Config struct {
 	BindAddress        string `json:"bind_address,default:localhost:8080"`
 	ReadTimeout        int    `json:"read_timeout,default:10"`
 	WriteTimeout       int    `json:"write_timeout,default:10"`
+	MaxBodyBytes       int64  `json:"max_body_size,default:1000000"`
 	WebServer          string `json:"web_server"`
 	ApiServer          string `json:"api_server"`
 	NameServer         string `json:"name_server"`
@@ -40,7 +41,14 @@ func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer, acce
 		handlers.ErrorResponse(c, http.StatusInternalServerError, err.(string), nil)
 		c.Abort()
 	}
+	bodySizeMiddleware := func(c *gin.Context) {
+		var w http.ResponseWriter = c.Writer
+		c.Request.Body = http.MaxBytesReader(w, c.Request.Body, config.MaxBodyBytes)
+
+		c.Next()
+	}
 	router.Use(gin.CustomRecovery(handleRecovery))
+	router.Use(bodySizeMiddleware)
 	router.Use(logger.MiddlewareFunc(accessLogger))
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,14 +9,19 @@ import (
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/api/handlers/recaptcha"
 	"github.com/hawell/z42/internal/api/handlers/zone"
+	"github.com/hawell/z42/internal/dnssec"
 	"github.com/hawell/z42/internal/mailer"
 	"github.com/hawell/z42/internal/types"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/miekg/dns"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +32,7 @@ var (
 		BindAddress:        "localhost:8080",
 		ReadTimeout:        10,
 		WriteTimeout:       10,
+		MaxBodyBytes:       1000000,
 		WebServer:          "z42.com",
 		ApiServer:          "api.z42.com",
 		NameServer:         "ns.z42.com.",
@@ -201,29 +208,19 @@ func TestGetZone(t *testing.T) {
 	body, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	var response handlers.Response
+	response.Data = &database.Zone{}
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(body).To(MatchJSON(`{
-		"code": 200,
-	  	"message": "successful",
-	  	"data": {
-			"name":             "zone1.com.",
-			"enabled":          true,
-			"dnssec":           false,
-			"cname_flattening": false,
-			"soa": {
-				"ttl": 300,
-				"ns": "ns1.example.com.",
-				"mbox": "admin.example.com.",
-				"refresh": 44,
-				"retry": 55,
-				"expire": 66,
-				"minttl": 100,
-				"serial": 123456
-			},
-			"ds": ""
-		}
-	}`))
+	Expect(response.Data.(*database.Zone).DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	response.Data.(*database.Zone).DS = ""
+	Expect(response.Data).To(Equal(&database.Zone{
+		Name:            zone1Name,
+		Enabled:         true,
+		Dnssec:          false,
+		CNameFlattening: false,
+		SOA:             *types.DefaultSOA(zone1Name),
+		DS:              "",
+	}))
 
 	// non-existing zone
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+"invalid.none.", "")
@@ -248,20 +245,31 @@ func TestUpdateZone(t *testing.T) {
 	respBody, err := ioutil.ReadAll(resp.Body)
 	Expect(err).To(BeNil())
 	var response handlers.Response
+	response.Data = &database.Zone{}
 	err = json.Unmarshal(respBody, &response)
 	Expect(err).To(BeNil())
-	Expect(respBody).To(MatchJSON(`{
-		"code": 200,
-		"message": "successful",
-		"data": {
-			"name":             "zone1.com.",
-			"enabled":          true,
-			"dnssec":           true,
-			"cname_flattening": false,
-			"soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123457},
-			"ds": ""
-		}
-	}`))
+	err = json.Unmarshal(respBody, &response)
+	Expect(err).To(BeNil())
+	Expect(response.Data.(*database.Zone).DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	response.Data.(*database.Zone).DS = ""
+	Expect(response.Data).To(Equal(&database.Zone{
+		Name:            zone1Name,
+		Enabled:         true,
+		Dnssec:          true,
+		CNameFlattening: false,
+		SOA: types.SOA_RRSet{
+			GenericRRSet: types.GenericRRSet{TtlValue: 300},
+			Ns:           "ns1.example.com.",
+			MBox:         "admin.example.com.",
+			Data:         nil,
+			Refresh:      44,
+			Retry:        55,
+			Expire:       66,
+			MinTtl:       100,
+			Serial:       types.DefaultSOA(zone1Name).Serial + 1,
+		},
+		DS: "",
+	}))
 
 	// non-existing zone
 	resp = execRequest(users[0].Id, http.MethodPut, "/zones/"+"invalid.none.", `{"enabled": true, "dnssec":true, "cname_flattening": false}`)
@@ -789,7 +797,7 @@ func TestGetRecordSetWithEmptyRecords(t *testing.T) {
 		{"ds", `{"code":200,"message":"successful","data":{"value":{"ttl":0,"records":[]},"enabled":true}}`},
 	}
 	for _, r := range recordsets {
-		v := types.TypeToRRSet[r.Type]()
+		v := types.TypeStrToRRSet(r.Type)
 		_, err = addRecordSet(users[0].Id, zone1Name, location1, r.Type, v)
 		Expect(err).To(BeNil())
 		resp := execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations/"+location1+"/rrsets/"+r.Type, "")
@@ -989,6 +997,131 @@ func TestReset(t *testing.T) {
 	Expect(err).To(BeNil())
 }
 
+func TestExportZone(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+
+	path := "/zones/zone1.com./export"
+	resp := execRequest(users[0].Id, http.MethodGet, path, "")
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	b, err := ioutil.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+
+	z, err := db.GetZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+	Expect(z.DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	z.DS = ""
+	Expect(z).To(Equal(database.Zone{
+		Id:              z.Id,
+		Name:            zone1Name,
+		Enabled:         true,
+		Dnssec:          false,
+		CNameFlattening: false,
+		SOA:             *types.DefaultSOA(zone1Name),
+	}))
+	rr, err := db.GetRecordSet(users[0].Id, zone1Name, "@", "ns")
+	Expect(err).To(BeNil())
+	ns := rr.Value.(*types.NS_RRSet)
+	Expect(len(ns.Data)).To(Equal(2))
+	Expect(ns.TtlValue).To(Equal(uint32(3600)))
+	for i := range ns.Data {
+		Expect(ns.Data[i].Host).To(MatchRegexp(`.*\.ns\.z42.com\.`))
+	}
+
+	parser := dns.NewZoneParser(strings.NewReader(string(b)), "", "")
+	parser.SetIncludeAllowed(false)
+	for fileRR, ok := parser.Next(); ok; fileRR, ok = parser.Next() {
+		if fileRR.Header().Rrtype == dns.TypeSOA || (fileRR.Header().Rrtype == dns.TypeNS && fileRR.Header().Name == zone1Name) {
+			continue
+		}
+		var label string
+		if fileRR.Header().Name == zone1Name {
+			label = "@"
+		} else {
+			label = strings.TrimSuffix(fileRR.Header().Name, "."+zone1Name)
+		}
+		dbRRset, err := db.GetRecordSet(users[0].Id, zone1Name, label, types.TypeToString(fileRR.Header().Rrtype))
+		Expect(err).To(BeNil())
+		dbRRs := dbRRset.Value.Value(fileRR.Header().Name)
+		Expect(fileRR).To(BeElementOf(dbRRs))
+	}
+}
+
+func TestImportZone(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	file := "testdata/" + zone1Name
+	f, err := os.Open(file)
+	Expect(err).To(BeNil())
+	fw, err := w.CreateFormFile("file", file)
+	Expect(err).To(BeNil())
+	_, err = io.Copy(fw, f)
+	Expect(err).To(BeNil())
+	err = w.Close()
+	Expect(err).To(BeNil())
+	url := generateURL("/zones/" + zone1Name + "/import")
+	req, err := http.NewRequest("POST", url, &b)
+	Expect(err).To(BeNil())
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+tokens[users[0].Id])
+	resp, err := client.Do(req)
+	Expect(err).To(BeNil())
+	err = f.Close()
+	Expect(err).To(BeNil())
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	respBody, err := ioutil.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+	Expect(string(respBody)).To(MatchJSON(`{"code":200,"message":"successful"}`), string(respBody))
+
+	z, err := db.GetZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+	Expect(z.DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	z.DS = ""
+	Expect(z).To(Equal(database.Zone{
+		Id:              z.Id,
+		Name:            zone1Name,
+		Enabled:         true,
+		Dnssec:          false,
+		CNameFlattening: false,
+		SOA:             *types.DefaultSOA(zone1Name),
+	}))
+	rr, err := db.GetRecordSet(users[0].Id, zone1Name, "@", "ns")
+	Expect(err).To(BeNil())
+	ns := rr.Value.(*types.NS_RRSet)
+	Expect(len(ns.Data)).To(Equal(2))
+	Expect(ns.TtlValue).To(Equal(uint32(3600)))
+	for i := range ns.Data {
+		Expect(ns.Data[i].Host).To(MatchRegexp(`.*\.ns\.z42.com\.`))
+	}
+
+	f, err = os.Open(file)
+	Expect(err).To(BeNil())
+	parser := dns.NewZoneParser(f, "", "")
+	parser.SetIncludeAllowed(false)
+	for fileRR, ok := parser.Next(); ok; fileRR, ok = parser.Next() {
+		if fileRR.Header().Rrtype == dns.TypeSOA || (fileRR.Header().Rrtype == dns.TypeNS && fileRR.Header().Name == zone1Name) {
+			continue
+		}
+		var label string
+		if fileRR.Header().Name == zone1Name {
+			label = "@"
+		} else {
+			label = strings.TrimSuffix(fileRR.Header().Name, "."+zone1Name)
+		}
+		dbRRset, err := db.GetRecordSet(users[0].Id, zone1Name, label, types.TypeToString(fileRR.Header().Rrtype))
+		Expect(err).To(BeNil())
+		dbRRs := dbRRset.Value.Value(fileRR.Header().Name)
+		Expect(fileRR).To(BeElementOf(dbRRs))
+	}
+}
+
 func TestMain(m *testing.M) {
 	recaptchaServer.HandlerFunc = func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
@@ -1084,6 +1217,7 @@ func login(user string, password string) (string, error) {
 		return "", err
 	}
 	if loginResp["code"].(float64) != 200 {
+		fmt.Println(loginResp)
 		return "", errors.New("login failed")
 	}
 	return loginResp["token"].(string), nil
@@ -1096,24 +1230,15 @@ func initialize(t *testing.T) {
 }
 
 func addZone(userId database.ObjectId, zone string) (database.ObjectId, error) {
-	SOA := types.SOA_RRSet{
-		GenericRRSet: types.GenericRRSet{TtlValue: 300},
-		Ns:           "ns1.example.com.",
-		MBox:         "admin.example.com.",
-		Refresh:      44,
-		Retry:        55,
-		Expire:       66,
-		MinTtl:       100,
-		Serial:       123456,
-	}
-	NS := types.NS_RRSet{
-		GenericRRSet: types.GenericRRSet{TtlValue: 3600},
-		Data: []types.NS_RR{
-			{Host: "ns1.example.com."},
-			{Host: "ns2.example.com."},
-		},
-	}
-	return db.AddZone(userId, database.NewZone{Name: zone, Enabled: true, SOA: SOA, NS: NS})
+	Keys, err := dnssec.GenerateKeys(zone)
+	Expect(err).To(BeNil())
+	return db.AddZone(userId, database.NewZone{
+		Name:    zone,
+		Enabled: true,
+		SOA:     *types.DefaultSOA(zone),
+		Keys:    Keys,
+		NS:      *types.GenerateNS(serverConfig.NameServer),
+	})
 }
 
 func addLocation(userId database.ObjectId, zoneName string, location string) (database.ObjectId, error) {

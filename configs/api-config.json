@@ -10,6 +10,7 @@
   },
   "server": {
     "bind_address": "localhost:3000",
+    "max_body_size": 1000000,
     "web_server": "www.z42.com",
     "api_server": "api.z42.com",
     "name_server": "ns.z42.com.",

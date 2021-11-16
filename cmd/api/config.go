@@ -31,6 +31,7 @@ var apiDefaultConfig = &Config{
 		BindAddress:        "localhost:8080",
 		ReadTimeout:        10,
 		WriteTimeout:       10,
+		MaxBodyBytes:       1000000,
 		WebServer:          "www.z42.com",
 		ApiServer:          "api.z42.com",
 		NameServer:         "ns.z42.com.",

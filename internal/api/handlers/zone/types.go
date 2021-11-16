@@ -70,14 +70,14 @@ func (r *NewRecordSetRequest) UnmarshalJSON(data []byte) error {
 	if err := jsoniter.Unmarshal(data, &dat); err != nil {
 		return err
 	}
-	value := types.TypeToRRSet[dat.Type]
+	value := types.TypeStrToRRSet(dat.Type)
 	if value == nil {
 		return errors.New("invalid record type")
 	}
 	val := struct {
 		Value types.RRSet `json:"value"`
 	}{
-		Value: value(),
+		Value: value,
 	}
 	if err := jsoniter.Unmarshal(data, &val); err != nil {
 		return err

@@ -180,7 +180,7 @@ DROP TABLE IF EXISTS `z42`.`Events` ;
 CREATE TABLE IF NOT EXISTS `z42`.`Events` (
                                               `Revision` INT NOT NULL AUTO_INCREMENT,
                                               `ZoneId` CHAR(36) NOT NULL,
-                                              `Type` ENUM('add_zone', 'update_zone', 'delete_zone', 'add_location', 'update_location', 'delete_location', 'add_record', 'update_record', 'delete_record') NOT NULL,
+                                              `Type` ENUM('add_zone', 'update_zone', 'delete_zone', 'import_zone', 'add_location', 'update_location', 'delete_location', 'add_record', 'update_record', 'delete_record') NOT NULL,
                                               `Value` JSON NULL,
                                               PRIMARY KEY (`Revision`),
                                               INDEX `zone_id` (`ZoneId` ASC) VISIBLE)

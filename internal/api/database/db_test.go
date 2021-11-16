@@ -2,6 +2,7 @@ package database
 
 import (
 	"github.com/hawell/z42/internal/types"
+	"github.com/miekg/dns"
 	. "github.com/onsi/gomega"
 	"net"
 	"testing"
@@ -884,7 +885,7 @@ func TestEvent(t *testing.T) {
 			Revision: 1,
 			ZoneId:   string(zoneId),
 			Type:     AddZone,
-			Value:    `{"ns": {"ttl": 3600, "records": [{"host": "ns1.example.com."}, {"host": "ns2.example.com."}]}, "soa": {"ns": "ns1.example.com.", "ttl": 3600, "mbox": "admin.example.com.", "retry": 55, "expire": 66, "minttl": 100, "serial": 123456, "refresh": 44}, "name": "example.com.", "dnssec": false, "enabled": true, "cname_flattening": false}`,
+			Value:    `{"ns": {"ttl": 3600, "records": [{"host": "ns1.example.com."}, {"host": "ns2.example.com."}]}, "soa": {"ns": "ns1.example.com.", "ttl": 3600, "mbox": "admin.example.com.", "retry": 55, "expire": 66, "minttl": 100, "serial": 123456, "refresh": 44}, "keys": {"DS": "", "KSKPublic": "", "ZSKPublic": "", "KSKPrivate": "", "ZSKPrivate": ""}, "name": "example.com.", "dnssec": false, "enabled": true, "cname_flattening": false}`,
 		},
 		{
 			Revision: 2,
@@ -899,6 +900,64 @@ func TestEvent(t *testing.T) {
 			Value:    `{"type": "a", "value": {"ttl": 300, "filter": {}, "records": [{"ip": "1.2.3.4"}], "health_check": {}}, "enabled": true, "location": "www", "zone_name": "example.com."}`,
 		},
 	}))
+}
+
+func TestImportZone(t *testing.T) {
+	RegisterTestingT(t)
+	err := db.Clear(true)
+	Expect(err).To(BeNil())
+	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
+	Expect(err).To(BeNil())
+	_, err = db.AddZone(user1Id, NewZone{Name: "example1.com.", Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
+	Expect(err).To(BeNil())
+	zoneImport := ZoneImport{
+		Name: "example1.com.",
+		Entries: map[string]map[string]types.RRSet{
+			"@": {
+				types.TypeToString(dns.TypeNS): &types.NS_RRSet{
+					GenericRRSet: types.GenericRRSet{TtlValue: 300},
+					Data:         []types.NS_RR{{Host: "ns11.example1.com."}, {Host: "ns22.example11.com."}},
+				},
+				types.TypeToString(dns.TypeA): &types.IP_RRSet{
+					GenericRRSet:      types.GenericRRSet{TtlValue: 300},
+					FilterConfig:      types.IpFilterConfig{},
+					HealthCheckConfig: types.IpHealthCheckConfig{},
+					Data:              []types.IP_RR{{Ip: net.ParseIP("1.2.3.4")}, {Ip: net.ParseIP("2.3.4.5")}},
+				},
+			},
+			"www": {
+				types.TypeToString(dns.TypeA): &types.IP_RRSet{
+					GenericRRSet:      types.GenericRRSet{TtlValue: 300},
+					FilterConfig:      types.IpFilterConfig{},
+					HealthCheckConfig: types.IpHealthCheckConfig{},
+					Data:              []types.IP_RR{{Ip: net.ParseIP("1.2.3.4")}, {Ip: net.ParseIP("2.3.4.5")}},
+				},
+				types.TypeToString(dns.TypeTXT): &types.TXT_RRSet{
+					GenericRRSet: types.GenericRRSet{TtlValue: 300},
+					Data:         []types.TXT_RR{{Text: "1234"}, {Text: "hello"}, {Text: "foo bar"}},
+				},
+			},
+			"a": {
+				types.TypeToString(dns.TypeCNAME): &types.CNAME_RRSet{
+					GenericRRSet: types.GenericRRSet{TtlValue: 300},
+					Host:         "example1.com.",
+				},
+			},
+		},
+	}
+
+	err = db.ImportZone(user1Id, zoneImport)
+	Expect(err).To(BeNil())
+	for label, location := range zoneImport.Entries {
+		_, err = db.GetLocation(user1Id, "example1.com.", label)
+		Expect(err).To(BeNil())
+
+		for rtype, rrset := range location {
+			rr, err := db.GetRecordSet(user1Id, "example1.com.", label, rtype)
+			Expect(err).To(BeNil())
+			Expect(rr.Value).To(Equal(rrset))
+		}
+	}
 }
 
 func TestMain(m *testing.M) {
