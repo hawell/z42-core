@@ -2435,7 +2435,6 @@ var handlerTestCases = []*TestCase{
 					return nil, err
 				}
 			}
-			h.RedisData.LoadZones()
 			time.Sleep(time.Second)
 			return h, nil
 		},

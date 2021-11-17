@@ -87,22 +87,19 @@ func (db *DataBase) Clear(removeUsers bool) error {
 }
 
 func (db *DataBase) AddUser(u NewUser) (ObjectId, string, error) {
-	var err error
-	userId := EmptyObjectId
-	var code string
+	hash, err := HashPassword(u.Password)
+	if err != nil {
+		return EmptyObjectId, "", err
+	}
+	userId := NewObjectId()
+	code := randomString(50)
 	err = db.withTransaction(func(t *sql.Tx) error {
-		hash, err := HashPassword(u.Password)
-		if err != nil {
-			return err
-		}
-		userId = NewObjectId()
 		_, err = t.Exec("INSERT INTO User(Id, Email, Password, Status) VALUES (?, ?, ?, ?)", userId, u.Email, hash, u.Status)
 		if err != nil {
 			return err
 		}
 
 		if u.Status == UserStatusPending {
-			code = randomString(50)
 			_, err = t.Exec("REPLACE INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeSignup, userId)
 			if err != nil {
 				return err
@@ -130,11 +127,11 @@ func (db *DataBase) SetRecoveryCode(userId ObjectId) (string, error) {
 }
 
 func (db *DataBase) ResetPassword(code string, newPassword string) error {
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
 	return db.applyVerifiedAction(code, VerificationTypeRecover, func(t *sql.Tx, userId string) error {
-		hash, err := HashPassword(newPassword)
-		if err != nil {
-			return err
-		}
 		_, err = t.Exec("UPDATE User SET Password = ? WHERE Id = ?", hash, userId)
 		return err
 	})

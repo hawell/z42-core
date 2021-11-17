@@ -12,18 +12,20 @@ import (
 	"github.com/hawell/z42/pkg/hiredis"
 	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
+	"github.com/tevino/abool/v2"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type DataHandler struct {
 	config         *DataHandlerConfig
 	redis          *hiredis.Redis
-	zones          *iradix.Tree
+	zones          atomic.Value
 	lastZoneUpdate time.Time
 	recordCache    *ristretto.Cache
 	recordInflight *singleflight.Group
@@ -44,11 +46,11 @@ func NewDataHandler(config *DataHandlerConfig) *DataHandler {
 	dh := &DataHandler{
 		config:         config,
 		redis:          hiredis.NewRedis(&config.Redis),
-		zones:          iradix.New(),
 		recordInflight: new(singleflight.Group),
 		zoneInflight:   new(singleflight.Group),
 		quit:           make(chan struct{}),
 	}
+	dh.zones.Store(iradix.New())
 	dh.zoneCache, _ = ristretto.NewCache(&ristretto.Config{
 		NumCounters: int64(config.ZoneCacheSize) * 10,
 		MaxCost:     int64(config.ZoneCacheSize),
@@ -72,11 +74,11 @@ func (dh *DataHandler) Start() {
 		zap.L().Debug("zone updater")
 		dh.quitWG.Add(1)
 		zoneListQuitChan := make(chan *sync.WaitGroup, 1)
-		modified := false
+		modified := abool.New()
 		go dh.redis.SubscribeEvent(zonesKey, func() {
-			modified = true
+			modified.Set()
 		}, func(channel string, data string) {
-			modified = true
+			modified.Set()
 		}, func(err error) {
 			zap.L().Error("error", zap.Error(err))
 		}, zoneListQuitChan)
@@ -108,13 +110,14 @@ func (dh *DataHandler) Start() {
 				zonesQuitChan <- &dh.quitWG
 				return
 			case <-reloadTicker.C:
-				if modified {
+				// TODO: fix race
+				if modified.IsSet() {
 					zap.L().Debug("loading zones")
 					dh.LoadZones()
-					modified = false
+					modified.UnSet()
 				}
 			case <-forceReloadTicker.C:
-				modified = true
+				modified.Set()
 			}
 		}
 	}()
@@ -181,7 +184,7 @@ func (dh *DataHandler) LoadZones() {
 	for _, zone := range zones {
 		newZones, _, _ = newZones.Insert(types.ReverseName(zone), zone)
 	}
-	dh.zones = newZones
+	dh.zones.Store(newZones)
 }
 
 func (dh *DataHandler) EnableZone(zone string) error {
@@ -197,7 +200,8 @@ func (dh *DataHandler) DisableZone(zone string) error {
 
 func (dh *DataHandler) FindZone(qname string) string {
 	rname := types.ReverseName(qname)
-	if _, zname, ok := dh.zones.Root().LongestPrefix(rname); ok {
+	zones := dh.zones.Load().(*iradix.Tree)
+	if _, zname, ok := zones.Root().LongestPrefix(rname); ok {
 		return zname.(string)
 	}
 	return ""

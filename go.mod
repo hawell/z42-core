@@ -19,6 +19,7 @@ require (
 	github.com/oschwald/maxminddb-golang v1.8.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
+	github.com/tevino/abool/v2 v2.0.1
 	go.uber.org/zap v1.19.1
 	golang.org/x/crypto v0.0.0-20211115234514-b4de73f9ece8
 	golang.org/x/net v0.0.0-20211116231205-47ca1ff31462
