@@ -1253,6 +1253,7 @@ func execRequest(userId database.ObjectId, method string, path string, body stri
 	url := generateURL(path)
 	reqBody := strings.NewReader(body)
 	req, err := http.NewRequest(method, url, reqBody)
+	req.Close = true
 	Expect(err).To(BeNil())
 	req.Header.Add("Content-Type", "application/json")
 	if userId != "" {
