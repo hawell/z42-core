@@ -16,14 +16,6 @@ type RateLimiter struct {
 	BlackList map[string]interface{}
 }
 
-type Config struct {
-	Enable    bool     `json:"enable"`
-	Burst     int      `json:"burst"`
-	Rate      int      `json:"rate"`
-	WhiteList []string `json:"whitelist"`
-	BlackList []string `json:"blacklist"`
-}
-
 func NewRateLimiter(config *Config) *RateLimiter {
 	rl := &RateLimiter{
 		Config: config,

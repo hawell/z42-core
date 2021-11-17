@@ -2,29 +2,29 @@ package main
 
 import (
 	"flag"
-	"github.com/hawell/z42/internal/handler"
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/server"
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/pkg/ratelimit"
-	"github.com/json-iterator/go"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/hawell/z42/internal/logger"
+	"github.com/hawell/z42/internal/resolver"
+	"github.com/hawell/z42/internal/server"
+	"github.com/hawell/z42/internal/storage"
+	"github.com/hawell/z42/pkg/ratelimit"
+	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
-	_ "net/http/pprof"
+	"go.uber.org/zap"
 )
 
 var (
 	servers           []*dns.Server
 	redisDataHandler  *storage.DataHandler
 	redisStatHandler  *storage.StatHandler
-	dnsRequestHandler *handler.DnsRequestHandler
+	dnsRequestHandler *resolver.DnsRequestHandler
 	rateLimiter       *ratelimit.RateLimiter
 	configFile        string
 	accessLogger      *zap.Logger
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	if flagset["g"] {
-		data, err := jsoniter.MarshalIndent(resolverDefaultConfig, "", "  ")
+		data, err := jsoniter.MarshalIndent(DefaultConfig(), "", "  ")
 		if err != nil {
 			log.Println("cannot unmarshal template config : ", err)
 			return
@@ -81,7 +81,7 @@ func main() {
 }
 
 func handleRequest(w dns.ResponseWriter, r *dns.Msg) {
-	context := handler.NewRequestContext(w, r)
+	context := resolver.NewRequestContext(w, r)
 	zap.L().Debug(
 		"handle request",
 		zap.Uint16("id", r.Id),
@@ -105,11 +105,11 @@ func Start() {
 	}
 
 	log.Printf("[INFO] loading logger...")
-	accessLogger, err = logger.NewLogger(cfg.AccessLog)
+	accessLogger, err = logger.NewLogger(&cfg.AccessLog)
 	if err != nil {
 		panic(err)
 	}
-	eventLogger, err = logger.NewLogger(cfg.EventLog)
+	eventLogger, err = logger.NewLogger(&cfg.EventLog)
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +123,7 @@ func Start() {
 	redisStatHandler = storage.NewStatHandler(&cfg.RedisStat)
 
 	eventLogger.Info("starting handler...")
-	dnsRequestHandler = handler.NewHandler(&cfg.Handler, redisDataHandler, accessLogger)
+	dnsRequestHandler = resolver.NewHandler(&cfg.Handler, redisDataHandler, accessLogger)
 	eventLogger.Info("handler started")
 
 	rateLimiter = ratelimit.NewRateLimiter(&cfg.RateLimit)

@@ -1,4 +1,4 @@
-package handler
+package resolver
 
 import (
 	"github.com/hawell/z42/internal/geotools"
@@ -18,7 +18,7 @@ import (
 )
 
 type DnsRequestHandler struct {
-	Config        *DnsRequestHandlerConfig
+	Config        *Config
 	RedisData     *storage.DataHandler
 	requestLogger *zap.Logger
 	geoip         *geoip.GeoIp
@@ -27,13 +27,7 @@ type DnsRequestHandler struct {
 	quitWG        sync.WaitGroup
 }
 
-type DnsRequestHandlerConfig struct {
-	Upstream          []upstream.Config `json:"upstream"`
-	GeoIp             geoip.Config      `json:"geoip"`
-	LogSourceLocation bool              `json:"log_source_location"`
-}
-
-func NewHandler(config *DnsRequestHandlerConfig, redisData *storage.DataHandler, requestLogger *zap.Logger) *DnsRequestHandler {
+func NewHandler(config *Config, redisData *storage.DataHandler, requestLogger *zap.Logger) *DnsRequestHandler {
 	h := &DnsRequestHandler{
 		Config:        config,
 		RedisData:     redisData,

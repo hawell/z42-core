@@ -15,10 +15,6 @@ const (
 	cacheSize = 100000
 )
 
-type StatHandlerConfig struct {
-	Redis hiredis.Config `json:"redis"`
-}
-
 type StatHandler struct {
 	redis  *hiredis.Redis
 	cache  *ristretto.Cache

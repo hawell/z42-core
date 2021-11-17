@@ -39,7 +39,7 @@ func main() {
 	}
 
 	if flagset["g"] {
-		data, err := jsoniter.MarshalIndent(healthcheckerDefaultConfig, "", "  ")
+		data, err := jsoniter.MarshalIndent(DefaultConfig(), "", "  ")
 		if err != nil {
 			fmt.Println("cannot unmarshal template config : ", err)
 			return
@@ -77,11 +77,11 @@ func Start() {
 	cfg, _ := LoadConfig(configFile)
 
 	log.Printf("[INFO] loading logger...")
-	accessLogger, err := logger.NewLogger(cfg.AccessLog)
+	accessLogger, err := logger.NewLogger(&cfg.AccessLog)
 	if err != nil {
 		panic(err)
 	}
-	eventLogger, err := logger.NewLogger(cfg.EventLog)
+	eventLogger, err := logger.NewLogger(&cfg.EventLog)
 	if err != nil {
 		panic(err)
 	}

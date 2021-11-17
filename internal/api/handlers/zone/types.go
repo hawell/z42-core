@@ -21,9 +21,9 @@ type ListResponse []ListResponseItem
 
 type NewZoneRequest struct {
 	Name            string `json:"name" binding:"required"`
-	Enabled         bool   `json:"enabled,default:true"`
-	Dnssec          bool   `json:"dnssec,default:false"`
-	CNameFlattening bool   `json:"cname_flattening,default:false"`
+	Enabled         bool   `json:"enabled"`
+	Dnssec          bool   `json:"dnssec"`
+	CNameFlattening bool   `json:"cname_flattening"`
 }
 
 type GetZoneResponse struct {
@@ -36,15 +36,15 @@ type GetZoneResponse struct {
 }
 
 type UpdateZoneRequest struct {
-	Enabled         bool            `json:"enabled,default:true"`
-	Dnssec          bool            `json:"dnssec,default:false"`
-	CNameFlattening bool            `json:"cname_flattening,default:false"`
+	Enabled         bool            `json:"enabled"`
+	Dnssec          bool            `json:"dnssec"`
+	CNameFlattening bool            `json:"cname_flattening"`
 	SOA             types.SOA_RRSet `json:"soa"`
 }
 
 type NewLocationRequest struct {
 	Name    string `json:"name" binding:"required"`
-	Enabled bool   `json:"enabled,default:true"`
+	Enabled bool   `json:"enabled"`
 }
 
 type GetLocationResponse struct {
@@ -53,19 +53,19 @@ type GetLocationResponse struct {
 }
 
 type UpdateLocationRequest struct {
-	Enabled bool `json:"enabled,default=true"`
+	Enabled bool `json:"enabled"`
 }
 
 type NewRecordSetRequest struct {
 	Type    string      `json:"type" binding:"required"`
 	Value   types.RRSet `json:"value" binding:"required"`
-	Enabled bool        `json:"enabled,default=true"`
+	Enabled bool        `json:"enabled"`
 }
 
 func (r *NewRecordSetRequest) UnmarshalJSON(data []byte) error {
 	var dat struct {
 		Type    string `json:"type"`
-		Enabled bool   `json:"enabled,default=true"`
+		Enabled bool   `json:"enabled"`
 	}
 	if err := jsoniter.Unmarshal(data, &dat); err != nil {
 		return err
@@ -95,5 +95,5 @@ type GetRecordSetResponse struct {
 
 type UpdateRecordSetRequest struct {
 	Value   types.RRSet `json:"value" binding:"required"`
-	Enabled bool        `json:"enabled,default=true"`
+	Enabled bool        `json:"enabled"`
 }

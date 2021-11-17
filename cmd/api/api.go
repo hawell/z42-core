@@ -20,7 +20,7 @@ func main() {
 		panic(err)
 	}
 
-	eventLogger, err := logger.NewLogger(config.EventLog)
+	eventLogger, err := logger.NewLogger(&config.EventLog)
 	if err != nil {
 		panic(err)
 	}
@@ -32,18 +32,18 @@ func main() {
 		panic(err)
 	}
 
-	m, err := mailer.NewSMTP(config.MailerConfig)
+	m, err := mailer.NewSMTP(&config.MailerConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	accessLogger, err := logger.NewLogger(config.AccessLog)
+	accessLogger, err := logger.NewLogger(&config.AccessLog)
 	if err != nil {
 		panic(err)
 	}
 
 	gin.SetMode(gin.ReleaseMode)
-	s := server.NewServer(config.ServerConfig, db, m, accessLogger)
+	s := server.NewServer(&config.ServerConfig, db, m, accessLogger)
 	err = s.ListenAndServer()
 	fmt.Println(err)
 }

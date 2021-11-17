@@ -16,16 +16,31 @@ import (
 )
 
 type Config struct {
-	BindAddress        string `json:"bind_address,default:localhost:8080"`
-	ReadTimeout        int    `json:"read_timeout,default:10"`
-	WriteTimeout       int    `json:"write_timeout,default:10"`
-	MaxBodyBytes       int64  `json:"max_body_size,default:1000000"`
+	BindAddress        string `json:"bind_address"`
+	ReadTimeout        int    `json:"read_timeout"`
+	WriteTimeout       int    `json:"write_timeout"`
+	MaxBodyBytes       int64  `json:"max_body_size"`
 	WebServer          string `json:"web_server"`
 	ApiServer          string `json:"api_server"`
 	NameServer         string `json:"name_server"`
 	HtmlTemplates      string `json:"html_templates"`
 	RecaptchaSecretKey string `json:"recaptcha_secret_key"`
 	RecaptchaServer    string `json:"recaptcha_server"`
+}
+
+func DefaultConfig() Config {
+	return Config{
+		BindAddress:        "localhost:8080",
+		ReadTimeout:        10,
+		WriteTimeout:       10,
+		MaxBodyBytes:       1000000,
+		WebServer:          "www.z42.com",
+		ApiServer:          "api.z42.com",
+		NameServer:         "ns.z42.com.",
+		HtmlTemplates:      "./templates/*.tmpl",
+		RecaptchaSecretKey: "RECAPTCHA_SECRET_KEY",
+		RecaptchaServer:    "https://www.google.com/recaptcha/api/siteverify",
+	}
 }
 
 type Server struct {

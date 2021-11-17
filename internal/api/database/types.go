@@ -144,7 +144,7 @@ func (r *NewRecordSet) UnmarshalJSON(data []byte) error {
 		ZoneName string `json:"zone_name"`
 		Location string `json:"location"`
 		Type     string `json:"type"`
-		Enabled  bool   `json:"enabled,default=true"`
+		Enabled  bool   `json:"enabled"`
 	}
 	if err := jsoniter.Unmarshal(data, &dat); err != nil {
 		return err
@@ -182,7 +182,7 @@ func (r *RecordSetUpdate) UnmarshalJSON(data []byte) error {
 		ZoneName string `json:"zone_name"`
 		Location string `json:"location"`
 		Type     string `json:"type"`
-		Enabled  bool   `json:"enabled,default=true"`
+		Enabled  bool   `json:"enabled"`
 	}
 	if err := jsoniter.Unmarshal(data, &dat); err != nil {
 		return err

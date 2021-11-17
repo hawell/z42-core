@@ -19,7 +19,7 @@ func main() {
 		panic(err)
 	}
 
-	eventLogger, err := logger.NewLogger(config.EventLog)
+	eventLogger, err := logger.NewLogger(&config.EventLog)
 	if err != nil {
 		panic(err)
 	}
@@ -30,7 +30,7 @@ func main() {
 		zap.L().Fatal("database connection failed", zap.Error(err))
 	}
 
-	dh := storage.NewDataHandler(config.RedisData)
+	dh := storage.NewDataHandler(&config.RedisData)
 
 	for {
 		revision, err := dh.GetRevision()

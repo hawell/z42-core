@@ -1,4 +1,4 @@
-package handler
+package resolver
 
 import (
 	"github.com/hawell/z42/internal/types"

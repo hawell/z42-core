@@ -10,53 +10,30 @@ import (
 )
 
 type Config struct {
-	DBConnectionString string         `json:"db_connection_string"`
-	EventLog           *logger.Config `json:"event_log"`
-	AccessLog          *logger.Config `json:"access_log"`
-	ServerConfig       *server.Config `json:"server"`
-	MailerConfig       *mailer.Config `json:"mailer"`
+	DBConnectionString string        `json:"db_connection_string"`
+	EventLog           logger.Config `json:"event_log"`
+	AccessLog          logger.Config `json:"access_log"`
+	ServerConfig       server.Config `json:"server"`
+	MailerConfig       mailer.Config `json:"mailer"`
 }
 
-var apiDefaultConfig = &Config{
-	DBConnectionString: "root:root@tcp(127.0.0.1:3306)/z42",
-	AccessLog: &logger.Config{
-		Level:       "info",
-		Destination: "stdout",
-	},
-	EventLog: &logger.Config{
-		Level:       "error",
-		Destination: "stderr",
-	},
-	ServerConfig: &server.Config{
-		BindAddress:        "localhost:8080",
-		ReadTimeout:        10,
-		WriteTimeout:       10,
-		MaxBodyBytes:       1000000,
-		WebServer:          "www.z42.com",
-		ApiServer:          "api.z42.com",
-		NameServer:         "ns.z42.com.",
-		HtmlTemplates:      "./templates/*.tmpl",
-		RecaptchaSecretKey: "RECAPTCHA_SECRET_KEY",
-		RecaptchaServer:    "https://www.google.com/recaptcha/api/siteverify",
-	},
-	MailerConfig: &mailer.Config{
-		Address:       "127.0.0.1:25",
-		FromName:      "z42",
-		FromEmail:     "noreply@z42.com",
-		WebServer:     "www.z42.com",
-		ApiServer:     "api.z42.com",
-		NameServer:    "ns.z42.com.",
-		HtmlTemplates: "./templates/*.tmpl",
-	},
+func DefaultConfig() Config {
+	return Config{
+		DBConnectionString: "root:root@tcp(127.0.0.1:3306)/z42",
+		EventLog:           logger.DefaultConfig(),
+		AccessLog:          logger.DefaultConfig(),
+		ServerConfig:       server.DefaultConfig(),
+		MailerConfig:       mailer.DefaultConfig(),
+	}
 }
 
 func LoadConfig(path string) (*Config, error) {
-	config := apiDefaultConfig
+	config := DefaultConfig()
 	configFile, err := os.Open(path)
 	if err != nil {
 		log.Printf("[ERROR] cannot load file %s : %s", path, err)
 		log.Printf("[INFO] loading default config")
-		return config, err
+		return &config, err
 	}
 	decoder := jsoniter.NewDecoder(configFile)
 	decoder.DisallowUnknownFields()
@@ -64,7 +41,7 @@ func LoadConfig(path string) (*Config, error) {
 	if err != nil {
 		log.Printf("[ERROR] cannot load json file")
 		log.Printf("[INFO] loading default config")
-		return config, err
+		return &config, err
 	}
-	return config, nil
+	return &config, nil
 }

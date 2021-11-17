@@ -2,23 +2,16 @@ package geoip
 
 import (
 	"errors"
+	"github.com/oschwald/maxminddb-golang"
 	"go.uber.org/zap"
 	"math"
 	"net"
-
-	"github.com/oschwald/maxminddb-golang"
 )
 
 type GeoIp struct {
 	enable    bool
 	countryDB *maxminddb.Reader
 	asnDB     *maxminddb.Reader
-}
-
-type Config struct {
-	Enable    bool   `json:"enable"`
-	CountryDB string `json:"country_db"`
-	ASNDB     string `json:"asn_db"`
 }
 
 var (

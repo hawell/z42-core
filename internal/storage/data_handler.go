@@ -20,17 +20,6 @@ import (
 	"time"
 )
 
-type DataHandlerConfig struct {
-	ZoneCacheSize      int            `json:"zone_cache_size"`
-	ZoneCacheTimeout   int64          `json:"zone_cache_timeout"`
-	ZoneReload         int            `json:"zone_reload"`
-	RecordCacheSize    int            `json:"record_cache_size"`
-	RecordCacheTimeout int64          `json:"record_cache_timeout"`
-	Redis              hiredis.Config `json:"redis"`
-	MinTTL             uint32         `json:"min_ttl,default:5"`
-	MaxTTL             uint32         `json:"max_ttl,default:3600"`
-}
-
 type DataHandler struct {
 	config         *DataHandlerConfig
 	redis          *hiredis.Redis

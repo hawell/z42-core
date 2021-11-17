@@ -1,4 +1,4 @@
-package handler
+package resolver
 
 import (
 	"errors"
@@ -18,7 +18,7 @@ type TestCase struct {
 	Description     string
 	Enabled         bool
 	RedisDataConfig storage.DataHandlerConfig
-	HandlerConfig   DnsRequestHandlerConfig
+	HandlerConfig   Config
 	Initialize      func(testCase *TestCase) (*DnsRequestHandler, error)
 	ApplyAndVerify  func(testCase *TestCase, handler *DnsRequestHandler, t *testing.T)
 	Zones           []string
@@ -96,7 +96,7 @@ var DefaultRedisDataTestConfig = storage.DataHandlerConfig{
 	},
 }
 
-var DefaultHandlerTestConfig = DnsRequestHandlerConfig{
+var DefaultHandlerTestConfig = Config{
 	Upstream: []upstream.Config{
 		{
 			Ip:       "1.1.1.1",

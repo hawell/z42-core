@@ -9,21 +9,6 @@ import (
 	"io/ioutil"
 )
 
-type TlsConfig struct {
-	Enable   bool   `json:"enable"`
-	CertPath string `json:"cert_path"`
-	KeyPath  string `json:"key_path"`
-	CaPath   string `json:"ca_path"`
-}
-
-type Config struct {
-	Ip       string    `json:"ip"`
-	Port     int       `json:"port"`
-	Protocol string    `json:"protocol"`
-	Count    int       `json:"count"`
-	Tls      TlsConfig `json:"tls"`
-}
-
 func loadRoots(caPath string) *x509.CertPool {
 	if caPath == "" {
 		return nil

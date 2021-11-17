@@ -22,13 +22,6 @@ type Upstream struct {
 	inflight    *singleflight.Group
 }
 
-type Config struct {
-	Ip       string `json:"ip"`
-	Port     int    `json:"port"`
-	Protocol string `json:"protocol"`
-	Timeout  int    `json:"timeout"`
-}
-
 func NewUpstream(config []Config) *Upstream {
 	u := &Upstream{
 		inflight: new(singleflight.Group),

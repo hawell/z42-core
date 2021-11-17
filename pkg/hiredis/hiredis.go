@@ -15,26 +15,6 @@ type Redis struct {
 	pool   *redisCon.Pool
 }
 
-type ConnectionConfig struct {
-	MaxIdleConnections   int  `json:"max_idle_connections"`
-	MaxActiveConnections int  `json:"max_active_connections"`
-	ConnectTimeout       int  `json:"connect_timeout"`
-	ReadTimeout          int  `json:"read_timeout"`
-	IdleKeepAlive        int  `json:"idle_keep_alive"`
-	MaxKeepAlive         int  `json:"max_keep_alive"`
-	WaitForConnection    bool `json:"wait_for_connection"`
-}
-
-type Config struct {
-	Address    string           `json:"address"`
-	Net        string           `json:"net"`
-	DB         int              `json:"db"`
-	Password   string           `json:"password"`
-	Prefix     string           `json:"prefix"`
-	Suffix     string           `json:"suffix"`
-	Connection ConnectionConfig `json:"connection"`
-}
-
 var noConnectionError = errors.New("no connection")
 
 func NewRedis(config *Config) *Redis {
