@@ -400,6 +400,99 @@ paths:
         401:
           $ref: '#/components/responses/error_response'
 
+  /auth/recover:
+    post:
+      summary: 'request password recovery'
+      requestBody:
+        $ref: '#/components/requestBodies/recovery_request'
+      responses:
+        200:
+          $ref: '#/components/responses/success_response'
+        400:
+          $ref: '#/components/responses/error_response'
+
+  /auth/reset:
+    patch:
+      summary: 'reset password'
+      requestBody:
+        $ref: '#/components/requestBodies/reset_request'
+      responses:
+        202:
+          $ref: '#/components/responses/success_response'
+        400:
+          $ref: '#/components/responses/error_response'
+
+  /auth/api_keys:
+    get:
+      summary: 'list of all api keys'
+      responses:
+        200:
+          $ref: '#/components/responses/api_keys_response'
+        400:
+          $ref: '#/components/responses/error_response'
+
+    post:
+      summary: 'create a new api key'
+      requestBody:
+        $ref: '#/components/requestBodies/new_api_key'
+      responses:
+        201:
+          $ref: '#/components/responses/new_api_key_response'
+        400:
+          $ref: '#/components/responses/error_response'
+        401:
+          $ref: '#/components/responses/error_response'
+        409:
+          $ref: '#/components/responses/error_response'
+
+  /auth/api_keys/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 'get api key data'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api_key'
+        400:
+          $ref: '#/components/responses/error_response'
+        401:
+          $ref: '#/components/responses/error_response'
+        404:
+          $ref: '#/components/responses/error_response'
+
+    put:
+      summary: 'update api-key data'
+      requestBody:
+        $ref: '#/components/requestBodies/update_api_key'
+      responses:
+        200:
+          $ref: '#/components/responses/success_response'
+        400:
+          $ref: '#/components/responses/error_response'
+        401:
+          $ref: '#/components/responses/error_response'
+        404:
+          $ref: '#/components/responses/error_response'
+
+    delete:
+      responses:
+        200:
+          $ref: '#/components/responses/success_response'
+        400:
+          $ref: '#/components/responses/error_response'
+        401:
+          $ref: '#/components/responses/error_response'
+        404:
+          $ref: '#/components/responses/error_response'
+
 components:
   parameters:
     start:
@@ -504,6 +597,41 @@ components:
               password:
                 type: string
 
+    recovery_request:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+
+    reset_request:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              password:
+                type: string
+                description: 'new password'
+              code:
+                type: string
+                description: 'verification code'
+
+    new_api_key:
+      description: 'api-key'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/api_key'
+
+    update_api_key:
+      description: 'update api-key'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/update_api_key'
 
   responses:
     list_response:
@@ -525,6 +653,23 @@ components:
                       type: string
                     enabled:
                       type: boolean
+
+    new_api_key_response:
+      description: 'created api-key'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/new_api_key_response'
+
+    api_keys_response:
+      description: 'list of api-keys'
+      content:
+        application/json:
+          schema:
+            title: 'list of keys'
+            type: array
+            items:
+              $ref: '#/components/schemas/api_key'
 
     error_response:
       description: 'error response'
@@ -1021,3 +1166,47 @@ components:
           default: 300
         location:
           type: string
+
+    new_api_key_response:
+      title: new api-key
+      type: object
+      properties:
+        name:
+          type: string
+        key:
+          type: string
+        zone_name:
+          type: string
+        scope:
+          type: string
+          enum: ['acme']
+        enabled:
+          type: boolean
+
+    api_key:
+      title: api-key
+      type: object
+      properties:
+        name:
+          type: string
+          required: true
+        zone_name:
+          type: string
+          required: true
+        scope:
+          type: string
+          required: true
+          enum: ['acme']
+        enabled:
+          type: boolean
+
+    update_api_key:
+      title: update-api-key
+      type: object
+      properties:
+        scope:
+          type: string
+          required: true
+          enum: ['acme']
+        enabled:
+          type: boolean

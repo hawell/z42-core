@@ -137,6 +137,71 @@ func (db *DataBase) ResetPassword(code string, newPassword string) error {
 	})
 }
 
+func (db *DataBase) AddAPIKey(userId ObjectId, newAPIKey APIKeyItem) (string, error) {
+	owner, err := db.getZoneOwner(newAPIKey.ZoneName)
+	if err != nil {
+		return "", parseError(err)
+	}
+	if owner != userId {
+		return "", ErrInvalid
+	}
+	zoneId, err := db.getZoneId(newAPIKey.ZoneName)
+	if err != nil {
+		return "", parseError(err)
+	}
+	key := randomString(50)
+	hash, err := HashPassword(key)
+	if err != nil {
+		return "", err
+	}
+	_, err = db.db.Exec("INSERT INTO APIKeys(Name, Scope, Hash, Enabled, User_Id, Zone_Id) VALUES (?, ?, ?, ?, ?, ?)", newAPIKey.Name, newAPIKey.Scope, hash, newAPIKey.Enabled, userId, zoneId)
+	if err != nil {
+		return "", err
+	}
+	return key, nil
+}
+
+func (db *DataBase) GetAPIKeys(userId ObjectId) ([]APIKeyItem, error) {
+	rows, err := db.db.Query("SELECT T1.ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM (SELECT User_Id, Z.Resource_Id AS Zone_Id, Z.Name AS ZoneName FROM Zone Z WHERE Z.User_Id = ?) T1 JOIN APIKeys ON T1.User_Id = APIKeys.User_Id AND T1.Zone_Id = APIKeys.Zone_Id ORDER BY APIKeys.Name", userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []APIKeyItem{}, nil
+		}
+		return []APIKeyItem{}, parseError(err)
+	}
+	defer func() { _ = rows.Close() }()
+	res := []APIKeyItem{}
+	for rows.Next() {
+		var item APIKeyItem
+		err := rows.Scan(&item.ZoneName, &item.Name, &item.Scope, &item.Enabled)
+		if err != nil {
+			return []APIKeyItem{}, parseError(err)
+		}
+		res = append(res, item)
+	}
+	return res, nil
+}
+
+func (db *DataBase) GetAPIKey(userId ObjectId, name string) (APIKeyItem, error) {
+	row := db.db.QueryRow("SELECT T1.ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM (SELECT User_Id, Z.Resource_Id AS Zone_Id, Z.Name AS ZoneName FROM Zone Z WHERE Z.User_Id = ?) T1 JOIN APIKeys ON T1.User_Id = APIKeys.User_Id AND T1.Zone_Id = APIKeys.Zone_Id WHERE APIKeys.Name = ?", userId, name)
+	var res APIKeyItem
+	err := row.Scan(&res.ZoneName, &res.Name, &res.Scope, &res.Enabled)
+	if err != nil {
+		return APIKeyItem{}, parseError(err)
+	}
+	return res, nil
+}
+
+func (db *DataBase) UpdateAPIKey(userId ObjectId, model APIKeyUpdate) error {
+	_, err := db.db.Exec("UPDATE APIKeys SET Enabled = ?, Scope = ? WHERE User_Id = ? AND Name = ?", model.Enabled, model.Scope, userId, model.Name)
+	return err
+}
+
+func (db *DataBase) DeleteAPIKey(userId ObjectId, name string) error {
+	_, err := db.db.Exec("DELETE FROM APIKeys WHERE  User_Id = ? AND Name = ?", userId, name)
+	return err
+}
+
 func (db *DataBase) applyVerifiedAction(code string, actionType string, action func(t *sql.Tx, userId string) error) error {
 	res := db.db.QueryRow("select U.Id, V.Type from Verification V left join User U on U.Id = V.User_Id WHERE Code = ?", code)
 	var (

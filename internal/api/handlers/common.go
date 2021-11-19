@@ -72,3 +72,8 @@ func SuccessfulOperationResponse(c *gin.Context, code int, message string, name 
 		},
 	})
 }
+
+func ExtractUser(c *gin.Context) database.ObjectId {
+	user, _ := c.Get(IdentityKey)
+	return user.(*IdentityData).Id
+}

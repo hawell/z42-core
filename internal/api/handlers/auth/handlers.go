@@ -19,6 +19,12 @@ type storage interface {
 	Verify(code string) error
 	SetRecoveryCode(userId database.ObjectId) (string, error)
 	ResetPassword(code string, newPassword string) error
+
+	AddAPIKey(userId database.ObjectId, newAPIKey database.APIKeyItem) (string, error)
+	GetAPIKeys(userId database.ObjectId) ([]database.APIKeyItem, error)
+	GetAPIKey(userId database.ObjectId, name string) (database.APIKeyItem, error)
+	UpdateAPIKey(userId database.ObjectId, model database.APIKeyUpdate) error
+	DeleteAPIKey(userId database.ObjectId, name string) error
 }
 
 type Handler struct {
@@ -30,7 +36,8 @@ type Handler struct {
 }
 
 const (
-	emailKey = "email"
+	emailKey   = "email"
+	apiNameKey = "key_name"
 )
 
 func New(db storage, mailer mailer.Mailer, recaptchaHandler *recaptcha.Handler, serverName string) *Handler {
@@ -129,6 +136,14 @@ func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 	group.POST("/login", h.recaptchaHandler.MiddlewareFunc(), h.jwtMiddleWare.LoginHandler)
 	group.POST("/logout", h.jwtMiddleWare.LogoutHandler)
 	group.GET("/refresh_token", h.MiddlewareFunc(), h.jwtMiddleWare.RefreshHandler)
+
+	apikeyGroup := group.Group("/api_keys")
+	apikeyGroup.Use(h.MiddlewareFunc())
+	apikeyGroup.POST("", h.addAPIKey)
+	apikeyGroup.GET("", h.getAPIKeys)
+	apikeyGroup.GET("/:key_name", h.getAPIKey)
+	apikeyGroup.PUT("/:key_name", h.updateAPIKey)
+	apikeyGroup.DELETE("/:key_name", h.deleteAPIKey)
 }
 
 func (h *Handler) MiddlewareFunc() gin.HandlerFunc {
@@ -231,4 +246,126 @@ func (h *Handler) reset(c *gin.Context) {
 		"your password has been updated successfully. you may now login using your new password",
 		nil,
 	)
+}
+
+func (h *Handler) addAPIKey(c *gin.Context) {
+	userId := handlers.ExtractUser(c)
+	if userId == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
+		return
+	}
+
+	var r NewAPIKeyRequest
+	err := c.ShouldBindJSON(&r)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "binding request failed", err)
+		return
+	}
+
+	model := database.APIKeyItem{
+		Name:     r.Name,
+		Scope:    r.Scope,
+		ZoneName: r.ZoneName,
+		Enabled:  r.Enabled,
+	}
+	key, err := h.db.AddAPIKey(userId, model)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	resp := NewAPIKeyResponse{
+		Name:     r.Name,
+		Key:      key,
+		ZoneName: r.ZoneName,
+		Scope:    r.Scope,
+		Enabled:  r.Enabled,
+	}
+	handlers.SuccessResponse(c, http.StatusCreated, "successful", resp)
+}
+
+func (h *Handler) getAPIKeys(c *gin.Context) {
+	userId := handlers.ExtractUser(c)
+	if userId == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
+		return
+	}
+	items, err := h.db.GetAPIKeys(userId)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	handlers.SuccessResponse(c, http.StatusOK, "successful", items)
+}
+
+func (h *Handler) getAPIKey(c *gin.Context) {
+	userId := handlers.ExtractUser(c)
+	if userId == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
+		return
+	}
+	name := c.Param(apiNameKey)
+	if name == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "api name missing", nil)
+		return
+	}
+
+	item, err := h.db.GetAPIKey(userId, name)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	handlers.SuccessResponse(c, http.StatusOK, "successful", item)
+}
+
+func (h *Handler) updateAPIKey(c *gin.Context) {
+	userId := handlers.ExtractUser(c)
+	if userId == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
+		return
+	}
+	name := c.Param(apiNameKey)
+	if name == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "api name missing", nil)
+		return
+	}
+
+	var r UpdateAPIKeyRequest
+	err := c.ShouldBindJSON(&r)
+	if err != nil {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "binding request failed", err)
+		return
+	}
+
+	model := database.APIKeyUpdate{
+		Name:    name,
+		Scope:   r.Scope,
+		Enabled: r.Enabled,
+	}
+	err = h.db.UpdateAPIKey(userId, model)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", name)
+}
+
+func (h *Handler) deleteAPIKey(c *gin.Context) {
+	userId := handlers.ExtractUser(c)
+	if userId == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
+		return
+	}
+	name := c.Param(apiNameKey)
+	if name == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "api name missing", nil)
+		return
+	}
+
+	err := h.db.DeleteAPIKey(userId, name)
+	if err != nil {
+		handlers.ErrorResponse(handlers.StatusFromError(c, err))
+		return
+	}
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", name)
+
 }

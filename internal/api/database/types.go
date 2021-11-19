@@ -251,3 +251,31 @@ const (
 	UpdateRecord   EventType = "update_record"
 	DeleteRecord   EventType = "delete_record"
 )
+
+type APIKey struct {
+	Name    string
+	Scope   APIKeyScope
+	Hash    string
+	Enabled bool
+	ZoneId  ObjectId
+	UserId  ObjectId
+}
+
+type APIKeyScope string
+
+const (
+	ACME APIKeyScope = "acme"
+)
+
+type APIKeyItem struct {
+	Name     string `json:"name"`
+	Scope    string `json:"scope"`
+	ZoneName string `json:"zone_name"`
+	Enabled  bool   `json:"enabled"`
+}
+
+type APIKeyUpdate struct {
+	Name    string `json:"name"`
+	Scope   string `json:"scope"`
+	Enabled bool   `json:"enabled"`
+}

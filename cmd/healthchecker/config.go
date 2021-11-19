@@ -39,7 +39,7 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	decoder := jsoniter.NewDecoder(configFile)
 	decoder.DisallowUnknownFields()
-	err = decoder.Decode(config)
+	err = decoder.Decode(&config)
 	if err != nil {
 		log.Printf("[ERROR] cannot load json file")
 		log.Printf("[INFO] loading default config")

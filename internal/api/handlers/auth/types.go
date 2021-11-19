@@ -28,3 +28,23 @@ type passwordReset struct {
 	Password string `form:"password" json:"password" binding:"required"`
 	Code     string `form:"code" json:"code" binding:"required"`
 }
+
+type NewAPIKeyRequest struct {
+	Name     string `json:"name" binding:"required"`
+	ZoneName string `json:"zone_name" binding:"required"`
+	Scope    string `json:"scope" binding:"required"`
+	Enabled  bool   `json:"enabled"`
+}
+
+type NewAPIKeyResponse struct {
+	Name     string `json:"name"`
+	Key      string `json:"key"`
+	ZoneName string `json:"zone_name"`
+	Scope    string `json:"scope"`
+	Enabled  bool   `json:"enabled"`
+}
+
+type UpdateAPIKeyRequest struct {
+	Scope   string `json:"scope" binding:"required"`
+	Enabled bool   `json:"enabled"`
+}

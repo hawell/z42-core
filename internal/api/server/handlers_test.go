@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/hawell/z42/internal/api/database"
 	"github.com/hawell/z42/internal/api/handlers"
+	"github.com/hawell/z42/internal/api/handlers/auth"
 	"github.com/hawell/z42/internal/api/handlers/recaptcha"
 	"github.com/hawell/z42/internal/api/handlers/zone"
 	"github.com/hawell/z42/internal/dnssec"
@@ -1283,6 +1284,206 @@ func TestImportZone(t *testing.T) {
 	}
 }
 
+func TestAddAPIKey(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+
+	body := `{"name": "api_key_1", "zone_name": "zone1.com.", "scope": "acme", "enabled": true}`
+	path := "/auth/api_keys"
+	resp := execRequest(users[0].Id, http.MethodPost, path, body)
+	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+	respBody, err := io.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+	err = resp.Body.Close()
+	Expect(err).To(BeNil())
+	var response handlers.Response
+	response.Data = &auth.NewAPIKeyResponse{}
+	err = jsoniter.Unmarshal(respBody, &response)
+	Expect(err).To(BeNil())
+	Expect(response.Data.(*auth.NewAPIKeyResponse).Key).NotTo(BeEmpty())
+	response.Data.(*auth.NewAPIKeyResponse).Key = ""
+	Expect(response.Data).To(Equal(&auth.NewAPIKeyResponse{
+		Name:     "api_key_1",
+		Key:      "",
+		ZoneName: "zone1.com.",
+		Scope:    "acme",
+		Enabled:  true,
+	}))
+}
+
+func TestGetAPIKeys(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	zone2Name := "zone2.com."
+	zone3Name := "zone3.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+	_, err = addZone(users[0].Id, zone2Name)
+	Expect(err).To(BeNil())
+	_, err = addZone(users[1].Id, zone3Name)
+	Expect(err).To(BeNil())
+
+	path := "/auth/api_keys"
+	resp := execRequest(users[0].Id, http.MethodGet, path, "")
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	respBody, err := io.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+	err = resp.Body.Close()
+	Expect(err).To(BeNil())
+	Expect(respBody).To(MatchJSON(`{
+	  "code": 200,
+	  "message": "successful",
+	  "data": []
+	}`))
+
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_1", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_2", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_3", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone2Name, "key_4", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone2Name, "key_5", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[1].Id, zone3Name, "key_1", "acme")
+	Expect(err).To(BeNil())
+
+	path = "/auth/api_keys"
+	resp = execRequest(users[0].Id, http.MethodGet, path, "")
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	respBody, err = io.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+	err = resp.Body.Close()
+	Expect(err).To(BeNil())
+	var response handlers.Response
+	err = json.Unmarshal(respBody, &response)
+	Expect(err).To(BeNil())
+	Expect(respBody).To(MatchJSON(`{
+	  "code": 200,
+	  "message": "successful",
+	  "data": [
+		{
+		  "name": "key_1",
+		  "scope": "acme",
+		  "zone_name": "zone1.com.",
+		  "enabled": true
+		},
+		{
+		  "name": "key_2",
+		  "scope": "acme",
+		  "zone_name": "zone1.com.",
+		  "enabled": true
+		},
+		{
+		  "name": "key_3",
+		  "scope": "acme",
+		  "zone_name": "zone1.com.",
+		  "enabled": true
+		},
+		{
+		  "name": "key_4",
+		  "scope": "acme",
+		  "zone_name": "zone2.com.",
+		  "enabled": true
+		},
+		{
+		  "name": "key_5",
+		  "scope": "acme",
+		  "zone_name": "zone2.com.",
+		  "enabled": true
+		}
+	  ]
+	}
+	`))
+}
+
+func TestGetAPIKey(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	zone2Name := "zone2.com."
+	zone3Name := "zone3.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+	_, err = addZone(users[0].Id, zone2Name)
+	Expect(err).To(BeNil())
+	_, err = addZone(users[1].Id, zone3Name)
+	Expect(err).To(BeNil())
+
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_1", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_2", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_3", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone2Name, "key_4", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[0].Id, zone2Name, "key_5", "acme")
+	Expect(err).To(BeNil())
+	_, err = addAPIKey(users[1].Id, zone3Name, "key_1", "acme")
+	Expect(err).To(BeNil())
+
+	path := "/auth/api_keys/key_1"
+	resp := execRequest(users[0].Id, http.MethodGet, path, "")
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	respBody, err := io.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+	err = resp.Body.Close()
+	Expect(err).To(BeNil())
+	var response handlers.Response
+	err = json.Unmarshal(respBody, &response)
+	Expect(err).To(BeNil())
+	Expect(respBody).To(MatchJSON(`{
+	  "code": 200,
+	  "message": "successful",
+	  "data": {
+        "name": "key_1",
+        "scope": "acme",
+        "zone_name": "zone1.com.",
+        "enabled": true
+      }
+	}
+	`))
+}
+
+func TestUpdateAPIKey(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_1", "acme")
+	Expect(err).To(BeNil())
+
+	path := "/auth/api_keys/key_1"
+	body := `{"scope": "acme", "enabled": false}`
+	resp := execRequest(users[0].Id, http.MethodPut, path, body)
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	_, err = io.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+	err = resp.Body.Close()
+	Expect(err).To(BeNil())
+}
+
+func TestDeleteAPIKey(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+
+	_, err = addAPIKey(users[0].Id, zone1Name, "key_1", "acme")
+	Expect(err).To(BeNil())
+
+	path := "/auth/api_keys/key_1"
+	resp := execRequest(users[0].Id, http.MethodDelete, path, "")
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+	_, err = db.GetAPIKey(users[0].Id, "key_1")
+	Expect(err).To(MatchError(database.ErrNotFound))
+}
+
 func TestMain(m *testing.M) {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.DisableKeepAlives = true
@@ -1415,6 +1616,15 @@ func addLocation(userId database.ObjectId, zoneName string, location string) (da
 
 func addRecordSet(userId database.ObjectId, zoneName string, location string, recordType string, recordset types.RRSet) (database.ObjectId, error) {
 	return db.AddRecordSet(userId, database.NewRecordSet{ZoneName: zoneName, Location: location, Enabled: true, Type: recordType, Value: recordset})
+}
+
+func addAPIKey(userId database.ObjectId, zoneName string, name string, scope string) (string, error) {
+	return db.AddAPIKey(userId, database.APIKeyItem{
+		Name:     name,
+		Scope:    scope,
+		ZoneName: zoneName,
+		Enabled:  true,
+	})
 }
 
 func execRequest(userId database.ObjectId, method string, path string, body string) *http.Response {

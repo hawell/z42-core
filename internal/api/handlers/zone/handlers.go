@@ -79,7 +79,7 @@ func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 }
 
 func (h *Handler) getZones(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -100,7 +100,7 @@ func (h *Handler) getZones(c *gin.Context) {
 }
 
 func (h *Handler) addZone(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -136,7 +136,7 @@ func (h *Handler) addZone(c *gin.Context) {
 }
 
 func (h *Handler) getZone(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -167,7 +167,7 @@ func (h *Handler) getZone(c *gin.Context) {
 }
 
 func (h *Handler) updateZone(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -203,11 +203,11 @@ func (h *Handler) updateZone(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", zoneName)
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", zoneName)
 }
 
 func (h *Handler) deleteZone(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -223,11 +223,11 @@ func (h *Handler) deleteZone(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", zoneName)
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", zoneName)
 }
 
 func (h *Handler) getLocations(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -254,7 +254,7 @@ func (h *Handler) getLocations(c *gin.Context) {
 }
 
 func (h *Handler) addLocation(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -286,7 +286,7 @@ func (h *Handler) addLocation(c *gin.Context) {
 }
 
 func (h *Handler) getLocation(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -315,7 +315,7 @@ func (h *Handler) getLocation(c *gin.Context) {
 }
 
 func (h *Handler) updateLocation(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -347,11 +347,11 @@ func (h *Handler) updateLocation(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", location)
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", location)
 }
 
 func (h *Handler) deleteLocation(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -372,11 +372,11 @@ func (h *Handler) deleteLocation(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", location)
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", location)
 }
 
 func (h *Handler) getRecordSets(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -401,7 +401,7 @@ func (h *Handler) getRecordSets(c *gin.Context) {
 }
 
 func (h *Handler) addRecordSet(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -443,7 +443,7 @@ func (h *Handler) addRecordSet(c *gin.Context) {
 }
 
 func (h *Handler) getRecordSet(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -477,7 +477,7 @@ func (h *Handler) getRecordSet(c *gin.Context) {
 }
 
 func (h *Handler) updateRecordSet(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -518,11 +518,11 @@ func (h *Handler) updateRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", recordType)
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", recordType)
 }
 
 func (h *Handler) deleteRecordSet(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -548,11 +548,11 @@ func (h *Handler) deleteRecordSet(c *gin.Context) {
 		handlers.ErrorResponse(handlers.StatusFromError(c, err))
 		return
 	}
-	handlers.SuccessfulOperationResponse(c, http.StatusNoContent, "successful", recordType)
+	handlers.SuccessfulOperationResponse(c, http.StatusOK, "successful", recordType)
 }
 
 func (h *Handler) importZone(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -637,7 +637,7 @@ func (h *Handler) importZone(c *gin.Context) {
 }
 
 func (h *Handler) exportZone(c *gin.Context) {
-	userId := extractUser(c)
+	userId := handlers.ExtractUser(c)
 	if userId == "" {
 		handlers.ErrorResponse(c, http.StatusBadRequest, "user missing", nil)
 		return
@@ -702,11 +702,6 @@ func (h *Handler) exportZone(c *gin.Context) {
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+downloadName)
 	c.Data(http.StatusOK, "text/plain", []byte(b.String()))
-}
-
-func extractUser(c *gin.Context) database.ObjectId {
-	user, _ := c.Get(handlers.IdentityKey)
-	return user.(*handlers.IdentityData).Id
 }
 
 func rtypeValid(rtype string) bool {
