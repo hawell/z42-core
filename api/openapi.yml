@@ -68,7 +68,7 @@ paths:
       requestBody:
         $ref: '#/components/requestBodies/update_zone'
       responses:
-        204:
+        200:
           $ref: '#/components/responses/success_response'
         400:
           $ref: '#/components/responses/error_response'
@@ -79,7 +79,7 @@ paths:
 
     delete:
       responses:
-        204:
+        200:
           $ref: '#/components/responses/success_response'
         400:
           $ref: '#/components/responses/error_response'
@@ -213,7 +213,7 @@ paths:
       requestBody:
         $ref: '#/components/requestBodies/update_location'
       responses:
-        204:
+        200:
           $ref: '#/components/responses/success_response'
         400:
           $ref: '#/components/responses/error_response'
@@ -225,7 +225,7 @@ paths:
     delete:
       summary: 'remove a location from zone'
       responses:
-        204:
+        200:
           $ref: '#/components/responses/success_response'
         400:
           $ref: '#/components/responses/error_response'
@@ -312,7 +312,7 @@ paths:
       requestBody:
         $ref: '#/components/requestBodies/update_rrset'
       responses:
-        204:
+        200:
           $ref: '#/components/responses/success_response'
         400:
           $ref: '#/components/responses/error_response'
@@ -324,7 +324,7 @@ paths:
     delete:
       summary: 'remove a rrset from location'
       responses:
-        204:
+        200:
           $ref: '#/components/responses/success_response'
         400:
           $ref: '#/components/responses/error_response'
@@ -359,7 +359,7 @@ paths:
           schema:
             type: string
       responses:
-        204:
+        200:
           $ref: '#/components/responses/success_response'
         400:
           $ref: '#/components/responses/error_response'

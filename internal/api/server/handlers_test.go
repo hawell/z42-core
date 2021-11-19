@@ -257,7 +257,7 @@ func TestUpdateZone(t *testing.T) {
 
 	// update zone
 	resp := execRequest(users[0].Id, http.MethodPut, "/zones/"+zone1Name, `{"enabled": true, "dnssec":true, "cname_flattening": false, "soa": {"ttl": 300, "ns": "ns1.example.com.", "mbox": "admin.example.com.", "refresh": 44, "retry": 55, "expire": 66, "minttl": 100, "serial": 123456}}`)
-	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	err = resp.Body.Close()
 	Expect(err).To(BeNil())
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name, "")
@@ -320,7 +320,7 @@ func TestDeleteZone(t *testing.T) {
 
 	// delete zone
 	resp = execRequest(users[0].Id, http.MethodDelete, "/zones/"+zone1Name, "")
-	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	err = resp.Body.Close()
 	Expect(err).To(BeNil())
 
@@ -566,7 +566,7 @@ func TestUpdateLocation(t *testing.T) {
 
 	// update location
 	resp := execRequest(users[0].Id, http.MethodPut, "/zones/"+zone1Name+"/locations/"+location1, `{"enabled": false}`)
-	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	err = resp.Body.Close()
 	Expect(err).To(BeNil())
 	resp = execRequest(users[0].Id, http.MethodGet, "/zones/"+zone1Name+"/locations/"+location1, "")
@@ -623,7 +623,7 @@ func TestDeleteLocation(t *testing.T) {
 
 	// delete location
 	resp = execRequest(users[0].Id, http.MethodDelete, "/zones/"+zone1Name+"/locations/"+location1, "")
-	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	err = resp.Body.Close()
 	Expect(err).To(BeNil())
 
@@ -960,7 +960,7 @@ func TestUpdateRecordSet(t *testing.T) {
 
 	// update record set
 	resp = execRequest(users[0].Id, http.MethodPut, path, body)
-	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	err = resp.Body.Close()
 	Expect(err).To(BeNil())
 	resp = execRequest(users[0].Id, http.MethodGet, path, "")
@@ -1032,7 +1032,7 @@ func TestDeleteRecordSet(t *testing.T) {
 
 	// delete record set
 	resp = execRequest(users[0].Id, http.MethodDelete, "/zones/"+zone1Name+"/locations/"+location1+"/rrsets/"+r1, "")
-	Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
 	err = resp.Body.Close()
 	Expect(err).To(BeNil())
 
