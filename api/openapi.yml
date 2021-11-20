@@ -174,7 +174,6 @@ paths:
     get:
       summary: 'list of all locations within zone'
       parameters:
-        - $ref: '#/components/parameters/name'
         - $ref: '#/components/parameters/start'
         - $ref: '#/components/parameters/count'
         - $ref: '#/components/parameters/ascending'
@@ -1221,16 +1220,17 @@ components:
     api_key:
       title: api-key
       type: object
+      required:
+        - name
+        - zone_name
+        - scope
       properties:
         name:
           type: string
-          required: true
         zone_name:
           type: string
-          required: true
         scope:
           type: string
-          required: true
           enum: ['acme']
         enabled:
           type: boolean
@@ -1238,10 +1238,11 @@ components:
     update_api_key:
       title: update-api-key
       type: object
+      required:
+        - scope
       properties:
         scope:
           type: string
-          required: true
           enum: ['acme']
         enabled:
           type: boolean
