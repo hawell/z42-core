@@ -26,5 +26,13 @@
     "api_server": "api.z42.com",
     "name_server": "ns.z42.com.",
     "html_templates": "./templates/*.tmpl"
-  }
+  },
+  "upstream": [
+    {
+      "ip": "1.1.1.1",
+      "port": 53,
+      "protocol": "udp",
+      "timeout": 2000
+    }
+  ]
 }

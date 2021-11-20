@@ -10,6 +10,7 @@ import (
 	"github.com/hawell/z42/internal/api/handlers/zone"
 	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/mailer"
+	"github.com/hawell/z42/internal/upstream"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
@@ -49,7 +50,7 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer, accessLogger *zap.Logger) *Server {
+func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer, u *upstream.Upstream, accessLogger *zap.Logger) *Server {
 	router := gin.New()
 	router.LoadHTMLGlob(config.HtmlTemplates)
 	handleRecovery := func(c *gin.Context, err interface{}) {
@@ -93,7 +94,7 @@ func NewServer(config *Config, db *database.DataBase, mailer mailer.Mailer, acce
 
 	zoneGroup := router.Group("/zones")
 	zoneGroup.Use(authHandler.MiddlewareFunc())
-	zoneHandler := zone.New(db, config.NameServer)
+	zoneHandler := zone.New(db, u, config.NameServer)
 	zoneHandler.RegisterHandlers(zoneGroup)
 
 	return &Server{

@@ -8,6 +8,7 @@ import (
 	"github.com/hawell/z42/internal/api/server"
 	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/mailer"
+	"github.com/hawell/z42/internal/upstream"
 	"go.uber.org/zap"
 )
 
@@ -42,8 +43,10 @@ func main() {
 		panic(err)
 	}
 
+	u := upstream.NewUpstream(config.UpstreamConfig)
+
 	gin.SetMode(gin.ReleaseMode)
-	s := server.NewServer(&config.ServerConfig, db, m, accessLogger)
+	s := server.NewServer(&config.ServerConfig, db, m, u, accessLogger)
 	err = s.ListenAndServer()
 	fmt.Println(err)
 }

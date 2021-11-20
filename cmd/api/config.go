@@ -4,17 +4,19 @@ import (
 	"github.com/hawell/z42/internal/api/server"
 	"github.com/hawell/z42/internal/logger"
 	"github.com/hawell/z42/internal/mailer"
+	"github.com/hawell/z42/internal/upstream"
 	jsoniter "github.com/json-iterator/go"
 	"log"
 	"os"
 )
 
 type Config struct {
-	DBConnectionString string        `json:"db_connection_string"`
-	EventLog           logger.Config `json:"event_log"`
-	AccessLog          logger.Config `json:"access_log"`
-	ServerConfig       server.Config `json:"server"`
-	MailerConfig       mailer.Config `json:"mailer"`
+	DBConnectionString string            `json:"db_connection_string"`
+	EventLog           logger.Config     `json:"event_log"`
+	AccessLog          logger.Config     `json:"access_log"`
+	ServerConfig       server.Config     `json:"server"`
+	MailerConfig       mailer.Config     `json:"mailer"`
+	UpstreamConfig     []upstream.Config `json:"upstream"`
 }
 
 func DefaultConfig() Config {
@@ -24,6 +26,7 @@ func DefaultConfig() Config {
 		AccessLog:          logger.DefaultConfig(),
 		ServerConfig:       server.DefaultConfig(),
 		MailerConfig:       mailer.DefaultConfig(),
+		UpstreamConfig:     []upstream.Config{upstream.DefaultConfig()},
 	}
 }
 

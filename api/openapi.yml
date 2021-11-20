@@ -88,6 +88,30 @@ paths:
         404:
           $ref: '#/components/responses/error_response'
 
+  /zones/{zone}/active_ns:
+    parameters:
+      - name: zone
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 'get active nameservers of zone'
+      responses:
+        200:
+          description: 'successful response'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/active_ns'
+        400:
+          $ref: '#/components/responses/error_response'
+        502:
+          $ref: '#/components/responses/error_response'
+        404:
+          $ref: '#/components/responses/error_response'
+
+
   /zones/{zone}/import:
     parameters:
       - name: zone
@@ -721,6 +745,17 @@ components:
         expire:
           type: string
       example: '{"code": 200, "token":"abcdefg123", "expire":"2006-01-02T15:04:05Z07:00"}'
+
+    active_ns:
+      title: active ns
+      type: object
+      properties:
+        rcode:
+          type: integer
+        hosts:
+          type: array
+          items:
+            type: string
 
     new_zone:
       title: new zone

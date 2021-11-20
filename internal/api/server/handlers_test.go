@@ -13,6 +13,7 @@ import (
 	"github.com/hawell/z42/internal/dnssec"
 	"github.com/hawell/z42/internal/mailer"
 	"github.com/hawell/z42/internal/types"
+	"github.com/hawell/z42/internal/upstream"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	. "github.com/onsi/gomega"
@@ -1484,6 +1485,29 @@ func TestDeleteAPIKey(t *testing.T) {
 	Expect(err).To(MatchError(database.ErrNotFound))
 }
 
+func TestGetActiveNS(t *testing.T) {
+	initialize(t)
+	zone1Name := "zone1.com."
+	_, err := addZone(users[0].Id, zone1Name)
+	Expect(err).To(BeNil())
+
+	path := "/zones/" + zone1Name + "/active_ns"
+	resp := execRequest(users[0].Id, http.MethodGet, path, "")
+	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	respBody, err := io.ReadAll(resp.Body)
+	Expect(err).To(BeNil())
+	err = resp.Body.Close()
+	Expect(err).To(BeNil())
+	Expect(respBody).To(MatchJSON(`{
+		"code": 200,
+		"message": "successful",
+		"data": {
+			"rcode":0,
+			"hosts":["ns1.namefind.com.","ns2.namefind.com."]
+		}
+	}`))
+}
+
 func TestMain(m *testing.M) {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.DisableKeepAlives = true
@@ -1521,6 +1545,12 @@ func TestMain(m *testing.M) {
 				return nil
 			},
 		},
+		upstream.NewUpstream([]upstream.Config{{
+			Ip:       "1.1.1.1",
+			Port:     53,
+			Protocol: "udp",
+			Timeout:  2000,
+		}}),
 		zap.L(),
 	)
 	go func() {

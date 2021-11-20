@@ -97,3 +97,8 @@ type UpdateRecordSetRequest struct {
 	Value   types.RRSet `json:"value" binding:"required"`
 	Enabled bool        `json:"enabled"`
 }
+
+type ActiveNS struct {
+	RCode int      `json:"rcode"`
+	Hosts []string `json:"hosts"`
+}

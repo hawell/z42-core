@@ -8,6 +8,7 @@ import (
 	"github.com/hawell/z42/internal/api/handlers"
 	"github.com/hawell/z42/internal/dnssec"
 	"github.com/hawell/z42/internal/types"
+	"github.com/hawell/z42/internal/upstream"
 	"github.com/miekg/dns"
 	"io/ioutil"
 	"net/http"
@@ -36,12 +37,14 @@ type storage interface {
 
 type Handler struct {
 	nameServer string
+	upstream   *upstream.Upstream
 	db         storage
 }
 
-func New(db storage, nameServer string) *Handler {
+func New(db storage, u *upstream.Upstream, nameServer string) *Handler {
 	return &Handler{
 		db:         db,
+		upstream:   u,
 		nameServer: nameServer,
 	}
 }
@@ -59,6 +62,8 @@ func (h *Handler) RegisterHandlers(group *gin.RouterGroup) {
 	group.GET("/:zone_name", h.getZone)
 	group.PUT("/:zone_name", h.updateZone)
 	group.DELETE("/:zone_name", h.deleteZone)
+
+	group.GET("/:zone_name/active_ns", h.getActiveNS)
 
 	group.POST("/:zone_name/import", h.importZone)
 	group.GET("/:zone_name/export", h.exportZone)
@@ -702,6 +707,29 @@ func (h *Handler) exportZone(c *gin.Context) {
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Disposition", "attachment; filename="+downloadName)
 	c.Data(http.StatusOK, "text/plain", []byte(b.String()))
+}
+
+func (h *Handler) getActiveNS(c *gin.Context) {
+	zoneName := c.Param(zoneNameKey)
+	if zoneName == "" {
+		handlers.ErrorResponse(c, http.StatusBadRequest, "zone name missing", nil)
+		return
+	}
+
+	rrs, rcode := h.upstream.Query(zoneName, dns.TypeNS)
+	if rcode == dns.RcodeServerFailure {
+		handlers.ErrorResponse(c, http.StatusBadGateway, "query failed", nil)
+		return
+	}
+	resp := ActiveNS{
+		RCode: rcode,
+		Hosts: []string{},
+	}
+	for _, rr := range rrs {
+		ns := rr.(*dns.NS)
+		resp.Hosts = append(resp.Hosts, ns.Ns)
+	}
+	handlers.SuccessResponse(c, http.StatusOK, "successful", resp)
 }
 
 func rtypeValid(rtype string) bool {
