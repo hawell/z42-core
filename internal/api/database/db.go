@@ -392,7 +392,7 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 			if err != nil {
 				return err
 			}
-			if err := setPrivileges(t, userId, nsId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+			if err := setPrivileges(t, userId, nsId, ACL{Read: true, List: true, Edit: false, Insert: false, Delete: false}); err != nil {
 				return err
 			}
 			if err = setZoneKeys(t, zoneId, z.Keys); err != nil {
