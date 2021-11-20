@@ -380,7 +380,7 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 			if err != nil {
 				return err
 			}
-			if err = setPrivileges(t, userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
+			if err = setPrivileges(t, userId, locationId, ACL{Read: true, List: true, Edit: false, Insert: true, Delete: false}); err != nil {
 				return err
 			}
 			nsRecord := NewRecordSet{Type: "ns", Value: &z.NS, Enabled: true}
