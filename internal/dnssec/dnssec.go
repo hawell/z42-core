@@ -38,8 +38,8 @@ func GenerateKeys(zoneName string) (types.ZoneKeys, error) {
 	ksk.Hdr.Ttl = 14400
 	ksk.Flags = 257
 	ksk.Protocol = 3
-	ksk.Algorithm = dns.RSASHA256
-	kskPrivateKey, err := ksk.Generate(512)
+	ksk.Algorithm = dns.ECDSAP256SHA256
+	kskPrivateKey, err := ksk.Generate(256)
 	if err != nil {
 		return types.ZoneKeys{}, err
 	}

@@ -80,7 +80,7 @@ func TestAddZone(t *testing.T) {
 	Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 	z, err := db.GetZone(users[0].Id, "example.com.")
 	Expect(err).To(BeNil())
-	Expect(z.DS).To(MatchRegexp(`example.com.\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	Expect(z.DS).To(MatchRegexp(`example.com.\s14400\sIN\sDS\s\d* 13 2 \w*`))
 	z.DS = ""
 	Expect(z).To(Equal(database.Zone{
 		Id:              z.Id,
@@ -225,7 +225,7 @@ func TestGetZone(t *testing.T) {
 	response.Data = &database.Zone{}
 	err = json.Unmarshal(body, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data.(*database.Zone).DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	Expect(response.Data.(*database.Zone).DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 13 2 \w*`))
 	response.Data.(*database.Zone).DS = ""
 	Expect(response.Data).To(Equal(&database.Zone{
 		Name:            zone1Name,
@@ -272,7 +272,7 @@ func TestUpdateZone(t *testing.T) {
 	Expect(err).To(BeNil())
 	err = json.Unmarshal(respBody, &response)
 	Expect(err).To(BeNil())
-	Expect(response.Data.(*database.Zone).DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	Expect(response.Data.(*database.Zone).DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 13 2 \w*`))
 	response.Data.(*database.Zone).DS = ""
 	Expect(response.Data).To(Equal(&database.Zone{
 		Name:            zone1Name,
@@ -1179,7 +1179,7 @@ func TestExportZone(t *testing.T) {
 
 	z, err := db.GetZone(users[0].Id, zone1Name)
 	Expect(err).To(BeNil())
-	Expect(z.DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	Expect(z.DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 13 2 \w*`))
 	z.DS = ""
 	Expect(z).To(Equal(database.Zone{
 		Id:              z.Id,
@@ -1251,7 +1251,7 @@ func TestImportZone(t *testing.T) {
 
 	z, err := db.GetZone(users[0].Id, zone1Name)
 	Expect(err).To(BeNil())
-	Expect(z.DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 8 2 \w*`))
+	Expect(z.DS).To(MatchRegexp(zone1Name + `\s14400\sIN\sDS\s\d* 13 2 \w*`))
 	z.DS = ""
 	Expect(z).To(Equal(database.Zone{
 		Id:              z.Id,

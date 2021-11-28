@@ -108,9 +108,12 @@ func DefaultDnssecApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestH
 		state := NewRequestContext(w, r)
 		requestHandler.HandleRequest(state)
 		resp := w.Msg
-		for _, section := range []struct{rrs []dns.RR; tcSection string }{
-			{rrs: tc0.Answer}, {rrs: tc0.Ns}, {rrs: resp.Answer, tcSection:"answer"}, {rrs: resp.Ns, tcSection:"ns"},
+		for _, section := range []struct {
+			rrs       []dns.RR
+			tcSection string
 		}{
+			{rrs: tc0.Answer}, {rrs: tc0.Ns}, {rrs: resp.Answer, tcSection: "answer"}, {rrs: resp.Ns, tcSection: "ns"},
+		} {
 			sets := types.SplitSets(section.rrs)
 			rrsigs := make(map[types.RRSetKey]*dns.RRSIG)
 			for _, rr := range section.rrs {
