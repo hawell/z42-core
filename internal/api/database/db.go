@@ -3,10 +3,7 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/hawell/z42/internal/types"
-	jsoniter "github.com/json-iterator/go"
 	"math/rand"
 	"time"
 )
@@ -64,21 +61,18 @@ func (db *DataBase) Clear(removeUsers bool) error {
 	var err error
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if removeUsers {
-			if _, err := t.Exec("DELETE FROM User"); err != nil {
+			if err := deleteUsers(t); err != nil {
 				return err
 			}
 		} else {
-			if _, err := t.Exec("DELETE FROM Resource"); err != nil {
+			if err := deleteResources(t); err != nil {
 				return err
 			}
-			if _, err := t.Exec("DELETE FROM Verification"); err != nil {
+			if err := deleteVerifications(t); err != nil {
 				return err
 			}
 		}
-		if _, err := t.Exec("DELETE FROM Events"); err != nil {
-			return err
-		}
-		if _, err := t.Exec("ALTER TABLE Events AUTO_INCREMENT = 1"); err != nil {
+		if err := deleteEvents(t); err != nil {
 			return err
 		}
 		return nil
@@ -91,16 +85,15 @@ func (db *DataBase) AddUser(u NewUser) (ObjectId, string, error) {
 	if err != nil {
 		return EmptyObjectId, "", err
 	}
+	u.Password = hash
 	userId := NewObjectId()
 	code := randomString(50)
 	err = db.withTransaction(func(t *sql.Tx) error {
-		_, err = t.Exec("INSERT INTO User(Id, Email, Password, Status) VALUES (?, ?, ?, ?)", userId, u.Email, hash, u.Status)
-		if err != nil {
+		if err := addUser(t, userId, u); err != nil {
 			return err
 		}
-
 		if u.Status == UserStatusPending {
-			_, err = t.Exec("REPLACE INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeSignup, userId)
+			err := setVerification(t, userId, Verification{Code: code, Type: VerificationTypeSignup})
 			if err != nil {
 				return err
 			}
@@ -111,17 +104,20 @@ func (db *DataBase) AddUser(u NewUser) (ObjectId, string, error) {
 }
 
 func (db *DataBase) Verify(code string) error {
-	return db.applyVerifiedAction(code, VerificationTypeSignup, func(t *sql.Tx, userId string) error {
-		_, err := t.Exec("UPDATE User SET Status = ? WHERE Id = ?", UserStatusActive, userId)
-		return err
+	err := db.applyVerifiedAction(code, VerificationTypeSignup, func(t *sql.Tx, userId ObjectId) error {
+		return setUserStatus(t, userId, UserStatusActive)
 	})
+	return parseError(err)
 }
 
 func (db *DataBase) SetRecoveryCode(userId ObjectId) (string, error) {
 	code := randomString(50)
-	_, err := db.db.Exec("REPLACE INTO Verification(Code, Type, User_Id) VALUES (?, ?, ?)", code, VerificationTypeRecover, userId)
+	err := db.withTransaction(func(t *sql.Tx) error {
+		err := setVerification(t, userId, Verification{Type: VerificationTypeRecover, Code: code})
+		return err
+	})
 	if err != nil {
-		return "", err
+		return "", parseError(err)
 	}
 	return code, nil
 }
@@ -131,10 +127,10 @@ func (db *DataBase) ResetPassword(code string, newPassword string) error {
 	if err != nil {
 		return err
 	}
-	return db.applyVerifiedAction(code, VerificationTypeRecover, func(t *sql.Tx, userId string) error {
-		_, err = t.Exec("UPDATE User SET Password = ? WHERE Id = ?", hash, userId)
-		return err
+	err = db.applyVerifiedAction(code, VerificationTypeRecover, func(t *sql.Tx, userId ObjectId) error {
+		return setUserPassword(t, userId, hash)
 	})
+	return parseError(err)
 }
 
 func (db *DataBase) AddAPIKey(userId ObjectId, newAPIKey APIKeyItem) (string, error) {
@@ -154,130 +150,40 @@ func (db *DataBase) AddAPIKey(userId ObjectId, newAPIKey APIKeyItem) (string, er
 	if err != nil {
 		return "", err
 	}
-	_, err = db.db.Exec("INSERT INTO APIKeys(Name, Scope, Hash, Enabled, User_Id, Zone_Id) VALUES (?, ?, ?, ?, ?, ?)", newAPIKey.Name, newAPIKey.Scope, hash, newAPIKey.Enabled, userId, zoneId)
-	if err != nil {
-		return "", err
-	}
-	return key, nil
+	err = db.addAPIKey(userId, zoneId, newAPIKey, hash)
+	return key, parseError(err)
 }
 
 func (db *DataBase) GetAPIKeys(userId ObjectId) ([]APIKeyItem, error) {
-	rows, err := db.db.Query("SELECT T1.ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM (SELECT User_Id, Z.Resource_Id AS Zone_Id, Z.Name AS ZoneName FROM Zone Z WHERE Z.User_Id = ?) T1 JOIN APIKeys ON T1.User_Id = APIKeys.User_Id AND T1.Zone_Id = APIKeys.Zone_Id ORDER BY APIKeys.Name", userId)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []APIKeyItem{}, nil
-		}
-		return []APIKeyItem{}, parseError(err)
-	}
-	defer func() { _ = rows.Close() }()
-	res := []APIKeyItem{}
-	for rows.Next() {
-		var item APIKeyItem
-		err := rows.Scan(&item.ZoneName, &item.Name, &item.Scope, &item.Enabled)
-		if err != nil {
-			return []APIKeyItem{}, parseError(err)
-		}
-		res = append(res, item)
-	}
-	return res, nil
+	res, err := db.getAPIKeys(userId)
+	return res, parseError(err)
 }
 
 func (db *DataBase) GetAPIKey(userId ObjectId, name string) (APIKeyItem, error) {
-	row := db.db.QueryRow("SELECT T1.ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM (SELECT User_Id, Z.Resource_Id AS Zone_Id, Z.Name AS ZoneName FROM Zone Z WHERE Z.User_Id = ?) T1 JOIN APIKeys ON T1.User_Id = APIKeys.User_Id AND T1.Zone_Id = APIKeys.Zone_Id WHERE APIKeys.Name = ?", userId, name)
-	var res APIKeyItem
-	err := row.Scan(&res.ZoneName, &res.Name, &res.Scope, &res.Enabled)
-	if err != nil {
-		return APIKeyItem{}, parseError(err)
-	}
-	return res, nil
+	item, err := db.getAPIKey(userId, name)
+	return item, parseError(err)
 }
 
 func (db *DataBase) UpdateAPIKey(userId ObjectId, model APIKeyUpdate) error {
-	_, err := db.db.Exec("UPDATE APIKeys SET Enabled = ?, Scope = ? WHERE User_Id = ? AND Name = ?", model.Enabled, model.Scope, userId, model.Name)
-	return err
+	return parseError(db.updateAPIKey(userId, model))
 }
 
 func (db *DataBase) DeleteAPIKey(userId ObjectId, name string) error {
-	_, err := db.db.Exec("DELETE FROM APIKeys WHERE  User_Id = ? AND Name = ?", userId, name)
-	return err
-}
-
-func (db *DataBase) applyVerifiedAction(code string, actionType string, action func(t *sql.Tx, userId string) error) error {
-	res := db.db.QueryRow("select U.Id, V.Type from Verification V left join User U on U.Id = V.User_Id WHERE Code = ?", code)
-	var (
-		userId     ObjectId
-		storedType string
-	)
-	if err := res.Scan(&userId, &storedType); err != nil {
-		return parseError(err)
-	}
-	if storedType != actionType {
-		return errors.New("unknown verification type")
-	}
-
-	err := db.withTransaction(func(t *sql.Tx) error {
-		if err := action(t, string(userId)); err != nil {
-			return err
-		}
-		if _, err := t.Exec("DELETE FROM Verification WHERE Code = ?", code); err != nil {
-			return err
-		}
-		return nil
-	})
-	return parseError(err)
+	return parseError(db.deleteAPIKey(userId, name))
 }
 
 func (db *DataBase) GetUser(name string) (User, error) {
-	res := db.db.QueryRow("SELECT Id, Email, Password, Status FROM User WHERE Email = ?", name)
-	var u User
-	err := res.Scan(&u.Id, &u.Email, &u.Password, &u.Status)
+	u, err := db.getUser(name)
 	return u, parseError(err)
 }
 
-func (db *DataBase) DeleteUser(name string) (int64, error) {
-	res, err := db.db.Exec("DELETE FROM User WHERE Email = ?", name)
-	if err != nil {
-		return 0, parseError(err)
-	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return 0, parseError(err)
-	}
-	if rows == 0 {
-		return 0, ErrNotFound
-	}
-	return rows, parseError(err)
-}
-
-func (db *DataBase) getZoneOwner(zoneName string) (ObjectId, error) {
-	res := db.db.QueryRow("SELECT User_Id FROM Zone WHERE Name = ?", zoneName)
-	var userId ObjectId
-	err := res.Scan(&userId)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return EmptyObjectId, nil
-		}
-		return EmptyObjectId, parseError(err)
-	}
-	return userId, nil
+func (db *DataBase) DeleteUser(name string) error {
+	return parseError(db.deleteUser(name))
 }
 
 func (db *DataBase) GetEvents(revision int, start int, count int) ([]Event, error) {
-	rows, err := db.db.Query("SELECT Revision, ZoneId, Type, Value FROM Events WHERE Revision > ? ORDER BY Revision LIMIT ?, ?", revision, start, count)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var res []Event
-	for rows.Next() {
-		var event Event
-		err := rows.Scan(&event.Revision, &event.ZoneId, &event.Type, &event.Value)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, event)
-	}
-	return res, nil
+	res, err := db.getEvents(revision, start, count)
+	return res, parseError(err)
 }
 
 func (db *DataBase) ImportZone(userId ObjectId, z ZoneImport) error {
@@ -338,10 +244,7 @@ func (db *DataBase) ImportZone(userId ObjectId, z ZoneImport) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return parseError(err)
-	}
-	return nil
+	return parseError(err)
 }
 
 func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
@@ -415,33 +318,8 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 }
 
 func (db *DataBase) GetZones(userId ObjectId, start int, count int, q string, ascendingOrder bool) (List, error) {
-	like := "%" + q + "%"
-	query := "SELECT Name, Enabled FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?"
-	if !ascendingOrder {
-		query = "SELECT Name, Enabled FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name DESC LIMIT ?, ?"
-	}
-	rows, err := db.db.Query(query, userId, like, start, count)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return EmptyList(), nil
-		}
-		return List{}, parseError(err)
-	}
-	defer func() { _ = rows.Close() }()
-	res := List{Items: []ListItem{}}
-	for rows.Next() {
-		var item ListItem
-		err := rows.Scan(&item.Id, &item.Enabled)
-		if err != nil {
-			return List{}, parseError(err)
-		}
-		res.Items = append(res.Items, item)
-	}
-	row := db.db.QueryRow("SELECT count(*) FROM Zone WHERE User_Id = ? AND Name LIKE ?", userId, like)
-	if err := row.Scan(&res.Total); err != nil {
-		return List{}, parseError(err)
-	}
-	return res, nil
+	res, err := db.getZones(userId, start, count, q, ascendingOrder)
+	return res, parseError(err)
 }
 
 func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
@@ -452,15 +330,8 @@ func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
 	if err := db.canGetZone(userId, zoneId); err != nil {
 		return Zone{}, parseError(err)
 	}
-	res := db.db.QueryRow("SELECT Resource_Id, Name, CNameFlattening, Dnssec, Enabled, TTL, NS, MBox, Refresh, Retry, Expire, MinTTL, Serial, DS FROM Zone LEFT JOIN SOA ON Zone.Resource_Id = SOA.Zone_Id  LEFT JOIN `Keys` K ON Zone.Resource_Id = K.Zone_Id WHERE Zone.Resource_Id = ?", zoneId)
-	var (
-		z Zone
-	)
-	err = res.Scan(&z.Id, &z.Name, &z.CNameFlattening, &z.Dnssec, &z.Enabled, &z.SOA.TtlValue, &z.SOA.Ns, &z.SOA.MBox, &z.SOA.Refresh, &z.SOA.Retry, &z.SOA.Expire, &z.SOA.MinTtl, &z.SOA.Serial, &z.DS)
-	if err != nil {
-		return Zone{}, parseError(err)
-	}
-	return z, nil
+	z, err := db.getZone(zoneId)
+	return z, parseError(err)
 }
 
 func (db *DataBase) UpdateZone(userId ObjectId, z ZoneUpdate) error {
@@ -468,10 +339,10 @@ func (db *DataBase) UpdateZone(userId ObjectId, z ZoneUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
+	if err := db.canUpdateZone(userId, zoneId); err != nil {
+		return parseError(err)
+	}
 	err = db.withTransaction(func(t *sql.Tx) error {
-		if err := db.canUpdateZone(userId, zoneId); err != nil {
-			return err
-		}
 		if err := updateZone(t, zoneId, z); err != nil {
 			return err
 		}
@@ -483,10 +354,7 @@ func (db *DataBase) UpdateZone(userId ObjectId, z ZoneUpdate) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return parseError(err)
-	}
-	return nil
+	return parseError(err)
 }
 
 func (db *DataBase) DeleteZone(userId ObjectId, z ZoneDelete) error {
@@ -494,10 +362,10 @@ func (db *DataBase) DeleteZone(userId ObjectId, z ZoneDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
+	if err := db.canDeleteZone(userId, zoneId); err != nil {
+		return parseError(err)
+	}
 	err = db.withTransaction(func(t *sql.Tx) error {
-		if err := db.canDeleteZone(userId, zoneId); err != nil {
-			return err
-		}
 		if err := deleteZone(t, zoneId); err != nil {
 			return err
 		}
@@ -509,10 +377,7 @@ func (db *DataBase) DeleteZone(userId ObjectId, z ZoneDelete) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return parseError(err)
-	}
-	return nil
+	return parseError(err)
 }
 
 func (db *DataBase) AddLocation(userId ObjectId, l NewLocation) (ObjectId, error) {
@@ -556,33 +421,8 @@ func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, co
 	if err := db.canGetLocations(userId, zoneId); err != nil {
 		return List{}, parseError(err)
 	}
-	like := "%" + q + "%"
-	query := "SELECT Name, Enabled FROM Location WHERE Zone_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?"
-	if !ascendingOrder {
-		query = "SELECT Name, Enabled FROM Location WHERE Zone_Id = ? AND Name LIKE ? ORDER BY Name DESC LIMIT ?, ?"
-	}
-	rows, err := db.db.Query(query, zoneId, like, start, count)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return EmptyList(), nil
-		}
-		return List{}, parseError(err)
-	}
-	defer func() { _ = rows.Close() }()
-	res := List{Items: []ListItem{}}
-	for rows.Next() {
-		var item ListItem
-		err := rows.Scan(&item.Id, &item.Enabled)
-		if err != nil {
-			return List{}, parseError(err)
-		}
-		res.Items = append(res.Items, item)
-	}
-	row := db.db.QueryRow("SELECT count(*) FROM Location WHERE Zone_Id = ? AND Name LIKE ?", zoneId, like)
-	if err := row.Scan(&res.Total); err != nil {
-		return List{}, parseError(err)
-	}
-	return res, nil
+	res, err := db.getLocations(zoneId, start, count, q, ascendingOrder)
+	return res, parseError(err)
 }
 
 func (db *DataBase) GetLocation(userId ObjectId, zoneName string, location string) (Location, error) {
@@ -593,9 +433,7 @@ func (db *DataBase) GetLocation(userId ObjectId, zoneName string, location strin
 	if err := db.canGetLocation(userId, zoneId, locationId); err != nil {
 		return Location{}, parseError(err)
 	}
-	res := db.db.QueryRow("SELECT Resource_Id, Name, Enabled FROM Location WHERE Resource_Id = ?", locationId)
-	var l Location
-	err = res.Scan(&l.Id, &l.Name, &l.Enabled)
+	l, err := db.getLocation(locationId)
 	return l, parseError(err)
 }
 
@@ -604,10 +442,10 @@ func (db *DataBase) UpdateLocation(userId ObjectId, l LocationUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
+	if err := db.canUpdateLocation(userId, zoneId, locationId); err != nil {
+		return parseError(err)
+	}
 	err = db.withTransaction(func(t *sql.Tx) error {
-		if err := db.canUpdateLocation(userId, zoneId, locationId); err != nil {
-			return err
-		}
 		if err := updateLocation(t, locationId, l); err != nil {
 			return err
 		}
@@ -616,10 +454,7 @@ func (db *DataBase) UpdateLocation(userId ObjectId, l LocationUpdate) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return parseError(err)
-	}
-	return nil
+	return parseError(err)
 }
 
 func (db *DataBase) DeleteLocation(userId ObjectId, l LocationDelete) error {
@@ -627,10 +462,10 @@ func (db *DataBase) DeleteLocation(userId ObjectId, l LocationDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
+	if err := db.canDeleteLocation(userId, zoneId, locationId); err != nil {
+		return parseError(err)
+	}
 	err = db.withTransaction(func(t *sql.Tx) error {
-		if err := db.canDeleteLocation(userId, zoneId, locationId); err != nil {
-			return err
-		}
 		if err := deleteLocation(t, locationId); err != nil {
 			return err
 		}
@@ -639,10 +474,7 @@ func (db *DataBase) DeleteLocation(userId ObjectId, l LocationDelete) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return parseError(err)
-	}
-	return nil
+	return parseError(err)
 }
 
 func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, error) {
@@ -684,28 +516,8 @@ func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location str
 	if err := db.canGetRecordSets(userId, zoneId, locationId); err != nil {
 		return List{}, parseError(err)
 	}
-	rows, err := db.db.Query("SELECT Type, Enabled FROM RecordSet WHERE Location_Id = ? ORDER BY Type", locationId)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return EmptyList(), nil
-		}
-		return List{}, parseError(err)
-	}
-	defer func() { _ = rows.Close() }()
-	res := List{Items: []ListItem{}}
-	for rows.Next() {
-		var item ListItem
-		err := rows.Scan(&item.Id, &item.Enabled)
-		if err != nil {
-			return List{}, parseError(err)
-		}
-		res.Items = append(res.Items, item)
-	}
-	row := db.db.QueryRow("SELECT count(*) FROM RecordSet WHERE Location_Id = ?", locationId)
-	if err := row.Scan(&res.Total); err != nil {
-		return List{}, parseError(err)
-	}
-	return res, nil
+	res, err := db.getRecordSets(locationId)
+	return res, parseError(err)
 }
 
 func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location string, recordType string) (RecordSet, error) {
@@ -716,18 +528,7 @@ func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location stri
 	if err := db.canGetRecordSet(userId, zoneId, locationId, recordId); err != nil {
 		return RecordSet{}, parseError(err)
 	}
-	row := db.db.QueryRow("SELECT Resource_Id, Type, Value, Enabled FROM RecordSet WHERE Resource_Id = ?", recordId)
-	var (
-		r     RecordSet
-		value string
-	)
-	err = row.Scan(&r.Id, &r.Type, &value, &r.Enabled)
-	rrset := types.TypeStrToRRSet(recordType)
-	err = jsoniter.Unmarshal([]byte(value), &rrset)
-	if err != nil {
-		return RecordSet{}, err
-	}
-	r.Value = rrset
+	r, err := db.getRecordSet(recordId, recordType)
 	return r, parseError(err)
 }
 
@@ -736,10 +537,10 @@ func (db *DataBase) UpdateRecordSet(userId ObjectId, r RecordSetUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
+	if err := db.canUpdateRecordSet(userId, zoneId, locationId, recordId); err != nil {
+		return parseError(err)
+	}
 	err = db.withTransaction(func(t *sql.Tx) error {
-		if err := db.canUpdateRecordSet(userId, zoneId, locationId, recordId); err != nil {
-			return err
-		}
 		if err := updateRecordSet(t, recordId, r); err != nil {
 			return err
 		}
@@ -748,10 +549,7 @@ func (db *DataBase) UpdateRecordSet(userId ObjectId, r RecordSetUpdate) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return parseError(err)
-	}
-	return nil
+	return parseError(err)
 }
 
 func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
@@ -759,10 +557,10 @@ func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
+	if err := db.canDeleteRecordSet(userId, zoneId, locationId, recordId); err != nil {
+		return parseError(err)
+	}
 	err = db.withTransaction(func(t *sql.Tx) error {
-		if err := db.canDeleteRecordSet(userId, zoneId, locationId, recordId); err != nil {
-			return parseError(err)
-		}
 		if err := deleteRecordSet(t, recordId); err != nil {
 			return parseError(err)
 		}
@@ -771,73 +569,13 @@ func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return parseError(err)
-	}
-	return nil
+	return parseError(err)
 }
 
-func (db *DataBase) GetVerification(userId ObjectId, verificationType string) (string, error) {
-	res := db.db.QueryRow("SELECT Code FROM Verification WHERE User_Id = ? AND Type = ?", userId, verificationType)
-	var code string
-	err := res.Scan(&code)
+func (db *DataBase) GetVerification(userId ObjectId, verificationType VerificationType) (string, error) {
+	code, err := db.getVerification(userId, verificationType)
 	if err != nil {
 		return "", parseError(err)
 	}
 	return code, nil
-}
-
-func (db *DataBase) getZoneId(zoneName string) (ObjectId, error) {
-	var zoneId ObjectId
-	res := db.db.QueryRow("SELECT Resource_Id FROM Zone WHERE Name = ?", zoneName)
-	err := res.Scan(&zoneId)
-	if err != nil {
-		return EmptyObjectId, parseError(err)
-	}
-	return zoneId, nil
-}
-
-func (db *DataBase) getLocationId(zoneName string, location string) (ObjectId, ObjectId, error) {
-	res := db.db.QueryRow("SELECT Zone.Resource_Id, L.Resource_Id FROM Zone LEFT JOIN Location L on Zone.Resource_Id = L.Zone_Id WHERE Zone.Name = ? AND L.Name = ?", zoneName, location)
-	var (
-		zoneId     ObjectId
-		locationId ObjectId
-	)
-	err := res.Scan(&zoneId, &locationId)
-	if err != nil {
-		return EmptyObjectId, EmptyObjectId, parseError(err)
-	}
-	return zoneId, locationId, nil
-}
-
-func (db *DataBase) getRecordId(zoneName string, location string, recordType string) (ObjectId, ObjectId, ObjectId, error) {
-	res := db.db.QueryRow("SELECT Zone.Resource_Id, L.Resource_Id, RS.Resource_Id FROM Zone LEFT JOIN Location L on Zone.Resource_Id = L.Zone_Id LEFT JOIN RecordSet RS on L.Resource_Id = RS.Location_Id WHERE Zone.Name = ? AND L.Name = ? AND RS.Type = ?", zoneName, location, recordType)
-	var (
-		zoneId     ObjectId
-		locationId ObjectId
-		recordId   ObjectId
-	)
-	err := res.Scan(&zoneId, &locationId, &recordId)
-	if err != nil {
-		return EmptyObjectId, EmptyObjectId, EmptyObjectId, parseError(err)
-	}
-	return zoneId, locationId, recordId, nil
-}
-
-func parseError(err error) error {
-	var mysqlErr *mysql.MySQLError
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
-	if errors.As(err, &mysqlErr) {
-		switch mysqlErr.Number {
-		case 1062:
-			return ErrDuplicateEntry
-		case 1452:
-			return ErrInvalid
-		default:
-			return err
-		}
-	}
-	return err
 }

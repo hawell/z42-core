@@ -62,16 +62,14 @@ func TestUser(t *testing.T) {
 	Expect(err).To(Equal(ErrDuplicateEntry))
 
 	// delete
-	res, err := db.DeleteUser("dbUser1")
+	err = db.DeleteUser("dbUser1")
 	Expect(err).To(BeNil())
-	Expect(res).To(Equal(int64(1)))
 	_, err = db.GetUser("dbUser1")
 	Expect(err).NotTo(BeNil())
 
 	// delete non-existing user
-	res, err = db.DeleteUser("dbUser1")
+	err = db.DeleteUser("dbUser1")
 	Expect(err).To(Equal(ErrNotFound))
-	Expect(res).To(Equal(int64(0)))
 }
 
 func TestAddZone(t *testing.T) {
