@@ -6,7 +6,7 @@ require (
 	github.com/appleboy/gin-jwt/v2 v2.7.0
 	github.com/coredns/coredns v1.8.6
 	github.com/dgraph-io/ristretto v0.1.0
-	github.com/gin-gonic/gin v1.7.4
+	github.com/gin-gonic/gin v1.7.7
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gomodule/redigo v1.8.5
 	github.com/google/go-cmp v0.5.6
