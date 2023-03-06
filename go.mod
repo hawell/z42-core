@@ -22,7 +22,7 @@ require (
 	github.com/tevino/abool/v2 v2.0.1
 	go.uber.org/zap v1.19.1
 	golang.org/x/crypto v0.0.0-20211115234514-b4de73f9ece8
-	golang.org/x/net v0.0.0-20211116231205-47ca1ff31462
+	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 )
 
@@ -45,8 +45,8 @@ require (
 	github.com/ugorji/go/codec v1.2.6 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
-	golang.org/x/sys v0.0.0-20211116061358-0a5406a5449c // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
