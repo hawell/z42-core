@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/hawell/z42/pkg/workerpool"
-	"github.com/hawell/z42/tools/query/query"
-	"github.com/hawell/z42/tools/query/source"
-	"github.com/hawell/z42/tools/query/tool"
+	"z42-core/pkg/workerpool"
+	"z42-core/tools/query/query"
+	"z42-core/tools/query/source"
+	"z42-core/tools/query/tool"
 	"github.com/miekg/dns"
 	"time"
 )

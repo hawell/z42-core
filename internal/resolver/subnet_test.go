@@ -1,7 +1,7 @@
 package resolver
 
 import (
-	"github.com/hawell/z42/internal/test"
+	"z42-core/internal/test"
 	"github.com/miekg/dns"
 	. "github.com/onsi/gomega"
 	"net"

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
-	"github.com/hawell/z42/internal/types"
+	"z42-core/internal/types"
 	jsoniter "github.com/json-iterator/go"
 )
 

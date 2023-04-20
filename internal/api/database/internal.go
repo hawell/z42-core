@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
-	"github.com/hawell/z42/internal/types"
+	"z42-core/internal/types"
 	jsoniter "github.com/json-iterator/go"
 )
 

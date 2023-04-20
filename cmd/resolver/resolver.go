@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -10,11 +9,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/resolver"
-	"github.com/hawell/z42/internal/server"
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/pkg/ratelimit"
+	"z42-core/internal/logger"
+	"z42-core/internal/resolver"
+	"z42-core/internal/server"
+	"z42-core/internal/storage"
+	"z42-core/pkg/ratelimit"
 	"github.com/json-iterator/go"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
@@ -52,7 +51,7 @@ func main() {
 			log.Println("cannot unmarshal template config : ", err)
 			return
 		}
-		if err = ioutil.WriteFile(*generateConfigPtr, data, 0644); err != nil {
+		if err = os.WriteFile(*generateConfigPtr, data, 0644); err != nil {
 			log.Printf("cannot save template config to file %s : %s\n", *generateConfigPtr, err)
 		}
 		return

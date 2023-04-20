@@ -2,8 +2,8 @@ package storage
 
 import (
 	"github.com/google/go-cmp/cmp"
-	"github.com/hawell/z42/internal/api/database"
-	"github.com/hawell/z42/pkg/hiredis"
+	"z42-core/internal/api/database"
+	"z42-core/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
 	"net"
@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hawell/z42/internal/types"
+	"z42-core/internal/types"
 	"github.com/miekg/dns"
 )
 

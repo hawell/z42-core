@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/hawell/z42/pkg/workerpool"
+	"z42-core/pkg/workerpool"
 	"math/rand"
 	"time"
 )

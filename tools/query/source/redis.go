@@ -1,9 +1,9 @@
 package source
 
 import (
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/pkg/hiredis"
-	"github.com/hawell/z42/tools/query/query"
+	"z42-core/internal/storage"
+	"z42-core/pkg/hiredis"
+	"z42-core/tools/query/query"
 )
 
 type RedisDumpQueryGenerator struct {

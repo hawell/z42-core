@@ -4,12 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/hawell/z42/internal/api/database"
-	"github.com/hawell/z42/internal/api/server"
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/mailer"
-	"github.com/hawell/z42/internal/upstream"
 	"go.uber.org/zap"
+	"z42-core/internal/api/database"
+	"z42-core/internal/api/server"
+	"z42-core/internal/logger"
+	"z42-core/internal/mailer"
+	"z42-core/internal/upstream"
 )
 
 func main() {

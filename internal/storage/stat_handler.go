@@ -2,8 +2,8 @@ package storage
 
 import (
 	"github.com/dgraph-io/ristretto"
-	"github.com/hawell/z42/internal/types"
-	"github.com/hawell/z42/pkg/hiredis"
+	"z42-core/internal/types"
+	"z42-core/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 	"strings"

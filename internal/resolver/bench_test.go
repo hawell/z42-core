@@ -1,8 +1,8 @@
 package resolver
 
 import (
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/internal/test"
+	"z42-core/internal/storage"
+	"z42-core/internal/test"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 	"log"

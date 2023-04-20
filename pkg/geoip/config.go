@@ -2,7 +2,7 @@ package geoip
 
 import (
 	"fmt"
-	"github.com/hawell/z42/configs"
+	"z42-core/configs"
 	"github.com/oschwald/maxminddb-golang"
 	"net"
 	"os"

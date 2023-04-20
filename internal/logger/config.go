@@ -2,7 +2,7 @@ package logger
 
 import (
 	"fmt"
-	"github.com/hawell/z42/configs"
+	"z42-core/configs"
 	"go.uber.org/zap/zapcore"
 )
 

@@ -4,13 +4,13 @@ import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"github.com/hawell/z42/internal/api/database"
-	"github.com/hawell/z42/internal/api/handlers"
-	"github.com/hawell/z42/internal/api/handlers/recaptcha"
-	"github.com/hawell/z42/internal/mailer"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
+	"z42-core/internal/api/database"
+	"z42-core/internal/api/handlers"
+	"z42-core/internal/api/handlers/recaptcha"
+	"z42-core/internal/mailer"
 )
 
 type storage interface {

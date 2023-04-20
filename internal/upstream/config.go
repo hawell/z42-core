@@ -3,7 +3,7 @@ package upstream
 import (
 	"errors"
 	"fmt"
-	"github.com/hawell/z42/configs"
+	"z42-core/configs"
 	"github.com/miekg/dns"
 	"strconv"
 	"time"

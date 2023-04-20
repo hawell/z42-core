@@ -1,8 +1,8 @@
 package geotools
 
 import (
-	"github.com/hawell/z42/internal/types"
-	"github.com/hawell/z42/pkg/geoip"
+	"z42-core/internal/types"
+	"z42-core/pkg/geoip"
 	"go.uber.org/zap"
 	"net"
 )

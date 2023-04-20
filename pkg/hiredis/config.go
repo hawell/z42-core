@@ -3,8 +3,8 @@ package hiredis
 import (
 	"errors"
 	"fmt"
-	"github.com/hawell/z42/configs"
 	"strings"
+	"z42-core/configs"
 )
 
 type ConnectionConfig struct {

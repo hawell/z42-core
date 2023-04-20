@@ -2,8 +2,10 @@ package mailer
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"html/template"
+	"net"
 	"net/mail"
 	"net/smtp"
 )
@@ -58,7 +60,7 @@ func (m *SMTP) SendEMailVerification(toName string, toEmail string, code string)
 	if err != nil {
 		return err
 	}
-	return m.send(toName, toEmail, b.String())
+	return m.send(toName, toEmail, "email verification", b.String())
 }
 
 func (m *SMTP) SendPasswordReset(toName string, toEmail string, code string) error {
@@ -76,23 +78,47 @@ func (m *SMTP) SendPasswordReset(toName string, toEmail string, code string) err
 	if err != nil {
 		return err
 	}
-	return m.send(toName, toEmail, b.String())
+	return m.send(toName, toEmail, "password reset", b.String())
 }
 
-func (m *SMTP) send(toName string, toEmail string, body string) error {
-	c, err := smtp.Dial(m.config.Address)
+func (m *SMTP) send(toName string, toEmail string, subject string, body string) error {
+	var (
+		c   *smtp.Client
+		err error
+	)
+	host, _, err := net.SplitHostPort(m.config.Address)
 	if err != nil {
 		return err
 	}
+	if m.config.Auth.Username != "" {
+		conn, err := tls.Dial("tcp", m.config.Address, &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         host,
+		})
+		if err != nil {
+			return err
+		}
+		c, err = smtp.NewClient(conn, host)
+		if err != nil {
+			return err
+		}
+		err = c.Auth(smtp.PlainAuth("", m.config.Auth.Username, m.config.Auth.Password, host))
+		if err != nil {
+			return err
+		}
+	} else {
+		c, err = smtp.Dial(m.config.Address)
+		if err != nil {
+			return err
+		}
+	}
 	defer c.Close()
-	from := mail.Address{Name: m.config.FromName, Address: m.config.FromEmail}
-	fromHeader := from.String()
 
 	to := mail.Address{Name: toName, Address: toEmail}
 	header := make(map[string]string)
 	header["To"] = to.String()
-	header["From"] = fromHeader
-	header["Subject"] = "email verification"
+	header["From"] = m.config.FromEmail
+	header["Subject"] = subject
 	header["Content-Type"] = `text/html; charset="UTF-8"`
 	msg := ""
 	for k, v := range header {
@@ -100,7 +126,7 @@ func (m *SMTP) send(toName string, toEmail string, body string) error {
 	}
 	msg += "\r\n" + body
 	bMsg := []byte(msg)
-	if err = c.Mail(fromHeader); err != nil {
+	if err = c.Mail(m.config.FromEmail); err != nil {
 		return err
 	}
 	err = c.Rcpt(toEmail)

@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"github.com/hawell/z42/internal/api/handlers"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
+	"z42-core/internal/api/handlers"
 )
 
 type Handler struct {

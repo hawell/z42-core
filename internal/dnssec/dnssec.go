@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"errors"
-	"github.com/hawell/z42/internal/types"
+	"z42-core/internal/types"
 	"go.uber.org/zap"
 
 	"github.com/miekg/dns"

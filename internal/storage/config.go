@@ -1,6 +1,6 @@
 package storage
 
-import "github.com/hawell/z42/pkg/hiredis"
+import "z42-core/pkg/hiredis"
 
 type DataHandlerConfig struct {
 	ZoneCacheSize      int            `json:"zone_cache_size"`

@@ -2,8 +2,8 @@ package resolver
 
 import (
 	"fmt"
-	"github.com/hawell/z42/internal/upstream"
-	"github.com/hawell/z42/pkg/geoip"
+	"z42-core/internal/upstream"
+	"z42-core/pkg/geoip"
 )
 
 type Config struct {

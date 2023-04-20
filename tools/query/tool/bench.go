@@ -2,7 +2,7 @@ package tool
 
 import (
 	"fmt"
-	"github.com/hawell/z42/tools/query/query"
+	"z42-core/tools/query/query"
 	"github.com/miekg/dns"
 	"sync"
 	"time"

@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"github.com/hawell/z42/configs"
+	"z42-core/configs"
 	"net"
 	"strconv"
 )

@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/hawell/z42/internal/api/database"
+	"z42-core/internal/api/database"
 	"go.uber.org/zap"
 	"net/http"
 )

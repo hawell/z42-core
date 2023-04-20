@@ -1,18 +1,18 @@
 package resolver
 
 import (
-	"github.com/hawell/z42/internal/geotools"
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/pkg/geoip"
+	"z42-core/internal/geotools"
+	"z42-core/internal/storage"
+	"z42-core/pkg/geoip"
 	"go.uber.org/zap"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/hawell/z42/internal/dnssec"
-	"github.com/hawell/z42/internal/types"
-	"github.com/hawell/z42/internal/upstream"
+	"z42-core/internal/dnssec"
+	"z42-core/internal/types"
+	"z42-core/internal/upstream"
 
 	"github.com/miekg/dns"
 )

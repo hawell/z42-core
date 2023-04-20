@@ -3,8 +3,8 @@ package resolver
 import (
 	"errors"
 	"fmt"
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/internal/types"
+	"z42-core/internal/storage"
+	"z42-core/internal/types"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"net"
@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hawell/z42/internal/test"
+	"z42-core/internal/test"
 	"github.com/miekg/dns"
 )
 

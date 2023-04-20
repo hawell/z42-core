@@ -2,9 +2,9 @@ package healthcheck
 
 import (
 	"fmt"
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/internal/types"
-	"github.com/hawell/z42/pkg/hiredis"
+	"z42-core/internal/storage"
+	"z42-core/internal/types"
+	"z42-core/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"

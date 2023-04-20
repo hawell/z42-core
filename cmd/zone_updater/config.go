@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/storage"
 	jsoniter "github.com/json-iterator/go"
+	"z42-core/internal/logger"
+	"z42-core/internal/storage"
 )
 
 type Config struct {

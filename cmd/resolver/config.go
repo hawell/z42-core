@@ -5,13 +5,13 @@ import (
 	"log"
 	"os"
 
-	"github.com/hawell/z42/configs"
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/resolver"
-	"github.com/hawell/z42/internal/server"
-	"github.com/hawell/z42/internal/storage"
-	"github.com/hawell/z42/pkg/ratelimit"
 	jsoniter "github.com/json-iterator/go"
+	"z42-core/configs"
+	"z42-core/internal/logger"
+	"z42-core/internal/resolver"
+	"z42-core/internal/server"
+	"z42-core/internal/storage"
+	"z42-core/pkg/ratelimit"
 )
 
 type Config struct {

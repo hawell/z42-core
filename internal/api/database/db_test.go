@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/hawell/z42/internal/types"
+	"z42-core/internal/types"
 	"github.com/miekg/dns"
 	. "github.com/onsi/gomega"
 	"net"

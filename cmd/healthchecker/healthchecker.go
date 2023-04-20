@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/hawell/z42/internal/healthcheck"
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/storage"
+	"z42-core/internal/healthcheck"
+	"z42-core/internal/logger"
+	"z42-core/internal/storage"
 	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 	"io/ioutil"

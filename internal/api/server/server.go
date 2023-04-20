@@ -3,17 +3,17 @@ package server
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/hawell/z42/internal/api/database"
-	"github.com/hawell/z42/internal/api/handlers"
-	"github.com/hawell/z42/internal/api/handlers/auth"
-	"github.com/hawell/z42/internal/api/handlers/recaptcha"
-	"github.com/hawell/z42/internal/api/handlers/zone"
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/mailer"
-	"github.com/hawell/z42/internal/upstream"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
+	"z42-core/internal/api/database"
+	"z42-core/internal/api/handlers"
+	"z42-core/internal/api/handlers/auth"
+	"z42-core/internal/api/handlers/recaptcha"
+	"z42-core/internal/api/handlers/zone"
+	"z42-core/internal/logger"
+	"z42-core/internal/mailer"
+	"z42-core/internal/upstream"
 )
 
 type Config struct {

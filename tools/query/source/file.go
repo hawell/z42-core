@@ -3,7 +3,7 @@ package source
 import (
 	"bufio"
 	"fmt"
-	"github.com/hawell/z42/tools/query/query"
+	"z42-core/tools/query/query"
 	"math/rand"
 	"os"
 )

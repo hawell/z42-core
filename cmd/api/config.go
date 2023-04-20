@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/hawell/z42/internal/api/server"
-	"github.com/hawell/z42/internal/logger"
-	"github.com/hawell/z42/internal/mailer"
-	"github.com/hawell/z42/internal/upstream"
 	jsoniter "github.com/json-iterator/go"
 	"log"
 	"os"
+	"z42-core/internal/api/server"
+	"z42-core/internal/logger"
+	"z42-core/internal/mailer"
+	"z42-core/internal/upstream"
 )
 
 type Config struct {

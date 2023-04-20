@@ -2,7 +2,7 @@ package zone
 
 import (
 	"errors"
-	"github.com/hawell/z42/internal/types"
+	"z42-core/internal/types"
 	jsoniter "github.com/json-iterator/go"
 )
 
