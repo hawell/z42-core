@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  api:
+    restart: on-failure
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+      target: api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./configs/api-config.json:/etc/z42/api-config.json
+      - ./templates:/var/z42/templates
+    networks:
+      - app-network
+
+  resolver:
+    restart: on-failure
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+      target: resolver
+    ports:
+      - "1053:1053/tcp"
+      - "1053:1053/udp"
+    volumes:
+      - ./configs/resolver-config.json:/etc/z42/resolver-config.json
+      - ./assets/geoCity.mmdb:/var/z42/geoCity.mmdb
+      - ./assets/geoIsp.mmdb:/var/z42/geoIsp.mmdb
+    networks:
+      - app-network
+
+  updater:
+    restart: on-failure
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+      target: updater
+    volumes:
+      - ./configs/updater-config.json:/etc/z42/updater-config.json
+    networks:
+      - app-network
+
+  redis:
+    image: redis:alpine
+    restart: on-failure
+    ports:
+      - "6379:6379"
+    expose:
+      - 6379
+    volumes:
+      - redis:/data
+    networks:
+      - app-network
+
+  db:
+    image: mysql:latest
+    restart: on-failure
+    environment:
+      MYSQL_DATABASE: 'z42'
+      MYSQL_USER: 'z42user'
+      MYSQL_PASSWORD: 'z42password'
+      MYSQL_ROOT_PASSWORD: 'root'
+    ports:
+      - "3306:3306"
+    expose:
+      - 3306
+    volumes:
+      - db:/var/lib/mysql
+      - ./scripts/schema-final.sql:/docker-entrypoint-initdb.d/1.sql
+    networks:
+      - app-network
+
+volumes:
+  db:
+    driver: local
+  redis:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
