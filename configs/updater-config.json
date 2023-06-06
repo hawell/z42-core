@@ -3,7 +3,7 @@
     "level": "ERROR",
     "destination": "stderr"
   },
-  "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
+  "db_connection_string": "z42user:z42password@tcp(db:3306)/z42",
   "redis_data": {
     "zone_cache_size": 10000,
     "zone_cache_timeout": 60,
@@ -11,7 +11,7 @@
     "record_cache_size": 1000000,
     "record_cache_timeout": 60,
     "redis": {
-      "address": "127.0.0.1:6379",
+      "address": "redis:6379",
       "net": "tcp",
       "db": 0,
       "password": "",

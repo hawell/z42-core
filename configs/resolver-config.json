@@ -9,7 +9,7 @@
   },
   "server": [
     {
-      "ip": "127.0.0.1",
+      "ip": "0.0.0.0",
       "port": 1053,
       "protocol": "udp",
       "count": 1,
@@ -28,7 +28,7 @@
     "record_cache_size": 1000000,
     "record_cache_timeout": 60,
     "redis": {
-      "address": "127.0.0.1:6379",
+      "address": "redis:6379",
       "net": "tcp",
       "db": 0,
       "password": "",
@@ -47,7 +47,7 @@
   },
   "redis_stat": {
     "redis": {
-      "address": "127.0.0.1:6379",
+      "address": "redis:6379",
       "net": "tcp",
       "db": 0,
       "password": "",
@@ -75,8 +75,8 @@
     ],
     "geoip": {
       "enable": false,
-      "country_db": "geoCity.mmdb",
-      "asn_db": "geoIsp.mmdb"
+      "country_db": "/var/z42/geoCity.mmdb",
+      "asn_db": "/var/z42/geoIsp.mmdb"
     },
     "log_source_location": false
   },

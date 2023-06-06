@@ -1,5 +1,5 @@
 {
-  "db_connection_string": "root:root@tcp(127.0.0.1:3306)/z42",
+  "db_connection_string": "z42user:z42password@tcp(db:3306)/z42",
   "event_log": {
     "level": "WARNING",
     "destination": "stderr"
@@ -9,23 +9,26 @@
     "destination": "stdout"
   },
   "server": {
-    "bind_address": "localhost:3000",
+    "bind_address": "0.0.0.0:3000",
     "max_body_size": 1000000,
-    "web_server": "www.z42.com",
-    "api_server": "api.z42.com",
-    "name_server": "ns.z42.com.",
-    "html_templates": "./templates/*.tmpl",
-    "recaptcha_secret_key": "6LdNW6UcAAAAAL7M90WaPU2h4KwIveMuleVPMlkK",
+    "web_server": "www.zone-42.com",
+    "api_server": "api.zone-42.com",
+    "name_server": "ns.zone-42.com.",
+    "html_templates": "/var/z42/templates/*.tmpl",
+    "recaptcha_secret_key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "recaptcha_server": "https://www.google.com/recaptcha/api/siteverify"
   },
   "mailer": {
-    "address": "127.0.0.1:25",
-    "from_name": "zone-42",
-    "from_email": "noreply@zone-42.com",
-    "web_server": "www.z42.com",
-    "api_server": "api.z42.com",
-    "name_server": "ns.z42.com.",
-    "html_templates": "./templates/*.tmpl"
+    "address": "mail.zone-42.com:465",
+    "from_email": "no-reply@mail.zone-42.com",
+    "web_server": "www.zone-42.com",
+    "api_server": "api.zone-42.com",
+    "name_server": "ns.zone-42.com.",
+    "html_templates": "/var/z42/templates/*.tmpl",
+    "auth": {
+      "username": "mailuser",
+      "password": "mailpassword"
+    }
   },
   "upstream": [
     {
