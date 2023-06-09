@@ -7,6 +7,7 @@ import (
 
 func TestSend(t *testing.T) {
 	RegisterTestingT(t)
+	t.Skip("manual")
 	m, err := NewSMTP(&Config{
 		Address:       "127.0.0.1:25",
 		FromEmail:     "noreply@zone-42.com",

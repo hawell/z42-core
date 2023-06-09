@@ -39,7 +39,7 @@ var (
 		ApiServer:          "api.z42.com",
 		NameServer:         "ns.z42.com.",
 		HtmlTemplates:      "../../../templates/*.tmpl",
-		RecaptchaSecretKey: "6LdNW6UcAAAAAL7M90WaPU2h4KwIveMuleVPMlkK",
+		RecaptchaSecretKey: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
 		RecaptchaServer:    "http://127.0.0.1:9798",
 	}
 	connectionStr = "z42user:z42password@tcp(127.0.0.1:3306)/z42"

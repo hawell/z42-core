@@ -1,3 +1,3 @@
-CREATE USER 'z42'@'localhost' IDENTIFIED BY 'z42password';
+CREATE USER 'z42user'@'localhost' IDENTIFIED BY 'z42password';
 GRANT SELECT, INSERT, UPDATE, DELETE ON 'z42' . * TO 'z42'@'localhost';
 FLUSH PRIVILEGES;
