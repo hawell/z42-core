@@ -1,15 +1,15 @@
 package database
 
 import (
-	"z42-core/internal/types"
 	"github.com/miekg/dns"
 	. "github.com/onsi/gomega"
 	"net"
 	"testing"
+	"z42-core/internal/types"
 )
 
 var (
-	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
+	connectionStr = "z42user:z42password@tcp(127.0.0.1:3306)/z42"
 	db            *DataBase
 	soa           = types.SOA_RRSet{
 		GenericRRSet: types.GenericRRSet{TtlValue: 3600},

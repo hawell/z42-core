@@ -42,7 +42,7 @@ var (
 		RecaptchaSecretKey: "6LdNW6UcAAAAAL7M90WaPU2h4KwIveMuleVPMlkK",
 		RecaptchaServer:    "http://127.0.0.1:9798",
 	}
-	connectionStr = "root:root@tcp(127.0.0.1:3306)/z42"
+	connectionStr = "z42user:z42password@tcp(127.0.0.1:3306)/z42"
 	db            *database.DataBase
 	client        *http.Client
 	tokens        map[database.ObjectId]string

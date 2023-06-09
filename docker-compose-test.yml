@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+
+  redis:
+    image: redis:alpine
+    restart: on-failure
+    ports:
+      - "6379:6379"
+    expose:
+      - 6379
+    volumes:
+      - redis:/data
+    networks:
+      - app-network
+
+  db:
+    image: mysql:latest
+    restart: on-failure
+    environment:
+      MYSQL_DATABASE: 'z42'
+      MYSQL_USER: 'z42user'
+      MYSQL_PASSWORD: 'z42password'
+      MYSQL_ROOT_PASSWORD: 'root'
+    ports:
+      - "3306:3306"
+    expose:
+      - 3306
+    volumes:
+      - db:/var/lib/mysql
+      - ./scripts/schema-final.sql:/docker-entrypoint-initdb.d/1.sql
+    networks:
+      - app-network
+
+volumes:
+  db:
+    driver: local
+  redis:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

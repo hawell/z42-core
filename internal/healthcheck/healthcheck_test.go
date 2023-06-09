@@ -2,9 +2,6 @@ package healthcheck
 
 import (
 	"fmt"
-	"z42-core/internal/storage"
-	"z42-core/internal/types"
-	"z42-core/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
@@ -13,6 +10,9 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"z42-core/internal/storage"
+	"z42-core/internal/types"
+	"z42-core/pkg/hiredis"
 )
 
 var healthcheckGetEntries = []*types.HealthCheckItem{
@@ -51,7 +51,7 @@ var healthCheckSetEntries = [][]string{
 
 var healthcheckRedisStatConfig = storage.StatHandlerConfig{
 	Redis: hiredis.Config{
-		Address:  "redis:6379",
+		Address:  "127.0.0.1:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
@@ -78,7 +78,7 @@ var healthcheckRedisDataConfig = storage.DataHandlerConfig{
 	MinTTL:             5,
 	MaxTTL:             300,
 	Redis: hiredis.Config{
-		Address:  "redis:6379",
+		Address:  "127.0.0.1:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",
@@ -351,7 +351,7 @@ func TestHealthCheck(t *testing.T) {
 	RegisterTestingT(t)
 	var healthcheckStatConfig = storage.StatHandlerConfig{
 		Redis: hiredis.Config{
-			Address:  "redis:6379",
+			Address:  "127.0.0.1:6379",
 			Net:      "tcp",
 			DB:       0,
 			Password: "",
@@ -421,7 +421,7 @@ func TestExpire(t *testing.T) {
 	RegisterTestingT(t)
 	var statConfig = storage.StatHandlerConfig{
 		Redis: hiredis.Config{
-			Address:  "redis:6379",
+			Address:  "127.0.0.1:6379",
 			Net:      "tcp",
 			DB:       0,
 			Password: "",

@@ -15,7 +15,7 @@ func TestRedis(t *testing.T) {
 	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 	}
@@ -61,7 +61,7 @@ func TestRedis(t *testing.T) {
 func TestConfig(t *testing.T) {
 	RegisterTestingT(t)
 	cfg := Config{
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 	}
@@ -84,7 +84,7 @@ func TestPubSub(t *testing.T) {
 	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 	}
@@ -166,7 +166,7 @@ func TestExpirePersist(t *testing.T) {
 	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 	}
@@ -205,7 +205,7 @@ func TestSets(t *testing.T) {
 	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 	}
@@ -239,6 +239,7 @@ func TestSets(t *testing.T) {
 }
 
 func TestUnixSocket(t *testing.T) {
+	t.Skip("manual")
 	RegisterTestingT(t)
 	cfg := Config{
 		Suffix:  "_redistest",
@@ -260,7 +261,7 @@ func TestStream(t *testing.T) {
 	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 	}
@@ -305,7 +306,7 @@ func TestTransaction(t *testing.T) {
 	cfg := Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 	}

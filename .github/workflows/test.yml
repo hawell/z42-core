@@ -1,0 +1,43 @@
+name: test
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: cache local images
+        id: local-images
+        uses: actions/cache@v3
+        with:
+          path: /var/lib/docker/
+          key: local-docker-directory
+
+      - name: build services images
+        run: |
+          docker-compose -f docker-compose-test.yml build
+
+      - name: run services
+        run: |
+          docker-compose -f docker-compose-test.yml up -d
+
+      - name: setup go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          Cache-dependency-path: subdir/go.sum
+
+      - name: install dependencies
+        run: |
+          go get -t ./...
+
+      - name: run tests
+        run: |
+          gofmt -w -s `go list -f '{{.Dir}}' ./...`
+          go test ./...

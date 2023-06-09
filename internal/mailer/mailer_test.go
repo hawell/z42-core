@@ -22,6 +22,7 @@ func TestSend(t *testing.T) {
 
 func TestSendWithAuthGMail(t *testing.T) {
 	RegisterTestingT(t)
+	t.Skip("manual")
 	m, err := NewSMTP(&Config{
 		Address:       "smtp.gmail.com:465",
 		FromEmail:     "arash.cordi@gmail.com",
@@ -41,6 +42,7 @@ func TestSendWithAuthGMail(t *testing.T) {
 
 func TestSendWithAuthAWS(t *testing.T) {
 	RegisterTestingT(t)
+	t.Skip("manual")
 	m, err := NewSMTP(&Config{
 		Address:       "email-smtp.eu-west-3.amazonaws.com:465",
 		FromEmail:     "arash.cordi@gmail.com",
@@ -49,8 +51,8 @@ func TestSendWithAuthAWS(t *testing.T) {
 		NameServer:    "ns.z42.com.",
 		HtmlTemplates: "../../templates/*.tmpl",
 		Auth: Auth{
-			Username: "AKIAXSERLOKQN6CFWN5Y",
-			Password: "BOb0SYEGZ0w444OtHZ8ReQvqhcGbOm+Mql6XU1ImoASn",
+			Username: "AAAAAAAAAAAAAAAAAAAA",
+			Password: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
 		},
 	})
 	Expect(err).To(BeNil())

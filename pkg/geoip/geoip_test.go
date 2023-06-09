@@ -121,6 +121,19 @@ func TestDisabled(t *testing.T) {
 	Expect(err).To(Equal(ErrGeoIpDisabled))
 }
 
+func Test1(t *testing.T) {
+	RegisterTestingT(t)
+	cfg := Config{
+		Enable:    true,
+		CountryDB: countryDB,
+		ASNDB:     asnDB,
+	}
+	geoIp := NewGeoIp(&cfg)
+
+	c, err := geoIp.GetASN(net.ParseIP("90.92.122.188"))
+	fmt.Println(c, err)
+}
+
 func TestBadDB(t *testing.T) {
 	RegisterTestingT(t)
 	cfg := Config{

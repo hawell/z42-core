@@ -3,14 +3,14 @@ package resolver
 import (
 	"errors"
 	"fmt"
+	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
+	"testing"
 	"z42-core/internal/storage"
 	"z42-core/internal/test"
 	"z42-core/internal/upstream"
 	"z42-core/pkg/geoip"
 	"z42-core/pkg/hiredis"
-	. "github.com/onsi/gomega"
-	"go.uber.org/zap"
-	"testing"
 )
 
 type TestCase struct {
@@ -78,7 +78,7 @@ var DefaultRedisDataTestConfig = storage.DataHandlerConfig{
 	MinTTL:             5,
 	MaxTTL:             3600,
 	Redis: hiredis.Config{
-		Address:  "redis:6379",
+		Address:  "127.0.0.1:6379",
 		Net:      "tcp",
 		DB:       0,
 		Password: "",

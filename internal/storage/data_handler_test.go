@@ -2,17 +2,17 @@ package storage
 
 import (
 	"github.com/google/go-cmp/cmp"
-	"z42-core/internal/api/database"
-	"z42-core/pkg/hiredis"
 	jsoniter "github.com/json-iterator/go"
 	. "github.com/onsi/gomega"
 	"net"
 	"sort"
 	"testing"
 	"time"
+	"z42-core/internal/api/database"
+	"z42-core/pkg/hiredis"
 
-	"z42-core/internal/types"
 	"github.com/miekg/dns"
+	"z42-core/internal/types"
 )
 
 var dataHandlerDefaultTestConfig = DataHandlerConfig{
@@ -26,7 +26,7 @@ var dataHandlerDefaultTestConfig = DataHandlerConfig{
 	Redis: hiredis.Config{
 		Suffix:  "_redistest",
 		Prefix:  "redistest_",
-		Address: "redis:6379",
+		Address: "127.0.0.1:6379",
 		Net:     "tcp",
 		DB:      0,
 		Connection: hiredis.ConnectionConfig{
