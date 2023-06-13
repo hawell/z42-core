@@ -36,7 +36,7 @@ func MiddlewareFunc(logger *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		logger.Info("",
 			zap.String("method", ctx.Request.Method),
-			zap.String("path", ctx.Request.URL.EscapedPath()),
+			zap.String("uri", ctx.Request.RequestURI),
 		)
 		ctx.Next()
 	}
