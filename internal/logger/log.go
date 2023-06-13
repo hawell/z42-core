@@ -37,6 +37,7 @@ func MiddlewareFunc(logger *zap.Logger) gin.HandlerFunc {
 		logger.Info("",
 			zap.String("method", ctx.Request.Method),
 			zap.String("uri", ctx.Request.RequestURI),
+			zap.String("query", ctx.Request.URL.RawQuery),
 		)
 		ctx.Next()
 	}
