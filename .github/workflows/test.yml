@@ -21,11 +21,11 @@ jobs:
 
       - name: build services images
         run: |
-          docker-compose -f docker-compose-test.yml build
+          docker-compose -f docker-compose-services.yml build
 
       - name: run services
         run: |
-          docker-compose -f docker-compose-test.yml up -d
+          docker-compose -f docker-compose-services.yml up -d
 
       - name: setup go
         uses: actions/setup-go@v4
