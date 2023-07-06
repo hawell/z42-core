@@ -64,13 +64,12 @@ func (db *DataBase) Clear(removeUsers bool) error {
 			if err := deleteUsers(t); err != nil {
 				return err
 			}
-		} else {
-			if err := deleteResources(t); err != nil {
-				return err
-			}
-			if err := deleteVerifications(t); err != nil {
-				return err
-			}
+		}
+		if err := deleteResources(t); err != nil {
+			return err
+		}
+		if err := deleteVerifications(t); err != nil {
+			return err
 		}
 		if err := deleteEvents(t); err != nil {
 			return err

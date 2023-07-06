@@ -23,17 +23,17 @@ func TestSend(t *testing.T) {
 
 func TestSendWithAuthGMail(t *testing.T) {
 	RegisterTestingT(t)
-	t.Skip("manual")
+	//t.Skip("manual")
 	m, err := NewSMTP(&Config{
 		Address:       "smtp.gmail.com:465",
-		FromEmail:     "arash.cordi@gmail.com",
-		WebServer:     "www.z42.com",
-		ApiServer:     "api.z42.com",
-		NameServer:    "ns.z42.com.",
+		FromEmail:     "mail.zone42@gmail.com",
+		WebServer:     "www.zone-42.com",
+		ApiServer:     "api.zone-42.com",
+		NameServer:    "ns.zone-42.com.",
 		HtmlTemplates: "../../templates/*.tmpl",
 		Auth: Auth{
-			Username: "arash.cordi@gmail.com",
-			Password: "tsyuzcvdhshhremx",
+			Username: "AAAA.AAAA@gmail.com",
+			Password: "XXXXXXXX",
 		},
 	})
 	Expect(err).To(BeNil())

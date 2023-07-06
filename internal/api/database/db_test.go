@@ -268,13 +268,37 @@ func TestDeleteZone(t *testing.T) {
 	user1Id, _, err := db.AddUser(NewUser{Email: "dbUser1", Password: "dbUser1", Status: UserStatusActive})
 	Expect(err).To(BeNil())
 
-	zoneName := "zone1.com."
-	_, err = db.AddZone(user1Id, NewZone{Name: zoneName, Dnssec: true, CNameFlattening: true, Enabled: true, SOA: soa, NS: ns})
+	zone1Name := "zone1.com."
+	z1Id, err := db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: true, CNameFlattening: true, Enabled: true, SOA: soa, NS: ns})
+	Expect(err).To(BeNil())
+	l1 := "a"
+	l1Id, err := db.AddLocation(user1Id, NewLocation{ZoneName: zone1Name, Location: l1, Enabled: true})
+	Expect(err).To(BeNil())
+	r1 := &types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data: []types.IP_RR{
+			{
+				Ip: net.ParseIP("1.2.3.4"),
+			},
+		},
+	}
+	r1Id, err := db.AddRecordSet(user1Id, NewRecordSet{ZoneName: zone1Name, Location: l1, Enabled: true, Type: "a", Value: r1})
 	Expect(err).To(BeNil())
 
 	// delete
-	err = db.DeleteZone(user1Id, ZoneDelete{Name: zoneName})
+	err = db.DeleteZone(user1Id, ZoneDelete{Name: zone1Name})
 	Expect(err).To(BeNil())
+	_, err = db.GetZone(user1Id, zone1Name)
+	Expect(err).To(Equal(ErrNotFound))
+	exist, err := db.resourceExists(z1Id)
+	Expect(err).To(BeNil())
+	Expect(exist).To(BeFalse())
+	exist, err = db.resourceExists(l1Id)
+	Expect(err).To(BeNil())
+	Expect(exist).To(BeFalse())
+	exist, err = db.resourceExists(r1Id)
+	Expect(err).To(BeNil())
+	Expect(exist).To(BeFalse())
 
 	// non-existing zone
 	err = db.DeleteZone(user1Id, ZoneDelete{Name: "zone2.com."})
@@ -485,7 +509,17 @@ func TestDeleteLocation(t *testing.T) {
 	_, err = db.AddZone(user1Id, NewZone{Name: zone1Name, Dnssec: false, CNameFlattening: false, Enabled: true, SOA: soa, NS: ns})
 	Expect(err).To(BeNil())
 	l1 := "a"
-	_, err = db.AddLocation(user1Id, NewLocation{ZoneName: zone1Name, Location: l1, Enabled: true})
+	l1Id, err := db.AddLocation(user1Id, NewLocation{ZoneName: zone1Name, Location: l1, Enabled: true})
+	Expect(err).To(BeNil())
+	r1 := &types.IP_RRSet{
+		GenericRRSet: types.GenericRRSet{TtlValue: 300},
+		Data: []types.IP_RR{
+			{
+				Ip: net.ParseIP("1.2.3.4"),
+			},
+		},
+	}
+	r1Id, err := db.AddRecordSet(user1Id, NewRecordSet{ZoneName: zone1Name, Location: l1, Enabled: true, Type: "a", Value: r1})
 	Expect(err).To(BeNil())
 
 	// delete
@@ -493,6 +527,12 @@ func TestDeleteLocation(t *testing.T) {
 	Expect(err).To(BeNil())
 	_, err = db.GetLocation(user1Id, zone1Name, l1)
 	Expect(err).To(Equal(ErrNotFound))
+	exist, err := db.resourceExists(l1Id)
+	Expect(err).To(BeNil())
+	Expect(exist).To(BeFalse())
+	exist, err = db.resourceExists(r1Id)
+	Expect(err).To(BeNil())
+	Expect(exist).To(BeFalse())
 
 	// non-existing zone
 	err = db.DeleteLocation(user1Id, LocationDelete{ZoneName: "zone2.com.", Location: l1})
@@ -772,12 +812,15 @@ func TestDeleteRecordSet(t *testing.T) {
 			},
 		},
 	}
-	_, err = db.AddRecordSet(user1Id, NewRecordSet{ZoneName: zone1Name, Location: l1, Type: r1Type, Value: r1, Enabled: true})
+	r1Id, err := db.AddRecordSet(user1Id, NewRecordSet{ZoneName: zone1Name, Location: l1, Type: r1Type, Value: r1, Enabled: true})
 	Expect(err).To(BeNil())
 
 	// delete
 	err = db.DeleteRecordSet(user1Id, RecordSetDelete{ZoneName: zone1Name, Location: l1, Type: r1Type})
 	Expect(err).To(BeNil())
+	exists, err := db.resourceExists(r1Id)
+	Expect(err).To(BeNil())
+	Expect(exists).To(BeFalse())
 
 	// non-existing zone
 	err = db.DeleteRecordSet(user1Id, RecordSetDelete{ZoneName: "zone2.com.", Location: l1, Type: r1Type})

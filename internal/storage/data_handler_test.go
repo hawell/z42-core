@@ -17,7 +17,7 @@ import (
 
 var dataHandlerDefaultTestConfig = DataHandlerConfig{
 	ZoneCacheSize:      10000,
-	ZoneCacheTimeout:   60,
+	ZoneCacheTimeout:   1,
 	ZoneReload:         1,
 	RecordCacheSize:    1000000,
 	RecordCacheTimeout: 60,

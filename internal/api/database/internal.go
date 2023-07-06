@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
-	"z42-core/internal/types"
 	jsoniter "github.com/json-iterator/go"
+	"z42-core/internal/types"
 )
 
 func addUser(t *sql.Tx, userId ObjectId, u NewUser) error {
@@ -100,7 +100,13 @@ func updateZone(t *sql.Tx, zoneId ObjectId, z ZoneUpdate) error {
 }
 
 func deleteZone(t *sql.Tx, zoneId ObjectId) error {
-	_, err := t.Exec("DELETE FROM Resource WHERE Id = ?", zoneId)
+	_, err := t.Exec(
+		`
+			WITH LocationIds AS (SELECT Resource_Id AS Id FROM Location WHERE Zone_Id = ?),
+			RecordIds AS (SELECT Resource_Id AS Id FROM RecordSet WHERE Location_Id IN (SELECT * FROM LocationIds)),
+			Ids AS (SELECT ? AS Id UNION SELECT Id FROM RecordIds UNION SELECT Id FROM LocationIds)
+			DELETE FROM Resource WHERE Id IN (SELECT Id FROM Ids) 
+		`, zoneId, zoneId)
 	return err
 }
 
@@ -117,7 +123,7 @@ func updateLocation(t *sql.Tx, locationId ObjectId, l LocationUpdate) error {
 }
 
 func deleteLocation(t *sql.Tx, locationId ObjectId) error {
-	_, err := t.Exec("DELETE FROM Resource WHERE Id = ?", locationId)
+	_, err := t.Exec("WITH IDS AS (SELECT ? as Id UNION SELECT Resource_Id FROM RecordSet WHERE Location_Id = ?) DELETE FROM Resource WHERE Id IN (SELECT * FROM IDS)", locationId, locationId)
 	return err
 }
 
@@ -454,4 +460,14 @@ func (db *DataBase) updateAPIKey(userId ObjectId, model APIKeyUpdate) error {
 func (db *DataBase) deleteAPIKey(userId ObjectId, name string) error {
 	_, err := db.db.Exec("DELETE FROM APIKeys WHERE  User_Id = ? AND Name = ?", userId, name)
 	return err
+}
+
+func (db *DataBase) resourceExists(Id ObjectId) (bool, error) {
+	row := db.db.QueryRow("SELECT COUNT(*) FROM Resource WHERE Id = ?", Id)
+	var count int
+	err := row.Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count == 1, nil
 }
