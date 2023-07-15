@@ -213,9 +213,6 @@ func (db *DataBase) ImportZone(userId ObjectId, z ZoneImport) error {
 			}); err != nil {
 				return err
 			}
-			if err = setPrivileges(t, userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
-				return err
-			}
 			for rtype, rset := range location {
 				recordId, err := addResource(t, EmptyObjectId)
 				if err != nil {
@@ -228,9 +225,6 @@ func (db *DataBase) ImportZone(userId ObjectId, z ZoneImport) error {
 					Value:    rset,
 					Enabled:  true,
 				}); err != nil {
-					return err
-				}
-				if err := setPrivileges(t, userId, recordId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: false}); err != nil {
 					return err
 				}
 			}
@@ -263,9 +257,6 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 			if err != nil {
 				return err
 			}
-			if err = setPrivileges(t, userId, zoneId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
-				return err
-			}
 			if err = setSOA(t, zoneId, z.SOA); err != nil {
 				return err
 			}
@@ -282,9 +273,6 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 			if err != nil {
 				return err
 			}
-			if err = setPrivileges(t, userId, locationId, ACL{Read: true, List: true, Edit: false, Insert: true, Delete: false}); err != nil {
-				return err
-			}
 			nsRecord := NewRecordSet{Type: "ns", Value: &z.NS, Enabled: true}
 			nsId, err := addResource(t, EmptyObjectId)
 			if err != nil {
@@ -292,9 +280,6 @@ func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
 			}
 			err = addRecordSet(t, locationId, nsId, nsRecord)
 			if err != nil {
-				return err
-			}
-			if err := setPrivileges(t, userId, nsId, ACL{Read: true, List: true, Edit: false, Insert: false, Delete: false}); err != nil {
 				return err
 			}
 			if err = setZoneKeys(t, zoneId, z.Keys); err != nil {
@@ -326,8 +311,8 @@ func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
 	if err != nil {
 		return Zone{}, parseError(err)
 	}
-	if err := db.canGetZone(userId, zoneId); err != nil {
-		return Zone{}, parseError(err)
+	if !db.isAuthorized(userId, zoneName) {
+		return Zone{}, ErrUnauthorized
 	}
 	z, err := db.getZone(zoneId)
 	return z, parseError(err)
@@ -338,8 +323,8 @@ func (db *DataBase) UpdateZone(userId ObjectId, z ZoneUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if err := db.canUpdateZone(userId, zoneId); err != nil {
-		return parseError(err)
+	if !db.isAuthorized(userId, z.Name) {
+		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := updateZone(t, zoneId, z); err != nil {
@@ -361,14 +346,11 @@ func (db *DataBase) DeleteZone(userId ObjectId, z ZoneDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if err := db.canDeleteZone(userId, zoneId); err != nil {
-		return parseError(err)
+	if !db.isAuthorized(userId, z.Name) {
+		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := deleteZone(t, zoneId); err != nil {
-			return err
-		}
-		if err := deletePrivileges(t, zoneId); err != nil {
 			return err
 		}
 		if _, err := addEvent(t, zoneId, DeleteZone, z.Name); err != nil {
@@ -384,7 +366,7 @@ func (db *DataBase) AddLocation(userId ObjectId, l NewLocation) (ObjectId, error
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	if err := db.canAddLocation(userId, zoneId); err != nil {
+	if !db.isAuthorized(userId, l.ZoneName) {
 		return EmptyObjectId, parseError(err)
 	}
 	var locationId ObjectId
@@ -396,9 +378,6 @@ func (db *DataBase) AddLocation(userId ObjectId, l NewLocation) (ObjectId, error
 		}
 		err = addLocation(t, zoneId, locationId, l)
 		if err != nil {
-			return err
-		}
-		if err := setPrivileges(t, userId, locationId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
 			return err
 		}
 		if _, err := addEvent(t, zoneId, AddLocation, l); err != nil {
@@ -417,7 +396,7 @@ func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, co
 	if err != nil {
 		return List{}, parseError(err)
 	}
-	if err := db.canGetLocations(userId, zoneId); err != nil {
+	if !db.isAuthorized(userId, zoneName) {
 		return List{}, parseError(err)
 	}
 	res, err := db.getLocations(zoneId, start, count, q, ascendingOrder)
@@ -425,11 +404,11 @@ func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, co
 }
 
 func (db *DataBase) GetLocation(userId ObjectId, zoneName string, location string) (Location, error) {
-	zoneId, locationId, err := db.getLocationId(zoneName, location)
+	_, locationId, err := db.getLocationId(zoneName, location)
 	if err != nil {
 		return Location{}, parseError(err)
 	}
-	if err := db.canGetLocation(userId, zoneId, locationId); err != nil {
+	if !db.isAuthorized(userId, zoneName) {
 		return Location{}, parseError(err)
 	}
 	l, err := db.getLocation(locationId)
@@ -441,7 +420,7 @@ func (db *DataBase) UpdateLocation(userId ObjectId, l LocationUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if err := db.canUpdateLocation(userId, zoneId, locationId); err != nil {
+	if !db.isAuthorized(userId, l.ZoneName) {
 		return parseError(err)
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
@@ -461,7 +440,7 @@ func (db *DataBase) DeleteLocation(userId ObjectId, l LocationDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if err := db.canDeleteLocation(userId, zoneId, locationId); err != nil {
+	if !db.isAuthorized(userId, l.ZoneName) {
 		return parseError(err)
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
@@ -481,7 +460,7 @@ func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, err
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	if err := db.canAddRecordSet(userId, zoneId, locationId); err != nil {
+	if !db.isAuthorized(userId, r.ZoneName) {
 		return EmptyObjectId, parseError(err)
 	}
 	var recordId ObjectId
@@ -491,9 +470,6 @@ func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, err
 			return err
 		}
 		if err = addRecordSet(t, locationId, recordId, r); err != nil {
-			return err
-		}
-		if err = setPrivileges(t, userId, recordId, ACL{Read: true, List: true, Edit: true, Insert: true, Delete: true}); err != nil {
 			return err
 		}
 		if _, err = addEvent(t, zoneId, AddRecord, r); err != nil {
@@ -508,11 +484,11 @@ func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, err
 }
 
 func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location string) (List, error) {
-	zoneId, locationId, err := db.getLocationId(zoneName, location)
+	_, locationId, err := db.getLocationId(zoneName, location)
 	if err != nil {
 		return List{}, parseError(err)
 	}
-	if err := db.canGetRecordSets(userId, zoneId, locationId); err != nil {
+	if !db.isAuthorized(userId, zoneName) {
 		return List{}, parseError(err)
 	}
 	res, err := db.getRecordSets(locationId)
@@ -520,11 +496,11 @@ func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location str
 }
 
 func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location string, recordType string) (RecordSet, error) {
-	zoneId, locationId, recordId, err := db.getRecordId(zoneName, location, recordType)
+	_, _, recordId, err := db.getRecordId(zoneName, location, recordType)
 	if err != nil {
 		return RecordSet{}, parseError(err)
 	}
-	if err := db.canGetRecordSet(userId, zoneId, locationId, recordId); err != nil {
+	if !db.isAuthorized(userId, zoneName) {
 		return RecordSet{}, parseError(err)
 	}
 	r, err := db.getRecordSet(recordId, recordType)
@@ -532,11 +508,11 @@ func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location stri
 }
 
 func (db *DataBase) UpdateRecordSet(userId ObjectId, r RecordSetUpdate) error {
-	zoneId, locationId, recordId, err := db.getRecordId(r.ZoneName, r.Location, r.Type)
+	zoneId, _, recordId, err := db.getRecordId(r.ZoneName, r.Location, r.Type)
 	if err != nil {
 		return parseError(err)
 	}
-	if err := db.canUpdateRecordSet(userId, zoneId, locationId, recordId); err != nil {
+	if !db.isAuthorized(userId, r.ZoneName) {
 		return parseError(err)
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
@@ -552,11 +528,11 @@ func (db *DataBase) UpdateRecordSet(userId ObjectId, r RecordSetUpdate) error {
 }
 
 func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
-	zoneId, locationId, recordId, err := db.getRecordId(r.ZoneName, r.Location, r.Type)
+	zoneId, _, recordId, err := db.getRecordId(r.ZoneName, r.Location, r.Type)
 	if err != nil {
 		return parseError(err)
 	}
-	if err := db.canDeleteRecordSet(userId, zoneId, locationId, recordId); err != nil {
+	if !db.isAuthorized(userId, r.ZoneName) {
 		return parseError(err)
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {

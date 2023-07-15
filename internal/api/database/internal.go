@@ -471,3 +471,11 @@ func (db *DataBase) resourceExists(Id ObjectId) (bool, error) {
 	}
 	return count == 1, nil
 }
+
+func (db *DataBase) isAuthorized(userId ObjectId, zoneName string) bool {
+	owner, err := db.getZoneOwner(zoneName)
+	if err != nil || owner != userId {
+		return false
+	}
+	return true
+}
