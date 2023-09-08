@@ -511,7 +511,7 @@ func (rrset *TLSA_RRSet) Value(name string) []dns.RR {
 	for _, tlsa := range rrset.Data {
 		r := new(dns.TLSA)
 		r.Hdr = dns.RR_Header{Name: name, Rrtype: dns.TypeTLSA,
-			Class: dns.ClassNONE, Ttl: rrset.TtlValue}
+			Class: dns.ClassINET, Ttl: rrset.TtlValue}
 		r.Usage = tlsa.Usage
 		r.Selector = tlsa.Selector
 		r.MatchingType = tlsa.MatchingType
