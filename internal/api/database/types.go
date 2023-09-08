@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
-	"z42-core/internal/types"
 	jsoniter "github.com/json-iterator/go"
+	"z42-core/internal/types"
 )
 
 type ObjectId string
@@ -29,6 +29,15 @@ const (
 	UserStatusActive   UserStatus = "active"
 	UserStatusDisabled UserStatus = "disabled"
 	UserStatusPending  UserStatus = "pending"
+)
+
+type UserRole string
+
+const (
+	UserRoleOwner    UserRole = "owner"
+	UserRoleRead     UserRole = "read"
+	UserRoleWrite    UserRole = "write"
+	UserRoleDisabled UserRole = "disabled"
 )
 
 type NewUser struct {

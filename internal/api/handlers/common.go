@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
-	"z42-core/internal/api/database"
 	"go.uber.org/zap"
 	"net/http"
+	"z42-core/internal/api/database"
 )
 
 const IdentityKey = "identity"
@@ -25,13 +25,13 @@ func IsServerError(code int) bool {
 func StatusFromError(c *gin.Context, err error) (*gin.Context, int, string, error) {
 	switch err {
 	case database.ErrInvalid:
-		return c, http.StatusForbidden, "invalid request", err
+		return c, http.StatusInternalServerError, "invalid operation", err
 	case database.ErrDuplicateEntry:
 		return c, http.StatusConflict, "duplicate entry", err
 	case database.ErrNotFound:
 		return c, http.StatusNotFound, "entry not found", err
 	case database.ErrUnauthorized:
-		return c, http.StatusUnauthorized, "authorization failed", err
+		return c, http.StatusForbidden, "authorization failed", err
 	default:
 		return c, http.StatusInternalServerError, "internal error", err
 	}

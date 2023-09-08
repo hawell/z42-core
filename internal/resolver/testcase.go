@@ -56,7 +56,6 @@ func DefaultInitialize(testCase *TestCase) (*DnsRequestHandler, error) {
 func DefaultApplyAndVerify(testCase *TestCase, requestHandler *DnsRequestHandler, t *testing.T) {
 	RegisterTestingT(t)
 	for _, tc := range testCase.TestCases {
-
 		r := tc.Msg()
 		w := test.NewRecorder(&test.ResponseWriter{})
 		state := NewRequestContext(w, r)

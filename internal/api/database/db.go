@@ -60,11 +60,6 @@ func (db *DataBase) Close() error {
 func (db *DataBase) Clear(removeUsers bool) error {
 	var err error
 	err = db.withTransaction(func(t *sql.Tx) error {
-		if removeUsers {
-			if err := deleteUsers(t); err != nil {
-				return err
-			}
-		}
 		if err := deleteResources(t); err != nil {
 			return err
 		}
@@ -73,6 +68,11 @@ func (db *DataBase) Clear(removeUsers bool) error {
 		}
 		if err := deleteEvents(t); err != nil {
 			return err
+		}
+		if removeUsers {
+			if err := deleteUsers(t); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -133,16 +133,16 @@ func (db *DataBase) ResetPassword(code string, newPassword string) error {
 }
 
 func (db *DataBase) AddAPIKey(userId ObjectId, newAPIKey APIKeyItem) (string, error) {
-	owner, err := db.getZoneOwner(newAPIKey.ZoneName)
+	zoneId, err := db.getZoneId(newAPIKey.ZoneName)
+	if err != nil {
+		return "", parseError(err)
+	}
+	owner, err := db.getZoneOwner(zoneId)
 	if err != nil {
 		return "", parseError(err)
 	}
 	if owner != userId {
-		return "", ErrInvalid
-	}
-	zoneId, err := db.getZoneId(newAPIKey.ZoneName)
-	if err != nil {
-		return "", parseError(err)
+		return "", ErrUnauthorized
 	}
 	key := randomString(50)
 	hash, err := HashPassword(key)
@@ -186,16 +186,16 @@ func (db *DataBase) GetEvents(revision int, start int, count int) ([]Event, erro
 }
 
 func (db *DataBase) ImportZone(userId ObjectId, z ZoneImport) error {
-	owner, err := db.getZoneOwner(z.Name)
-	if err != nil {
-		return parseError(err)
-	}
 	zoneId, err := db.getZoneId(z.Name)
 	if err != nil {
 		return parseError(err)
 	}
+	owner, err := db.getZoneOwner(zoneId)
+	if err != nil {
+		return parseError(err)
+	}
 	if owner != userId {
-		return ErrInvalid
+		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := deleteZoneData(t, zoneId); err != nil {
@@ -241,64 +241,65 @@ func (db *DataBase) ImportZone(userId ObjectId, z ZoneImport) error {
 }
 
 func (db *DataBase) AddZone(userId ObjectId, z NewZone) (ObjectId, error) {
-	owner, err := db.getZoneOwner(z.Name)
+	exists, err := db.zoneExists(z.Name)
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	if owner == EmptyObjectId {
-		var zoneId ObjectId
-		err := db.withTransaction(func(t *sql.Tx) error {
-			var err error
-			zoneId, err = addResource(t, EmptyObjectId)
-			if err != nil {
-				return err
-			}
-			err = addZone(t, userId, zoneId, z)
-			if err != nil {
-				return err
-			}
-			if err = setSOA(t, zoneId, z.SOA); err != nil {
-				return err
-			}
-			rootLocation := NewLocation{
-				ZoneName: z.Name,
-				Location: "@",
-				Enabled:  true,
-			}
-			locationId, err := addResource(t, EmptyObjectId)
-			if err != nil {
-				return err
-			}
-			err = addLocation(t, zoneId, locationId, rootLocation)
-			if err != nil {
-				return err
-			}
-			nsRecord := NewRecordSet{Type: "ns", Value: &z.NS, Enabled: true}
-			nsId, err := addResource(t, EmptyObjectId)
-			if err != nil {
-				return err
-			}
-			err = addRecordSet(t, locationId, nsId, nsRecord)
-			if err != nil {
-				return err
-			}
-			if err = setZoneKeys(t, zoneId, z.Keys); err != nil {
-				return err
-			}
-			if _, err = addEvent(t, zoneId, AddZone, z); err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			return EmptyObjectId, parseError(err)
-		}
-		return zoneId, nil
-	}
-	if owner == userId {
+	if exists {
 		return EmptyObjectId, ErrDuplicateEntry
 	}
-	return EmptyObjectId, ErrInvalid
+	var zoneId ObjectId
+	err = db.withTransaction(func(t *sql.Tx) error {
+		var err error
+		zoneId, err = addResource(t, EmptyObjectId)
+		if err != nil {
+			return err
+		}
+		err = addZone(t, zoneId, z)
+		if err != nil {
+			return err
+		}
+		err = addUserZone(t, userId, zoneId)
+		if err != nil {
+			return err
+		}
+		if err = setSOA(t, zoneId, z.SOA); err != nil {
+			return err
+		}
+		rootLocation := NewLocation{
+			ZoneName: z.Name,
+			Location: "@",
+			Enabled:  true,
+		}
+		locationId, err := addResource(t, EmptyObjectId)
+		if err != nil {
+			return err
+		}
+		err = addLocation(t, zoneId, locationId, rootLocation)
+		if err != nil {
+			return err
+		}
+		nsRecord := NewRecordSet{Type: "ns", Value: &z.NS, Enabled: true}
+		nsId, err := addResource(t, EmptyObjectId)
+		if err != nil {
+			return err
+		}
+		err = addRecordSet(t, locationId, nsId, nsRecord)
+		if err != nil {
+			return err
+		}
+		if err = setZoneKeys(t, zoneId, z.Keys); err != nil {
+			return err
+		}
+		if _, err = addEvent(t, zoneId, AddZone, z); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return EmptyObjectId, parseError(err)
+	}
+	return zoneId, nil
 }
 
 func (db *DataBase) GetZones(userId ObjectId, start int, count int, q string, ascendingOrder bool) (List, error) {
@@ -311,7 +312,7 @@ func (db *DataBase) GetZone(userId ObjectId, zoneName string) (Zone, error) {
 	if err != nil {
 		return Zone{}, parseError(err)
 	}
-	if !db.isAuthorized(userId, zoneName) {
+	if !db.isAuthorized(userId, zoneId) {
 		return Zone{}, ErrUnauthorized
 	}
 	z, err := db.getZone(zoneId)
@@ -323,7 +324,7 @@ func (db *DataBase) UpdateZone(userId ObjectId, z ZoneUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if !db.isAuthorized(userId, z.Name) {
+	if !db.isAuthorized(userId, zoneId) {
 		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
@@ -346,10 +347,13 @@ func (db *DataBase) DeleteZone(userId ObjectId, z ZoneDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if !db.isAuthorized(userId, z.Name) {
+	if !db.isAuthorized(userId, zoneId) {
 		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
+		if err := deleteUserZone(t, userId, zoneId); err != nil {
+			return err
+		}
 		if err := deleteZone(t, zoneId); err != nil {
 			return err
 		}
@@ -366,8 +370,8 @@ func (db *DataBase) AddLocation(userId ObjectId, l NewLocation) (ObjectId, error
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	if !db.isAuthorized(userId, l.ZoneName) {
-		return EmptyObjectId, parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return EmptyObjectId, ErrUnauthorized
 	}
 	var locationId ObjectId
 	err = db.withTransaction(func(t *sql.Tx) error {
@@ -396,20 +400,20 @@ func (db *DataBase) GetLocations(userId ObjectId, zoneName string, start int, co
 	if err != nil {
 		return List{}, parseError(err)
 	}
-	if !db.isAuthorized(userId, zoneName) {
-		return List{}, parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return List{}, ErrUnauthorized
 	}
 	res, err := db.getLocations(zoneId, start, count, q, ascendingOrder)
 	return res, parseError(err)
 }
 
 func (db *DataBase) GetLocation(userId ObjectId, zoneName string, location string) (Location, error) {
-	_, locationId, err := db.getLocationId(zoneName, location)
+	zoneId, locationId, err := db.getLocationId(zoneName, location)
 	if err != nil {
 		return Location{}, parseError(err)
 	}
-	if !db.isAuthorized(userId, zoneName) {
-		return Location{}, parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return Location{}, ErrUnauthorized
 	}
 	l, err := db.getLocation(locationId)
 	return l, parseError(err)
@@ -420,8 +424,8 @@ func (db *DataBase) UpdateLocation(userId ObjectId, l LocationUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if !db.isAuthorized(userId, l.ZoneName) {
-		return parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := updateLocation(t, locationId, l); err != nil {
@@ -440,8 +444,8 @@ func (db *DataBase) DeleteLocation(userId ObjectId, l LocationDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if !db.isAuthorized(userId, l.ZoneName) {
-		return parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := deleteLocation(t, locationId); err != nil {
@@ -460,8 +464,8 @@ func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, err
 	if err != nil {
 		return EmptyObjectId, parseError(err)
 	}
-	if !db.isAuthorized(userId, r.ZoneName) {
-		return EmptyObjectId, parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return EmptyObjectId, ErrUnauthorized
 	}
 	var recordId ObjectId
 	err = db.withTransaction(func(t *sql.Tx) error {
@@ -484,24 +488,24 @@ func (db *DataBase) AddRecordSet(userId ObjectId, r NewRecordSet) (ObjectId, err
 }
 
 func (db *DataBase) GetRecordSets(userId ObjectId, zoneName string, location string) (List, error) {
-	_, locationId, err := db.getLocationId(zoneName, location)
+	zoneId, locationId, err := db.getLocationId(zoneName, location)
 	if err != nil {
 		return List{}, parseError(err)
 	}
-	if !db.isAuthorized(userId, zoneName) {
-		return List{}, parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return List{}, ErrUnauthorized
 	}
 	res, err := db.getRecordSets(locationId)
 	return res, parseError(err)
 }
 
 func (db *DataBase) GetRecordSet(userId ObjectId, zoneName string, location string, recordType string) (RecordSet, error) {
-	_, _, recordId, err := db.getRecordId(zoneName, location, recordType)
+	zoneId, _, recordId, err := db.getRecordId(zoneName, location, recordType)
 	if err != nil {
 		return RecordSet{}, parseError(err)
 	}
-	if !db.isAuthorized(userId, zoneName) {
-		return RecordSet{}, parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return RecordSet{}, ErrUnauthorized
 	}
 	r, err := db.getRecordSet(recordId, recordType)
 	return r, parseError(err)
@@ -512,8 +516,8 @@ func (db *DataBase) UpdateRecordSet(userId ObjectId, r RecordSetUpdate) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if !db.isAuthorized(userId, r.ZoneName) {
-		return parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := updateRecordSet(t, recordId, r); err != nil {
@@ -532,8 +536,8 @@ func (db *DataBase) DeleteRecordSet(userId ObjectId, r RecordSetDelete) error {
 	if err != nil {
 		return parseError(err)
 	}
-	if !db.isAuthorized(userId, r.ZoneName) {
-		return parseError(err)
+	if !db.isAuthorized(userId, zoneId) {
+		return ErrUnauthorized
 	}
 	err = db.withTransaction(func(t *sql.Tx) error {
 		if err := deleteRecordSet(t, recordId); err != nil {

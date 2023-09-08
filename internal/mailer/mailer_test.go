@@ -23,7 +23,7 @@ func TestSend(t *testing.T) {
 
 func TestSendWithAuthGMail(t *testing.T) {
 	RegisterTestingT(t)
-	//t.Skip("manual")
+	t.Skip("manual")
 	m, err := NewSMTP(&Config{
 		Address:       "smtp.gmail.com:465",
 		FromEmail:     "mail.zone42@gmail.com",

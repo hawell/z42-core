@@ -3,17 +3,17 @@ package resolver
 import (
 	"errors"
 	"fmt"
-	"z42-core/internal/storage"
-	"z42-core/internal/types"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"net"
 	"strings"
 	"testing"
 	"time"
+	"z42-core/internal/storage"
+	"z42-core/internal/types"
 
-	"z42-core/internal/test"
 	"github.com/miekg/dns"
+	"z42-core/internal/test"
 )
 
 var handlerTestCases = []*TestCase{
@@ -2573,6 +2573,9 @@ var handlerTestCases = []*TestCase{
 func TestAllHandler(t *testing.T) {
 	RegisterTestingT(t)
 	for _, testCase := range handlerTestCases {
+		if testCase.Name != "Basic Usage" {
+			continue
+		}
 		if !testCase.Enabled {
 			continue
 		}

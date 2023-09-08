@@ -83,12 +83,30 @@ func addResource(t *sql.Tx, resourceId ObjectId) (ObjectId, error) {
 }
 
 func deleteResources(t *sql.Tx) error {
-	_, err := t.Exec("DELETE FROM Resource")
+	_, err := t.Exec("DELETE FROM UserZone")
+	if err != nil {
+		return err
+	}
+	_, err = t.Exec("DELETE FROM Resource")
 	return err
 }
 
-func addZone(t *sql.Tx, userId ObjectId, resourceId ObjectId, z NewZone) error {
-	if _, err := t.Exec("INSERT INTO Zone(Resource_Id, Name, CNameFlattening, Dnssec, Enabled, User_Id) VALUES (?, ?, ?, ?, ?, ?)", resourceId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled, userId); err != nil {
+func addZone(t *sql.Tx, resourceId ObjectId, z NewZone) error {
+	if _, err := t.Exec("INSERT INTO Zone(Resource_Id, Name, CNameFlattening, Dnssec, Enabled) VALUES (?, ?, ?, ?, ?)", resourceId, z.Name, z.CNameFlattening, z.Dnssec, z.Enabled); err != nil {
+		return err
+	}
+	return nil
+}
+
+func addUserZone(t *sql.Tx, userId ObjectId, zoneId ObjectId) error {
+	if _, err := t.Exec("INSERT INTO UserZone(User_Id, Zone_Id, Role) VALUES (?, ?, ?)", userId, zoneId, UserRoleOwner); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteUserZone(t *sql.Tx, userId ObjectId, zoneId ObjectId) error {
+	if _, err := t.Exec("DELETE FROM UserZone WHERE User_Id = ? AND Zone_Id = ?", userId, zoneId); err != nil {
 		return err
 	}
 	return nil
@@ -196,11 +214,21 @@ func (db *DataBase) getZoneId(zoneName string) (ObjectId, error) {
 	return zoneId, nil
 }
 
+func (db *DataBase) zoneExists(zoneName string) (bool, error) {
+	res := db.db.QueryRow("SELECT count(*) FROM Zone WHERE Name = ?", zoneName)
+	var count int
+	err := res.Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count == 1, nil
+}
+
 func (db *DataBase) getZones(userId ObjectId, start int, count int, q string, ascendingOrder bool) (List, error) {
 	like := "%" + q + "%"
-	query := "SELECT Name, Enabled FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?"
+	query := "SELECT Name, Enabled FROM UserZone LEFT JOIN Zone ON UserZone.Zone_Id = Zone.Resource_Id WHERE User_Id = ? AND Name LIKE ? ORDER BY Name LIMIT ?, ?"
 	if !ascendingOrder {
-		query = "SELECT Name, Enabled FROM Zone WHERE User_Id = ? AND Name LIKE ? ORDER BY Name DESC LIMIT ?, ?"
+		query = "SELECT Name, Enabled FROM UserZone LEFT JOIN Zone ON UserZone.Zone_Id = Zone.Resource_Id WHERE User_Id = ? AND Name LIKE ? ORDER BY Name DESC LIMIT ?, ?"
 	}
 	rows, err := db.db.Query(query, userId, like, start, count)
 	if err != nil {
@@ -219,7 +247,7 @@ func (db *DataBase) getZones(userId ObjectId, start int, count int, q string, as
 		}
 		res.Items = append(res.Items, item)
 	}
-	row := db.db.QueryRow("SELECT count(*) FROM Zone WHERE User_Id = ? AND Name LIKE ?", userId, like)
+	row := db.db.QueryRow("SELECT count(*) FROM UserZone LEFT JOIN Zone ON UserZone.Zone_Id = Zone.Resource_Id WHERE User_Id = ? AND Name LIKE ?", userId, like)
 	if err := row.Scan(&res.Total); err != nil {
 		return List{}, err
 	}
@@ -385,8 +413,8 @@ func (db *DataBase) applyVerifiedAction(code string, verificationType Verificati
 	return err
 }
 
-func (db *DataBase) getZoneOwner(zoneName string) (ObjectId, error) {
-	res := db.db.QueryRow("SELECT User_Id FROM Zone WHERE Name = ?", zoneName)
+func (db *DataBase) getZoneOwner(zoneId ObjectId) (ObjectId, error) {
+	res := db.db.QueryRow("SELECT User_Id FROM UserZone WHERE Zone_Id = ? AND Role = ?", zoneId, UserRoleOwner)
 	var userId ObjectId
 	err := res.Scan(&userId)
 	if err != nil {
@@ -399,7 +427,7 @@ func (db *DataBase) getZoneOwner(zoneName string) (ObjectId, error) {
 }
 
 func (db *DataBase) getEvents(revision int, start int, count int) ([]Event, error) {
-	rows, err := db.db.Query("SELECT Revision, ZoneId, Type, Value FROM Events WHERE Revision > ? ORDER BY Revision LIMIT ?, ?", revision, start, count)
+	rows, err := db.db.Query("SELECT Revision, ZoneId, Type, Value FROM z42.Events WHERE Revision > ? ORDER BY Revision LIMIT ?, ?", revision, start, count)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +450,7 @@ func (db *DataBase) addAPIKey(userId ObjectId, zoneId ObjectId, apiKey APIKeyIte
 }
 
 func (db *DataBase) getAPIKeys(userId ObjectId) ([]APIKeyItem, error) {
-	rows, err := db.db.Query("SELECT T1.ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM (SELECT User_Id, Z.Resource_Id AS Zone_Id, Z.Name AS ZoneName FROM Zone Z WHERE Z.User_Id = ?) T1 JOIN APIKeys ON T1.User_Id = APIKeys.User_Id AND T1.Zone_Id = APIKeys.Zone_Id ORDER BY APIKeys.Name", userId)
+	rows, err := db.db.Query("SELECT Zone.Name AS ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM APIKeys LEFT JOIN Zone on APIKeys.Zone_Id = Zone.Resource_Id WHERE APIKeys.User_Id = ? ORDER BY APIKeys.Name", userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return []APIKeyItem{}, nil
@@ -443,7 +471,7 @@ func (db *DataBase) getAPIKeys(userId ObjectId) ([]APIKeyItem, error) {
 }
 
 func (db *DataBase) getAPIKey(userId ObjectId, name string) (APIKeyItem, error) {
-	row := db.db.QueryRow("SELECT T1.ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM (SELECT User_Id, Z.Resource_Id AS Zone_Id, Z.Name AS ZoneName FROM Zone Z WHERE Z.User_Id = ?) T1 JOIN APIKeys ON T1.User_Id = APIKeys.User_Id AND T1.Zone_Id = APIKeys.Zone_Id WHERE APIKeys.Name = ?", userId, name)
+	row := db.db.QueryRow("SELECT Zone.Name AS ZoneName, APIKeys.Name, APIKeys.Scope, APIKeys.Enabled FROM APIKeys LEFT JOIN Zone on APIKeys.Zone_Id = Zone.Resource_Id WHERE APIKeys.User_Id = ? AND APIKeys.Name = ?", userId, name)
 	var res APIKeyItem
 	err := row.Scan(&res.ZoneName, &res.Name, &res.Scope, &res.Enabled)
 	if err != nil {
@@ -472,8 +500,8 @@ func (db *DataBase) resourceExists(Id ObjectId) (bool, error) {
 	return count == 1, nil
 }
 
-func (db *DataBase) isAuthorized(userId ObjectId, zoneName string) bool {
-	owner, err := db.getZoneOwner(zoneName)
+func (db *DataBase) isAuthorized(userId ObjectId, zoneId ObjectId) bool {
+	owner, err := db.getZoneOwner(zoneId)
 	if err != nil || owner != userId {
 		return false
 	}

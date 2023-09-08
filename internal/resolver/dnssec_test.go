@@ -3,16 +3,16 @@ package resolver
 import (
 	"errors"
 	"fmt"
-	"z42-core/internal/dnssec"
-	"z42-core/internal/storage"
-	"z42-core/internal/test"
-	"z42-core/internal/types"
 	"github.com/miekg/dns"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"sort"
 	"strings"
 	"testing"
+	"z42-core/internal/dnssec"
+	"z42-core/internal/storage"
+	"z42-core/internal/test"
+	"z42-core/internal/types"
 )
 
 func DefaultDnssecInitialize() func(testCase *TestCase) (requestHandler *DnsRequestHandler, e error) {
