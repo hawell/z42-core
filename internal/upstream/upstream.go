@@ -56,6 +56,7 @@ func (u *Upstream) Query(location string, qtype uint16) ([]dns.RR, int) {
 	}
 	answer, err, _ := u.inflight.Do(key, func() (interface{}, error) {
 		m := new(dns.Msg)
+
 		m.SetQuestion(location, qtype)
 		for _, c := range u.connections {
 			r, _, err := c.client.Exchange(m, c.connectionStr)

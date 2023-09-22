@@ -109,6 +109,7 @@ var DefaultHandlerTestConfig = Config{
 		CountryDB: "../../assets/geoCity.mmdb",
 		ASNDB:     "../../assets/geoIsp.mmdb",
 	},
+	CookieSecret: "000102030405060708090a0b0c0d0e0f",
 }
 
 func CenterText(s string, w int) string {

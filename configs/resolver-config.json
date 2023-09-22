@@ -1,6 +1,6 @@
 {
   "event_log": {
-    "level": "ERROR",
+    "level": "DEBUG",
     "destination": "stderr"
   },
   "access_log": {
@@ -90,7 +90,8 @@
       "country_db": "/var/z42/geoCity.mmdb",
       "asn_db": "/var/z42/geoIsp.mmdb"
     },
-    "log_source_location": false
+    "log_source_location": false,
+    "cookie_secret": "000102030405060708090a0b0c0d0e0f"
   },
   "ratelimit": {
     "enable": false,

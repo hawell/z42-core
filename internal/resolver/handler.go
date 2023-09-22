@@ -1,14 +1,15 @@
 package resolver
 
 import (
-	"z42-core/internal/geotools"
-	"z42-core/internal/storage"
-	"z42-core/pkg/geoip"
+	"encoding/hex"
 	"go.uber.org/zap"
 	"net"
 	"strings"
 	"sync"
 	"time"
+	"z42-core/internal/geotools"
+	"z42-core/internal/storage"
+	"z42-core/pkg/geoip"
 
 	"z42-core/internal/dnssec"
 	"z42-core/internal/types"
@@ -23,6 +24,7 @@ type DnsRequestHandler struct {
 	requestLogger *zap.Logger
 	geoip         *geoip.GeoIp
 	upstream      *upstream.Upstream
+	cookieSecret  []byte
 	quit          chan struct{}
 	quitWG        sync.WaitGroup
 }
@@ -37,6 +39,7 @@ func NewHandler(config *Config, redisData *storage.DataHandler, requestLogger *z
 	h.geoip = geoip.NewGeoIp(&config.GeoIp)
 	h.upstream = upstream.NewUpstream(config.Upstream)
 	h.quit = make(chan struct{})
+	h.cookieSecret, _ = hex.DecodeString(config.CookieSecret)
 
 	return h
 }
@@ -64,6 +67,26 @@ func (h *DnsRequestHandler) HandleRequest(context *RequestContext) {
 		sourceIP := context.SourceIp
 		context.SourceCountry, _ = h.geoip.GetCountry(sourceIP)
 		context.SourceASN, _ = h.geoip.GetASN(sourceIP)
+	}
+
+	cCookie, sCookie, err := GetCookie(context.Req)
+	switch {
+	case err == CookieErrorNoCookie:
+		break
+	case err == CookieErrorBadFormat:
+		context.Res = dns.RcodeFormatError
+		h.response(context)
+	case sCookie != nil:
+		if CheckCookie(context, cCookie, sCookie, h.cookieSecret) {
+			CopyCookie(context, cCookie, sCookie, h.cookieSecret)
+			break
+		}
+		fallthrough
+	case sCookie == nil:
+		context.Res = dns.RcodeBadCookie
+		SetNewCookie(context, cCookie, h.cookieSecret)
+		h.response(context)
+		return
 	}
 
 	zoneName := h.RedisData.FindZone(context.RawName())

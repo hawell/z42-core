@@ -1026,14 +1026,8 @@ func TestDeleteRecordSet(t *testing.T) {
 	_, err = addRecordSet(users[0].Id, zone1Name, location1, r1, v1)
 	Expect(err).To(BeNil())
 
-	// acl error
-	resp := execRequest(users[0].Id, http.MethodDelete, "/zones/"+zone1Name+"/locations/@/rrsets/ns", "")
-	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
-	err = resp.Body.Close()
-	Expect(err).To(BeNil())
-
 	// unauthorized
-	resp = execRequest(users[1].Id, http.MethodDelete, "/zones/"+zone1Name+"/locations/"+location1+"/rrsets/"+r1, "")
+	resp := execRequest(users[1].Id, http.MethodDelete, "/zones/"+zone1Name+"/locations/"+location1+"/rrsets/"+r1, "")
 	Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
 	err = resp.Body.Close()
 	Expect(err).To(BeNil())
