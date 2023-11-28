@@ -529,7 +529,7 @@ func orderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 
 	index := -1
 	if rrset.FilterConfig.Order == "weighted" && sum > 0 {
-		s := time.Now().Nanosecond() % sum
+		s := LehmerRandom(sum)
 		for i, x := range mask {
 			if x == types.IpMaskWhite {
 				// skip Ips with 0 weight
@@ -541,7 +541,7 @@ func orderIps(rrset *types.IP_RRSet, mask []int) []net.IP {
 			}
 		}
 	} else if rrset.FilterConfig.Order == "rr" || (rrset.FilterConfig.Order == "weighted" && sum == 0) {
-		r := time.Now().Nanosecond() % count
+		r := LehmerRandom(count)
 		for i, x := range mask {
 			if x == types.IpMaskWhite {
 				if r == 0 {
