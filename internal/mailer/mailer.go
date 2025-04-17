@@ -91,15 +91,18 @@ func (m *SMTP) send(toName string, toEmail string, subject string, body string) 
 		return err
 	}
 	if m.config.Auth.Username != "" {
-		conn, err := tls.Dial("tcp", m.config.Address, &tls.Config{
-			InsecureSkipVerify: true,
-			ServerName:         host,
-		})
+		conn, err := net.Dial("tcp", m.config.Address)
 		if err != nil {
 			return err
 		}
 		c, err = smtp.NewClient(conn, host)
 		if err != nil {
+			return err
+		}
+		tlsConfig := &tls.Config{
+			ServerName: host,
+		}
+		if err = c.StartTLS(tlsConfig); err != nil {
 			return err
 		}
 		err = c.Auth(smtp.PlainAuth("", m.config.Auth.Username, m.config.Auth.Password, host))

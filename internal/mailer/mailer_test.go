@@ -1,8 +1,9 @@
 package mailer
 
 import (
-	. "github.com/onsi/gomega"
 	"testing"
+
+	. "github.com/onsi/gomega"
 )
 
 func TestSend(t *testing.T) {
